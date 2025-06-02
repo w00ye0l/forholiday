@@ -121,14 +121,14 @@ const chartData = [
 
 const chartConfig = {
   visitors: {
-    label: "Visitors",
+    label: "방문자",
   },
   desktop: {
-    label: "Desktop",
+    label: "데스크톱",
     color: "hsl(var(--chart-1))",
   },
   mobile: {
-    label: "Mobile",
+    label: "모바일",
     color: "hsl(var(--chart-2))",
   },
 } satisfies ChartConfig;
@@ -160,10 +160,22 @@ export function ChartAreaInteractive() {
   return (
     <Card>
       <CardHeader className="relative">
-        <CardTitle>Total Visitors</CardTitle>
+        <CardTitle>총 방문자</CardTitle>
         <CardDescription>
-          <span className="hidden md:block">Total for the last 3 months</span>
-          <span className="@[540px]/card:hidden">Last 3 months</span>
+          <span className="hidden md:block">
+            {timeRange === "90d"
+              ? "최근 3개월간의 방문자 통계"
+              : timeRange === "30d"
+              ? "최근 30일간의 방문자 통계"
+              : "최근 7일간의 방문자 통계"}
+          </span>
+          <span className="block md:hidden">
+            {timeRange === "90d"
+              ? "최근 3개월"
+              : timeRange === "30d"
+              ? "최근 30일"
+              : "최근 7일"}
+          </span>
         </CardDescription>
         <div className="absolute right-4 top-4">
           <ToggleGroup
@@ -171,34 +183,40 @@ export function ChartAreaInteractive() {
             value={timeRange}
             onValueChange={setTimeRange}
             variant="outline"
-            className="@[767px]/card:flex hidden"
+            className="hidden md:flex"
           >
-            <ToggleGroupItem value="90d" className="h-8 px-2.5">
-              Last 3 months
+            <ToggleGroupItem
+              value="90d"
+              className="h-8 px-3 rounded-none border-r-0"
+            >
+              최근 3개월
             </ToggleGroupItem>
-            <ToggleGroupItem value="30d" className="h-8 px-2.5">
-              Last 30 days
+            <ToggleGroupItem
+              value="30d"
+              className="h-8 px-3 rounded-none border-r-0"
+            >
+              최근 30일
             </ToggleGroupItem>
-            <ToggleGroupItem value="7d" className="h-8 px-2.5">
-              Last 7 days
+            <ToggleGroupItem value="7d" className="h-8 px-3 rounded-none">
+              최근 7일
             </ToggleGroupItem>
           </ToggleGroup>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger
-              className="@[767px]/card:hidden flex w-40"
-              aria-label="Select a value"
+              className="flex md:hidden w-40"
+              aria-label="기간 선택"
             >
-              <SelectValue placeholder="Last 3 months" />
+              <SelectValue placeholder="최근 3개월" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
               <SelectItem value="90d" className="rounded-lg">
-                Last 3 months
+                최근 3개월
               </SelectItem>
               <SelectItem value="30d" className="rounded-lg">
-                Last 30 days
+                최근 30일
               </SelectItem>
               <SelectItem value="7d" className="rounded-lg">
-                Last 7 days
+                최근 7일
               </SelectItem>
             </SelectContent>
           </Select>
@@ -245,8 +263,8 @@ export function ChartAreaInteractive() {
               minTickGap={32}
               tickFormatter={(value) => {
                 const date = new Date(value);
-                return date.toLocaleDateString("en-US", {
-                  month: "short",
+                return date.toLocaleDateString("ko-KR", {
+                  month: "long",
                   day: "numeric",
                 });
               }}
@@ -256,8 +274,8 @@ export function ChartAreaInteractive() {
               content={
                 <ChartTooltipContent
                   labelFormatter={(value) => {
-                    return new Date(value).toLocaleDateString("en-US", {
-                      month: "short",
+                    return new Date(value).toLocaleDateString("ko-KR", {
+                      month: "long",
                       day: "numeric",
                     });
                   }}

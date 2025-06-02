@@ -14,9 +14,9 @@ export function SectionCards() {
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 px-4 lg:px-6 *:data-[slot=card]:shadow-xs *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card">
       <Card>
         <CardHeader className="relative">
-          <CardDescription>Total Revenue</CardDescription>
+          <CardDescription>총 매출액</CardDescription>
           <CardTitle className="text-2xl md:text-3xl font-semibold tabular-nums">
-            $1,250.00
+            ₩1,620,000
           </CardTitle>
           <div className="absolute right-4 top-4">
             <Badge variant="outline" className="flex gap-1 rounded-lg text-xs">
@@ -27,16 +27,16 @@ export function SectionCards() {
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            Trending up this month <TrendingUpIcon className="size-4" />
+            이번 달 상승 추세 <TrendingUpIcon className="size-4" />
           </div>
           <div className="text-muted-foreground">
-            Visitors for the last 6 months
+            지난 6개월 간 방문자 수 기준
           </div>
         </CardFooter>
       </Card>
       <Card>
         <CardHeader className="relative">
-          <CardDescription>New Customers</CardDescription>
+          <CardDescription>신규 고객</CardDescription>
           <CardTitle className="text-2xl md:text-3xl font-semibold tabular-nums">
             1,234
           </CardTitle>
@@ -49,16 +49,14 @@ export function SectionCards() {
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            Down 20% this period <TrendingDownIcon className="size-4" />
+            이번 기간 20% 감소 <TrendingDownIcon className="size-4" />
           </div>
-          <div className="text-muted-foreground">
-            Acquisition needs attention
-          </div>
+          <div className="text-muted-foreground">고객 유치 전략 검토 필요</div>
         </CardFooter>
       </Card>
       <Card>
         <CardHeader className="relative">
-          <CardDescription>Active Accounts</CardDescription>
+          <CardDescription>활성 계정</CardDescription>
           <CardTitle className="text-2xl md:text-3xl font-semibold tabular-nums">
             45,678
           </CardTitle>
@@ -71,14 +69,14 @@ export function SectionCards() {
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            Strong user retention <TrendingUpIcon className="size-4" />
+            높은 사용자 유지율 <TrendingUpIcon className="size-4" />
           </div>
-          <div className="text-muted-foreground">Engagement exceed targets</div>
+          <div className="text-muted-foreground">참여도 목표 초과 달성</div>
         </CardFooter>
       </Card>
       <Card>
         <CardHeader className="relative">
-          <CardDescription>Growth Rate</CardDescription>
+          <CardDescription>성장률</CardDescription>
           <CardTitle className="text-2xl md:text-3xl font-semibold tabular-nums">
             4.5%
           </CardTitle>
@@ -91,9 +89,9 @@ export function SectionCards() {
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            Steady performance <TrendingUpIcon className="size-4" />
+            안정적인 성과 <TrendingUpIcon className="size-4" />
           </div>
-          <div className="text-muted-foreground">Meets growth projections</div>
+          <div className="text-muted-foreground">성장 목표 달성 중</div>
         </CardFooter>
       </Card>
     </div>
