@@ -1,28 +1,23 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
-  ArrowUpCircleIcon,
-  BarChartIcon,
-  CameraIcon,
-  ClipboardListIcon,
-  DatabaseIcon,
-  FileCodeIcon,
-  FileIcon,
+  PlaneTakeoff,
+  BellIcon,
+  BoxIcon,
+  CalendarIcon,
   FileTextIcon,
-  FolderIcon,
   HelpCircleIcon,
-  LayoutDashboardIcon,
-  ListIcon,
-  SearchIcon,
+  PackageIcon,
+  PlusCircleIcon,
+  RotateCcwIcon,
   SettingsIcon,
-  UsersIcon,
-} from "lucide-react"
+} from "lucide-react";
 
-import { NavDocuments } from "@/components/nav-documents"
-import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
+import { NavStorage } from "@/components/nav-storage";
+import { NavRental } from "@/components/nav-rental";
+import { NavSystem } from "@/components/nav-system";
+import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -31,7 +26,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 const data = {
   user: {
@@ -39,116 +34,68 @@ const data = {
     email: "m@example.com",
     avatar: "/avatars/shadcn.jpg",
   },
-  navMain: [
+  rentalMenu: [
     {
-      title: "Dashboard",
+      title: "예약 현황",
       url: "#",
-      icon: LayoutDashboardIcon,
+      icon: CalendarIcon,
     },
     {
-      title: "Lifecycle",
+      title: "신규 예약",
       url: "#",
-      icon: ListIcon,
+      icon: PlusCircleIcon,
     },
     {
-      title: "Analytics",
+      title: "대여 관리",
       url: "#",
-      icon: BarChartIcon,
+      icon: BoxIcon,
     },
     {
-      title: "Projects",
+      title: "반납 관리",
       url: "#",
-      icon: FolderIcon,
-    },
-    {
-      title: "Team",
-      url: "#",
-      icon: UsersIcon,
+      icon: RotateCcwIcon,
     },
   ],
-  navClouds: [
+  systemMenu: [
     {
-      title: "Capture",
-      icon: CameraIcon,
-      isActive: true,
+      title: "알림 센터",
       url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
+      icon: BellIcon,
     },
     {
-      title: "Proposal",
+      title: "대여 통계",
+      url: "#",
       icon: FileTextIcon,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
     },
     {
-      title: "Prompts",
-      icon: FileCodeIcon,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Settings",
+      title: "환경설정",
       url: "#",
       icon: SettingsIcon,
     },
+  ],
+  storageMenu: [
     {
-      title: "Get Help",
+      name: "보관함 현황",
       url: "#",
-      icon: HelpCircleIcon,
+      icon: CalendarIcon,
     },
     {
-      title: "Search",
+      name: "물품 등록",
       url: "#",
-      icon: SearchIcon,
+      icon: PlusCircleIcon,
+    },
+    {
+      name: "입고 처리",
+      url: "#",
+      icon: PackageIcon,
+    },
+    {
+      name: "출고 처리",
+      url: "#",
+      icon: BoxIcon,
     },
   ],
-  documents: [
-    {
-      name: "Data Library",
-      url: "#",
-      icon: DatabaseIcon,
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: ClipboardListIcon,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: FileIcon,
-    },
-  ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -161,21 +108,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
               <a href="#">
-                <ArrowUpCircleIcon className="h-5 w-5" />
-                <span className="text-base font-semibold">Acme Inc.</span>
+                <PlaneTakeoff className="h-5 w-5" />
+                <span className="text-base font-semibold">FORHOLIDAY</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavRental items={data.rentalMenu} />
+        <NavStorage items={data.storageMenu} />
+        <NavSystem items={data.systemMenu} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }
