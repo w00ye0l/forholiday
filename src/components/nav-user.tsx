@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   BellIcon,
@@ -6,13 +6,9 @@ import {
   LogOutIcon,
   MoreVerticalIcon,
   UserCircleIcon,
-} from "lucide-react"
+} from "lucide-react";
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,24 +17,24 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 export function NavUser({
   user,
 }: {
   user: {
-    name: string
-    email: string
-    avatar: string
-  }
+    name: string;
+    email: string;
+    avatar: string;
+  };
 }) {
-  const { isMobile } = useSidebar()
+  const { isMobile } = useSidebar();
 
   return (
     <SidebarMenu>
@@ -84,27 +80,27 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <UserCircleIcon />
+              <DropdownMenuItem className="flex items-center gap-2">
+                <UserCircleIcon className="size-4" />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon />
+              <DropdownMenuItem className="flex items-center gap-2">
+                <CreditCardIcon className="size-4" />
                 Billing
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <BellIcon />
+              <DropdownMenuItem className="flex items-center gap-2">
+                <BellIcon className="size-4" />
                 Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <LogOutIcon />
+            <DropdownMenuItem className="flex items-center gap-2">
+              <LogOutIcon className="size-4" />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }
