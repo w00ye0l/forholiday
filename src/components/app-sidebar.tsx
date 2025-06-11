@@ -7,7 +7,6 @@ import {
   BoxIcon,
   CalendarIcon,
   FileTextIcon,
-  HelpCircleIcon,
   PackageIcon,
   PlusCircleIcon,
   RotateCcwIcon,
@@ -17,11 +16,9 @@ import {
 import { NavStorage } from "@/components/nav-storage";
 import { NavRental } from "@/components/nav-rental";
 import { NavSystem } from "@/components/nav-system";
-import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -120,9 +117,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavStorage items={data.storageMenu} />
         <NavSystem items={data.systemMenu} className="mt-auto" />
       </SidebarContent>
-      {/* <SidebarFooter>
-        <NavUser user={data.user} />
-      </SidebarFooter> */}
     </Sidebar>
   );
 }
