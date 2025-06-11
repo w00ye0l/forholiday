@@ -1,16 +1,44 @@
+"use client";
+
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { NavUser } from "@/components/nav-user";
+import { useAuth } from "@/context/auth-context";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { LogIn } from "lucide-react";
 
 export function SiteHeader() {
+  const { user } = useAuth();
+  const router = useRouter();
+
   return (
-    <header className="group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 flex h-12 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear">
-      <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-        <SidebarTrigger className="-ml-1" />
-        <Separator
-          orientation="vertical"
-          className="mx-2 data-[orientation=vertical]:h-4"
-        />
-        <h1 className="text-base font-medium">대시보드</h1>
+    <header className="sticky top-0 z-50 w-full border-b bg-background">
+      <div className="flex h-16 items-center gap-4 px-4">
+        <SidebarTrigger />
+        <Separator orientation="vertical" className="h-6" />
+        <div className="flex flex-1" />
+        {user ? (
+          <NavUser
+            user={{
+              name:
+                user.user_metadata?.full_name ||
+                user.email?.split("@")[0] ||
+                "",
+              email: user.email || "",
+            }}
+          />
+        ) : (
+          <Button
+            variant="ghost"
+            size="lg"
+            onClick={() => router.push("/login")}
+            className="gap-2"
+          >
+            <LogIn className="size-4" />
+            로그인
+          </Button>
+        )}
       </div>
     </header>
   );
