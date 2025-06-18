@@ -111,7 +111,7 @@ export default function RentalOutPage() {
   const locationLabels: Record<PickupMethod, string> = {
     T1: "터미널1",
     T2: "터미널2",
-    delivery: "배송",
+    delivery: "택배",
     office: "사무실",
     direct: "직접수령",
   };

@@ -18,7 +18,7 @@ import { RentalReservation, ReservationStatus } from "@/types/rental";
 import { Device, DEVICE_CATEGORY_LABELS } from "@/types/device";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { CalendarIcon, PencilIcon, PhoneIcon } from "lucide-react";
+import { CalendarIcon, PencilIcon, PhoneIcon, MapPinIcon } from "lucide-react";
 
 interface OutgoingListProps {
   rentals: RentalReservation[];
@@ -44,6 +44,15 @@ const CARD_BORDER_COLORS: Record<ReservationStatus, string> = {
   pending: "border-gray-200",
   picked_up: "border-blue-400",
   not_picked_up: "border-red-400",
+};
+
+// 수령 방법 라벨
+const PICKUP_METHOD_LABELS = {
+  T1: "터미널1",
+  T2: "터미널2",
+  delivery: "택배",
+  office: "사무실",
+  direct: "직접수령",
 };
 
 export function OutgoingList({
@@ -174,7 +183,7 @@ export function OutgoingList({
           <div className="flex flex-col gap-2 text-sm">
             <div className="flex gap-2 justify-between">
               {/* 메인 정보 (이름, 연락처, 시간) */}
-              <div className="flex flex-col justify-between">
+              <div className="flex flex-col justify-between gap-1">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-base">
                     {rental.renter_name}
@@ -185,6 +194,10 @@ export function OutgoingList({
                   <span className="text-xs text-gray-600">
                     {rental.renter_phone}
                   </span>
+                </div>
+                <div className="text-xs text-gray-600 flex gap-2 items-center">
+                  <MapPinIcon className="w-3 h-3" />
+                  <span>{PICKUP_METHOD_LABELS[rental.pickup_method]}</span>
                 </div>
                 <div className="text-xs text-gray-600 flex gap-2 items-center">
                   <CalendarIcon className="w-3 h-3" />
@@ -251,9 +264,11 @@ export function OutgoingList({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="pending">수령전</SelectItem>
-                      <SelectItem value="picked_up">수령완료</SelectItem>
-                      <SelectItem value="not_picked_up">미수령</SelectItem>
+                      {Object.entries(STATUS_LABELS).map(([status, label]) => (
+                        <SelectItem key={status} value={status}>
+                          {label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
