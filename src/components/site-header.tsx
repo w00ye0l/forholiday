@@ -13,7 +13,7 @@ export function SiteHeader() {
   const router = useRouter();
 
   return (
-    <header className="sticky top-0 w-full border-b bg-background">
+    <header className="sticky top-0 z-10 w-full border-b bg-background">
       <div className="flex h-16 items-center gap-4 px-4">
         <SidebarTrigger />
         <Separator orientation="vertical" className="h-6" />
@@ -32,7 +32,7 @@ export function SiteHeader() {
           <Button
             variant="ghost"
             size="lg"
-            onClick={() => router.push("/login")}
+            onClick={() => router.push("/auth/login")}
             className="gap-2"
           >
             <LogIn className="size-4" />

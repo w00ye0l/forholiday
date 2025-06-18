@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/context/auth-context";
+import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SiteHeader } from "@/components/site-header";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -19,17 +23,31 @@ export const metadata: Metadata = {
   description: "FORHOLIDAY는 휴가를 위한 장비 대여 플랫폼입니다.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const initialUser = user || null;
+
   return (
     <html lang="ko">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider initialUser={initialUser}>
+          <SidebarProvider>
+            <AppSidebar variant="inset" />
+            <SidebarInset>
+              <SiteHeader />
+              {children}
+            </SidebarInset>
+          </SidebarProvider>
+        </AuthProvider>
       </body>
     </html>
   );

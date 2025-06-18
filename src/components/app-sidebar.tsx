@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import {
-  PlaneTakeoff,
-  BellIcon,
+  ArrowRightIcon,
   BoxIcon,
   CalendarIcon,
   FileTextIcon,
@@ -24,73 +23,64 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import Image from "next/image";
 
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   rentalMenu: [
     {
-      title: "예약 현황",
-      url: "#",
+      title: "예약 목록",
+      url: "/rentals",
       icon: CalendarIcon,
     },
     {
       title: "신규 예약",
-      url: "#",
+      url: "/rentals/new",
       icon: PlusCircleIcon,
     },
     {
-      title: "대여 관리",
-      url: "#",
-      icon: BoxIcon,
+      title: "출고 관리",
+      url: "/rentals/out",
+      icon: ArrowRightIcon,
     },
     {
       title: "반납 관리",
-      url: "#",
+      url: "/rentals/return",
       icon: RotateCcwIcon,
-    },
-  ],
-  systemMenu: [
-    {
-      title: "알림 센터",
-      url: "#",
-      icon: BellIcon,
-    },
-    {
-      title: "대여 통계",
-      url: "#",
-      icon: FileTextIcon,
-    },
-    {
-      title: "환경설정",
-      url: "#",
-      icon: SettingsIcon,
     },
   ],
   storageMenu: [
     {
-      name: "보관함 현황",
-      url: "#",
+      title: "짐보관 현황",
+      url: "/storages",
       icon: CalendarIcon,
     },
     {
-      name: "물품 등록",
-      url: "#",
+      title: "짐보관 등록",
+      url: "/storages/new",
       icon: PlusCircleIcon,
     },
     {
-      name: "입고 처리",
-      url: "#",
+      title: "입출고 관리",
+      url: "/storages/manage",
       icon: PackageIcon,
     },
+  ],
+  systemMenu: [
     {
-      name: "출고 처리",
-      url: "#",
+      title: "기기 관리",
+      url: "/devices",
       icon: BoxIcon,
     },
+    // {
+    //   title: "대여 통계",
+    //   url: "#",
+    //   icon: FileTextIcon,
+    // },
+    // {
+    //   title: "환경설정",
+    //   url: "#",
+    //   icon: SettingsIcon,
+    // },
   ],
 };
 
@@ -104,9 +94,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="#">
-                <PlaneTakeoff className="h-5 w-5" />
-                <span className="text-base font-semibold">FORHOLIDAY</span>
+              <a href="/">
+                <Image
+                  src="/images/forholiday.png"
+                  alt="FORHOLIDAY"
+                  width={120}
+                  height={14}
+                  className="ml-2"
+                />
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -115,7 +110,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavRental items={data.rentalMenu} />
         <NavStorage items={data.storageMenu} />
-        <NavSystem items={data.systemMenu} className="mt-auto" />
+        <NavSystem items={data.systemMenu} />
       </SidebarContent>
     </Sidebar>
   );

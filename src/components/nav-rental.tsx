@@ -1,38 +1,53 @@
 "use client";
 
-import { type LucideIcon } from "lucide-react";
-
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuButton,
 } from "@/components/ui/sidebar";
 
-export function NavRental({
-  items,
-}: {
+interface NavRentalProps {
   items: {
     title: string;
     url: string;
-    icon?: LucideIcon;
+    icon: React.ComponentType<{ className?: string }>;
   }[];
-}) {
+  className?: string;
+}
+
+export function NavRental({ items, className }: NavRentalProps) {
+  const pathname = usePathname();
+
   return (
-    <SidebarGroup>
+    <SidebarGroup className={className}>
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarGroupLabel>장비 대여</SidebarGroupLabel>
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton tooltip={item.title}>
-                {item.icon && <item.icon />}
-                <span>{item.title}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {items.map((item) => {
+            const isActive = pathname === item.url;
+            return (
+              <SidebarMenuItem key={item.url}>
+                <SidebarMenuButton
+                  asChild
+                  className={cn(
+                    "data-[slot=sidebar-menu-button]:!p-1.5",
+                    isActive && "bg-gray-100"
+                  )}
+                >
+                  <Link href={item.url}>
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
