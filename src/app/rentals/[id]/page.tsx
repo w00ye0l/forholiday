@@ -18,12 +18,9 @@ interface RentalDetail extends RentalReservation {
 }
 
 const statusMap = {
-  pending: { label: "대기중", variant: "secondary" },
-  confirmed: { label: "확정됨", variant: "default" },
-  in_progress: { label: "진행중", variant: "primary" },
-  completed: { label: "완료됨", variant: "success" },
-  cancelled: { label: "취소됨", variant: "destructive" },
-  overdue: { label: "연체", variant: "warning" },
+  pending: { label: "수령전", variant: "secondary" },
+  picked_up: { label: "수령완료", variant: "default" },
+  not_picked_up: { label: "미수령", variant: "destructive" },
 } as const;
 
 const PICKUP_METHOD_LABELS = {
@@ -80,15 +77,20 @@ export default function RentalDetailPage() {
           throw rentalError;
         }
 
-        // 기기 정보 조회
-        const { data: device, error: deviceError } = await supabase
-          .from("devices")
-          .select("id, tag_name, category, status")
-          .eq("tag_name", rental.tag_name)
-          .single();
+        // 기기 정보 조회 (device_tag_name이 있을 때만)
+        let device = null;
+        if (rental.device_tag_name) {
+          const { data: deviceData, error: deviceError } = await supabase
+            .from("devices")
+            .select("id, tag_name, category, status")
+            .eq("tag_name", rental.device_tag_name)
+            .single();
 
-        if (deviceError) {
-          console.warn("기기 정보 조회 실패:", deviceError);
+          if (deviceError) {
+            console.warn("기기 정보 조회 실패:", deviceError);
+          } else {
+            device = deviceData;
+          }
         }
 
         // 예약과 기기 정보 조합
@@ -96,8 +98,8 @@ export default function RentalDetailPage() {
           ...rental,
           devices: device || {
             id: "",
-            tag_name: rental.tag_name,
-            category: "알 수 없음",
+            tag_name: rental.device_tag_name || "",
+            category: rental.device_category,
             status: "unknown",
           },
         };
@@ -146,10 +148,10 @@ export default function RentalDetailPage() {
           <ArrowLeft className="h-4 w-4" />
           뒤로가기
         </Button>
-        <h1 className="text-2xl font-bold text-teal-600">예약 상세 정보</h1>
+        <h1 className="text-2xl font-bold text-green-600">예약 상세 정보</h1>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-white rounded-lg border border-gray-200 shadow">
         <div className="overflow-hidden">
           <table className="w-full">
             <tbody>
@@ -275,9 +277,12 @@ export default function RentalDetailPage() {
           </table>
         </div>
 
-        <div className="p-6 border-t bg-gray-50">
+        <div className="p-6 border-t border-gray-200 rounded-b-lg bg-gray-50">
           <div className="flex gap-4">
-            <Button variant="default" className="bg-teal-600 hover:bg-teal-700">
+            <Button
+              variant="default"
+              className="bg-green-600 hover:bg-green-700"
+            >
               수정
             </Button>
             <Button variant="outline">삭제</Button>

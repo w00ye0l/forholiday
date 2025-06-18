@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { RentalReservation } from "@/types/rental";
+import { DEVICE_CATEGORY_LABELS } from "@/types/device";
 import {
   Table,
   TableBody,
@@ -24,12 +25,9 @@ interface RentalListProps {
 }
 
 const statusMap = {
-  pending: { label: "대기중", variant: "secondary" },
-  confirmed: { label: "확정됨", variant: "default" },
-  in_progress: { label: "진행중", variant: "primary" },
-  completed: { label: "완료됨", variant: "success" },
-  cancelled: { label: "취소됨", variant: "destructive" },
-  overdue: { label: "연체", variant: "warning" },
+  pending: { label: "수령전", variant: "secondary" },
+  picked_up: { label: "수령완료", variant: "default" },
+  not_picked_up: { label: "미수령", variant: "destructive" },
 } as const;
 
 export function RentalList({ rentals }: RentalListProps) {
@@ -60,9 +58,12 @@ export function RentalList({ rentals }: RentalListProps) {
             <TableCell>{rental.renter_name}</TableCell>
             <TableCell>
               <div>
-                <div className="font-medium">{rental.devices.category}</div>
+                <div className="font-medium">
+                  {DEVICE_CATEGORY_LABELS[rental.device_category] ||
+                    rental.device_category}
+                </div>
                 <div className="text-sm text-gray-500">
-                  {rental.devices.tag_name}
+                  {rental.device_tag_name || "미배정"}
                 </div>
               </div>
             </TableCell>

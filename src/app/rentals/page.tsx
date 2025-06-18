@@ -31,13 +31,15 @@ export default async function RentalsPage() {
     // 예약과 기기 정보를 매칭
     const rentalsWithDevices =
       rentals?.map((rental) => {
-        const device = devices?.find((d) => d.tag_name === rental.tag_name);
+        const device = rental.device_tag_name
+          ? devices?.find((d) => d.tag_name === rental.device_tag_name)
+          : null;
         return {
           ...rental,
           devices: device || {
             id: "",
-            tag_name: rental.tag_name,
-            category: "알 수 없음",
+            tag_name: rental.device_tag_name || "",
+            category: rental.device_category,
             status: "unknown",
           },
         };
@@ -46,7 +48,7 @@ export default async function RentalsPage() {
     return (
       <div className="container mx-auto py-8">
         <h1 className="text-2xl font-bold mb-8">예약 목록</h1>
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-2 rounded-lg shadow">
           {rentalsWithDevices.length === 0 ? (
             <div className="text-gray-500 text-center py-8">
               예약된 기기가 없습니다.

@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { Toaster } from "sonner";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -47,6 +48,7 @@ export default async function RootLayout({
               {children}
             </SidebarInset>
           </SidebarProvider>
+          <Toaster position="top-center" richColors />
         </AuthProvider>
       </body>
     </html>

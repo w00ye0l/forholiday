@@ -1,10 +1,7 @@
 export type ReservationStatus =
-  | "pending"
-  | "confirmed"
-  | "in_progress"
-  | "completed"
-  | "cancelled"
-  | "overdue";
+  | "pending" // 수령전
+  | "picked_up" // 수령완료
+  | "not_picked_up"; // 미수령
 export type PickupMethod = "T1" | "T2" | "delivery" | "office" | "direct";
 export type ReturnMethod = "T1" | "T2" | "delivery" | "office" | "direct";
 export type ReservationSite =
@@ -21,10 +18,13 @@ export type ReservationSite =
   | "waug"
   | "hanatour";
 
+import { DeviceCategory } from "./device";
+
 export interface RentalReservation {
   id: string;
   user_id: string;
-  tag_name: string;
+  device_category: DeviceCategory; // 예약 생성 시 입력
+  device_tag_name?: string; // 수령완료 시 입력 (nullable)
   status: ReservationStatus;
   pickup_date: string;
   pickup_time: string;
@@ -46,7 +46,7 @@ export interface RentalReservation {
 }
 
 export interface CreateRentalReservationDto {
-  tag_name: string;
+  device_category: DeviceCategory; // 예약 생성 시에는 카테고리만 입력
   pickup_date: string;
   pickup_time: string;
   return_date: string;

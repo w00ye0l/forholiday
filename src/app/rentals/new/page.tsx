@@ -132,7 +132,7 @@ export default function NewRentalPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex sm:flex-row flex-col justify-between items-center mb-4 gap-2">
         <h1 className="text-2xl font-bold">새 기기 렌탈 예약</h1>
         <div className="flex gap-2">
           <Button

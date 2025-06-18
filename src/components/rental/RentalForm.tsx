@@ -40,9 +40,11 @@ import {
 } from "@/types/rental";
 import {
   Device,
+  DeviceCategory,
   DEVICE_FEATURES,
   DEVICE_CATEGORY_LABELS,
 } from "@/types/device";
+import { useRouter } from "next/navigation";
 
 /**
  * 예약 폼 스키마
@@ -63,7 +65,30 @@ import {
  */
 
 const formSchema = z.object({
-  tag_name: z.string().min(1, "기기를 선택해주세요"),
+  device_category: z.enum(
+    [
+      "GP13",
+      "GP12",
+      "GP11",
+      "GP8",
+      "POCKET3",
+      "ACTION5",
+      "S23",
+      "S24",
+      "PS5",
+      "GLAMPAM",
+      "AIRWRAP",
+      "AIRSTRAIGHT",
+      "INSTA360",
+      "STROLLER",
+      "WAGON",
+      "MINIEVO",
+      "ETC",
+    ] as const,
+    {
+      required_error: "기기 카테고리를 선택해주세요",
+    }
+  ),
   pickup_date: z.date({
     required_error: "수령 날짜를 선택해주세요",
   }),
@@ -143,7 +168,7 @@ export function RentalForm({
   isSubmitting,
 }: RentalFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-
+  const router = useRouter();
   // 30분 단위 시간 옵션 생성
   const generateTimeOptions = () => {
     const times = [];
@@ -163,7 +188,7 @@ export function RentalForm({
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      tag_name: "",
+      device_category: undefined,
       pickup_time: "",
       return_time: "",
       pickup_method: undefined,
@@ -178,18 +203,15 @@ export function RentalForm({
     },
   });
 
-  const watchedTagName = form.watch("tag_name");
-  const selectedDevice = devices.find(
-    (device) => device.tag_name === watchedTagName
-  );
+  const watchedDeviceCategory = form.watch("device_category");
 
-  // 선택된 기기의 카테고리 확인
+  // 선택된 카테고리 확인
   const isPhoneDevice =
-    selectedDevice &&
-    DEVICE_FEATURES.PHONE_CATEGORIES.includes(selectedDevice.category);
+    watchedDeviceCategory &&
+    DEVICE_FEATURES.PHONE_CATEGORIES.includes(watchedDeviceCategory);
   const isCameraDevice =
-    selectedDevice &&
-    DEVICE_FEATURES.CAMERA_CATEGORIES.includes(selectedDevice.category);
+    watchedDeviceCategory &&
+    DEVICE_FEATURES.CAMERA_CATEGORIES.includes(watchedDeviceCategory);
 
   const handleSubmit = async (data: FormValues) => {
     try {
@@ -204,6 +226,8 @@ export function RentalForm({
 
       await onSubmit(formattedData);
       form.reset();
+      router.push("/rentals");
+      router.refresh();
     } catch (error) {
       console.error("예약 생성 중 오류 발생:", error);
     } finally {
@@ -358,26 +382,27 @@ export function RentalForm({
           />
         </div>
 
-        {/* 기기 선택 */}
+        {/* 기기 카테고리 선택 */}
         <FormField
           control={form.control}
-          name="tag_name"
+          name="device_category"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>기기 선택</FormLabel>
+              <FormLabel>기기 카테고리</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="기기를 선택해주세요" />
+                    <SelectValue placeholder="기기 카테고리를 선택해주세요" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {devices.map((device) => (
-                    <SelectItem key={device.tag_name} value={device.tag_name}>
-                      {device.tag_name} (
-                      {DEVICE_CATEGORY_LABELS[device.category]})
-                    </SelectItem>
-                  ))}
+                  {Object.entries(DEVICE_CATEGORY_LABELS).map(
+                    ([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    )
+                  )}
                 </SelectContent>
               </Select>
               <FormMessage />
