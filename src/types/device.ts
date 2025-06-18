@@ -46,6 +46,27 @@ export const DEVICE_CATEGORY_LABELS: Record<DeviceCategory, string> = {
   ETC: "기타",
 };
 
+// 카테고리 영어 라벨
+export const DEVICE_CATEGORY_LABELS_EN: Record<DeviceCategory, string> = {
+  GP13: "GP13",
+  GP12: "GP12",
+  GP11: "GP11",
+  GP8: "GP8",
+  POCKET3: "Pocket3",
+  ACTION5: "Action5",
+  S23: "S23",
+  S24: "S24",
+  PS5: "PS5",
+  GLAMPAM: "Glampam",
+  AIRWRAP: "Airwrap",
+  AIRSTRAIGHT: "Airstraight",
+  INSTA360: "Insta360",
+  STROLLER: "Stroller",
+  WAGON: "Wagon",
+  MINIEVO: "Minievo",
+  ETC: "Etc",
+};
+
 // 상태 한글 라벨
 export const DEVICE_STATUS_LABELS: Record<DeviceStatus, string> = {
   available: "사용가능",
