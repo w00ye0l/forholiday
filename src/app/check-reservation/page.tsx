@@ -7,26 +7,135 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { SearchIcon, CalendarIcon, PhoneIcon, MapPinIcon } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  SearchIcon,
+  CalendarIcon,
+  PhoneIcon,
+  MapPinIcon,
+  LanguagesIcon,
+} from "lucide-react";
 import { format } from "date-fns";
-import { ko } from "date-fns/locale";
+import { ko, enUS } from "date-fns/locale";
 import type { RentalReservation } from "@/types/rental";
-import { DEVICE_CATEGORY_LABELS } from "@/types/device";
+import {
+  DEVICE_CATEGORY_LABELS,
+  DEVICE_CATEGORY_LABELS_EN,
+} from "@/types/device";
 
-// 상태 라벨 매핑
-const STATUS_LABELS = {
-  pending: "수령전",
-  picked_up: "수령완료",
-  not_picked_up: "미수령",
-};
+// 언어별 번역
+const translations = {
+  ko: {
+    // 페이지 제목 및 설명
+    pageTitle: "예약 조회",
+    pageDescription: "예약 번호와 전화번호를 입력하여 예약 내역을 확인하세요.",
 
-// 수령/반납 방법 라벨
-const PICKUP_METHOD_LABELS = {
-  T1: "터미널1",
-  T2: "터미널2",
-  delivery: "택배",
-  office: "사무실",
-  direct: "직접수령",
+    // 검색 폼
+    searchFormTitle: "예약 정보 입력",
+    reservationIdLabel: "예약 번호",
+    reservationIdPlaceholder: "예약 번호를 입력하세요",
+    phoneLabel: "전화번호",
+    phonePlaceholder: "예약 시 입력한 전화번호를 입력하세요",
+    searchButton: "예약 조회",
+    searchingButton: "조회 중...",
+    resetButton: "초기화",
+
+    // 예약 정보 표시
+    reservationInfo: "예약 정보",
+    renterName: "예약자명",
+    phone: "연락처",
+    deviceInfo: "기기 정보",
+    pickupInfo: "수령 정보",
+    returnInfo: "반납 정보",
+    additionalOptions: "추가 옵션",
+    dataTransmission: "데이터 전송",
+    sdCard: "SD카드",
+    notes: "비고",
+    reservationDate: "예약일시",
+
+    // 상태 라벨
+    statusLabels: {
+      pending: "수령 전",
+      picked_up: "수령 완료",
+      not_picked_up: "미수령",
+    },
+
+    // 수령/반납 방법 라벨
+    pickupMethodLabels: {
+      T1: "터미널1",
+      T2: "터미널2",
+      delivery: "택배",
+      office: "사무실",
+      direct: "직접수령",
+    },
+
+    // 도움말
+    helpText1: "예약 번호는 예약 확인 메일 또는 문자에서 확인하실 수 있습니다.",
+    helpText2: "문의사항이 있으시면 고객센터로 연락해주세요.",
+
+    // 언어
+    language: "언어",
+  },
+  en: {
+    // Page title and description
+    pageTitle: "Check Reservation",
+    pageDescription:
+      "Enter your reservation number and phone number to check your reservation details.",
+
+    // Search form
+    searchFormTitle: "Enter Reservation Information",
+    reservationIdLabel: "Reservation Number",
+    reservationIdPlaceholder: "Enter your reservation number",
+    phoneLabel: "Phone Number",
+    phonePlaceholder: "Enter the phone number used for reservation",
+    searchButton: "Search Reservation",
+    searchingButton: "Searching...",
+    resetButton: "Reset",
+
+    // Reservation info display
+    reservationInfo: "Reservation Information",
+    renterName: "Customer Name",
+    phone: "Phone",
+    deviceInfo: "Device Information",
+    pickupInfo: "Pickup Information",
+    returnInfo: "Return Information",
+    additionalOptions: "Additional Options",
+    dataTransmission: "Data Transfer",
+    sdCard: "SD Card",
+    notes: "Notes",
+    reservationDate: "Reserved On",
+
+    // Status labels
+    statusLabels: {
+      pending: "Pending Pickup",
+      picked_up: "Picked Up",
+      not_picked_up: "Not Picked Up",
+    },
+
+    // Pickup/return method labels
+    pickupMethodLabels: {
+      T1: "Terminal 1",
+      T2: "Terminal 2",
+      delivery: "Delivery",
+      office: "Office",
+      direct: "Direct Pickup",
+    },
+
+    // Help text
+    helpText1:
+      "You can find your reservation number in the confirmation email or text message.",
+    helpText2:
+      "If you have any questions, please contact our customer service.",
+
+    // Language
+    language: "Language",
+  },
 };
 
 export default function CheckReservationPage() {
@@ -37,6 +146,10 @@ export default function CheckReservationPage() {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [language, setLanguage] = useState<"ko" | "en">("ko");
+
+  // 현재 언어의 번역 가져오기
+  const t = translations[language];
 
   const handleSearch = async () => {
     setLoading(true);
@@ -71,10 +184,30 @@ export default function CheckReservationPage() {
       <div className="container mx-auto max-w-2xl px-4">
         {/* 헤더 */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">예약 조회</h1>
-          <p className="text-gray-600">
-            예약 번호와 전화번호를 입력하여 예약 내역을 확인하세요
-          </p>
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex-1" />
+            <h1 className="text-2xl font-bold text-gray-900 flex-1">
+              {t.pageTitle}
+            </h1>
+            <div className="flex-1 flex justify-end">
+              <div className="flex items-center gap-2">
+                <LanguagesIcon className="w-4 h-4 text-gray-600" />
+                <Select
+                  value={language}
+                  onValueChange={(value: "ko" | "en") => setLanguage(value)}
+                >
+                  <SelectTrigger className="w-fit">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ko">한국어</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <p className="text-gray-600">{t.pageDescription}</p>
         </div>
 
         {/* 검색 폼 */}
@@ -82,33 +215,33 @@ export default function CheckReservationPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <SearchIcon className="w-5 h-5" />
-              예약 정보 입력
+              {t.searchFormTitle}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-3 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                예약 번호
+                {t.reservationIdLabel}
               </label>
               <Input
                 type="text"
-                placeholder="예약 번호를 입력하세요"
+                placeholder={t.reservationIdPlaceholder}
                 value={reservationId}
                 onChange={(e) => setReservationId(e.target.value)}
-                className="w-full"
+                className="w-full text-sm"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                전화번호
+                {t.phoneLabel}
               </label>
               <Input
                 type="tel"
-                placeholder="예약 시 입력한 전화번호를 입력하세요"
+                placeholder={t.phonePlaceholder}
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                className="w-full"
+                className="w-full text-sm"
               />
             </div>
 
@@ -124,14 +257,14 @@ export default function CheckReservationPage() {
                 disabled={loading}
                 className="flex-1"
               >
-                {loading ? "조회 중..." : "예약 조회"}
+                {loading ? t.searchingButton : t.searchButton}
               </Button>
               <Button
                 variant="outline"
                 onClick={handleReset}
                 disabled={loading}
               >
-                초기화
+                {t.resetButton}
               </Button>
             </div>
           </CardContent>
@@ -142,7 +275,7 @@ export default function CheckReservationPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>예약 정보</span>
+                <span>{t.reservationInfo}</span>
                 <Badge
                   variant={
                     reservation.status === "pending"
@@ -152,7 +285,7 @@ export default function CheckReservationPage() {
                       : "destructive"
                   }
                 >
-                  {STATUS_LABELS[reservation.status]}
+                  {t.statusLabels[reservation.status]}
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -161,13 +294,13 @@ export default function CheckReservationPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    예약자명
+                    {t.renterName}
                   </label>
                   <p className="font-medium">{reservation.renter_name}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    연락처
+                    {t.phone}
                   </label>
                   <div className="flex items-center gap-1">
                     <PhoneIcon className="w-4 h-4 text-gray-400" />
@@ -181,13 +314,14 @@ export default function CheckReservationPage() {
               {/* 기기 정보 */}
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">
-                  기기 정보
+                  {t.deviceInfo}
                 </label>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline">
-                    {DEVICE_CATEGORY_LABELS[reservation.device_category] ||
-                      reservation.device_category}
-                  </Badge>
+                  <span className="text-base font-bold text-green-600">
+                    {language === "ko"
+                      ? DEVICE_CATEGORY_LABELS[reservation.device_category]
+                      : DEVICE_CATEGORY_LABELS_EN[reservation.device_category]}
+                  </span>
                   {reservation.device_tag_name && (
                     <span className="text-sm text-gray-600">
                       ({reservation.device_tag_name})
@@ -202,24 +336,27 @@ export default function CheckReservationPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
-                    수령 정보
+                    {t.pickupInfo}
                   </label>
                   <div className="space-y-1">
                     <div className="flex items-center gap-1">
-                      <CalendarIcon className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm">
+                      <CalendarIcon className="w-4 h-4 text-green-600" />
+                      <span className="text-sm underline underline-offset-2 decoration-green-400 text-green-600 font-bold">
                         {format(
                           new Date(reservation.pickup_date),
-                          "yyyy년 MM월 dd일",
-                          { locale: ko }
-                        )}{" "}
+                          language === "ko"
+                            ? "yyyy년 MM월 dd일"
+                            : "MMM dd, yyyy",
+                          { locale: language === "ko" ? ko : enUS }
+                        )}
+                        {" / "}
                         {reservation.pickup_time.slice(0, 5)}
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <MapPinIcon className="w-4 h-4 text-gray-400" />
                       <span className="text-sm">
-                        {PICKUP_METHOD_LABELS[reservation.pickup_method]}
+                        {t.pickupMethodLabels[reservation.pickup_method]}
                       </span>
                     </div>
                   </div>
@@ -227,24 +364,27 @@ export default function CheckReservationPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
-                    반납 정보
+                    {t.returnInfo}
                   </label>
                   <div className="space-y-1">
                     <div className="flex items-center gap-1">
-                      <CalendarIcon className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm">
+                      <CalendarIcon className="w-4 h-4 text-green-600" />
+                      <span className="text-sm underline underline-offset-2 decoration-green-400 text-green-600 font-bold">
                         {format(
                           new Date(reservation.return_date),
-                          "yyyy년 MM월 dd일",
-                          { locale: ko }
-                        )}{" "}
+                          language === "ko"
+                            ? "yyyy년 MM월 dd일"
+                            : "MMM dd, yyyy",
+                          { locale: language === "ko" ? ko : enUS }
+                        )}
+                        {" / "}
                         {reservation.return_time.slice(0, 5)}
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <MapPinIcon className="w-4 h-4 text-gray-400" />
                       <span className="text-sm">
-                        {PICKUP_METHOD_LABELS[reservation.return_method]}
+                        {t.pickupMethodLabels[reservation.return_method]}
                       </span>
                     </div>
                   </div>
@@ -256,15 +396,15 @@ export default function CheckReservationPage() {
               {/* 추가 옵션 */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-600">
-                  추가 옵션
+                  {t.additionalOptions}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {reservation.data_transmission && (
-                    <Badge variant="secondary">데이터 전송</Badge>
+                    <Badge variant="secondary">{t.dataTransmission}</Badge>
                   )}
                   {reservation.sd_option && (
                     <Badge variant="secondary">
-                      SD카드 {reservation.sd_option}
+                      {t.sdCard} {reservation.sd_option}
                     </Badge>
                   )}
                 </div>
@@ -276,7 +416,7 @@ export default function CheckReservationPage() {
                   <Separator />
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">
-                      비고
+                      {t.notes}
                     </label>
                     <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
                       {reservation.description}
@@ -288,11 +428,13 @@ export default function CheckReservationPage() {
               {/* 예약 일시 */}
               <Separator />
               <div className="text-xs text-gray-500">
-                예약일시:{" "}
+                {t.reservationDate}:{" "}
                 {format(
                   new Date(reservation.created_at),
-                  "yyyy년 MM월 dd일 HH:mm",
-                  { locale: ko }
+                  language === "ko"
+                    ? "yyyy년 MM월 dd일 HH:mm"
+                    : "MMM dd, yyyy HH:mm",
+                  { locale: language === "ko" ? ko : enUS }
                 )}
               </div>
             </CardContent>
@@ -301,8 +443,8 @@ export default function CheckReservationPage() {
 
         {/* 도움말 */}
         <div className="mt-8 text-center text-sm text-gray-600">
-          <p>예약 번호는 예약 확인 메일 또는 문자에서 확인하실 수 있습니다.</p>
-          <p>문의사항이 있으시면 고객센터로 연락해주세요.</p>
+          <p>{t.helpText1}</p>
+          <p>{t.helpText2}</p>
         </div>
       </div>
     </div>
