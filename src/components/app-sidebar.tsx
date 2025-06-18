@@ -10,6 +10,7 @@ import {
   PlusCircleIcon,
   RotateCcwIcon,
   SettingsIcon,
+  UserIcon,
 } from "lucide-react";
 
 import { NavStorage } from "@/components/nav-storage";
@@ -71,11 +72,11 @@ const data = {
       url: "/devices",
       icon: BoxIcon,
     },
-    // {
-    //   title: "대여 통계",
-    //   url: "#",
-    //   icon: FileTextIcon,
-    // },
+    {
+      title: "고객 조회 페이지",
+      url: "/check-reservation",
+      icon: UserIcon,
+    },
     // {
     //   title: "환경설정",
     //   url: "#",
