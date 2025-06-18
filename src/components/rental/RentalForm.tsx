@@ -163,7 +163,18 @@ export function RentalForm({
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      tag_name: "",
+      pickup_time: "",
+      return_time: "",
+      pickup_method: undefined,
+      return_method: undefined,
+      renter_name: "",
+      renter_phone: "",
+      renter_address: "",
       data_transmission: false,
+      sd_option: undefined,
+      reservation_site: undefined,
+      description: "",
     },
   });
 

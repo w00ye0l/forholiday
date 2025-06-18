@@ -1,3 +1,6 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { RentalReservation } from "@/types/rental";
 import {
   Table,
@@ -30,23 +33,31 @@ const statusMap = {
 } as const;
 
 export function RentalList({ rentals }: RentalListProps) {
+  const router = useRouter();
+
+  const handleRowClick = (rentalId: string) => {
+    router.push(`/rentals/${rentalId}`);
+  };
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          {/* <TableHead>예약 번호</TableHead> */}
-          <TableHead>기기</TableHead>
-          <TableHead>수령 일시</TableHead>
-          <TableHead>반납 일시</TableHead>
+          <TableHead>고객명</TableHead>
+          <TableHead>대여기기</TableHead>
+          <TableHead>수령일</TableHead>
+          <TableHead>반납일</TableHead>
           <TableHead className="text-center">상태</TableHead>
-          <TableHead className="text-center">수령 방법</TableHead>
-          <TableHead className="text-center">반납 방법</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rentals.map((rental) => (
-          <TableRow key={rental.id}>
-            {/* <TableCell>{rental.id}</TableCell> */}
+          <TableRow
+            key={rental.id}
+            onClick={() => handleRowClick(rental.id)}
+            className="cursor-pointer hover:bg-gray-50 transition-colors"
+          >
+            <TableCell>{rental.renter_name}</TableCell>
             <TableCell>
               <div>
                 <div className="font-medium">{rental.devices.category}</div>
@@ -75,12 +86,6 @@ export function RentalList({ rentals }: RentalListProps) {
               <Badge variant={statusMap[rental.status].variant as any}>
                 {statusMap[rental.status].label}
               </Badge>
-            </TableCell>
-            <TableCell className="text-center">
-              {rental.pickup_method}
-            </TableCell>
-            <TableCell className="text-center">
-              {rental.return_method}
             </TableCell>
           </TableRow>
         ))}
