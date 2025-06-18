@@ -9,7 +9,6 @@ import {
 } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
 
 type AuthContextType = {
   user: User | null;
@@ -29,7 +28,6 @@ export function AuthProvider({
   const [user, setUser] = useState<User | null>(initialUser);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
-  const router = useRouter();
 
   useEffect(() => {
     // 초기 세션 확인
@@ -55,7 +53,8 @@ export function AuthProvider({
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    router.refresh(); // 로그아웃 후에도 상태를 새로고침
+    // 로그아웃 후 페이지를 완전히 새로고침하여 레이아웃 상태를 리셋
+    window.location.href = "/";
   };
 
   const value = {

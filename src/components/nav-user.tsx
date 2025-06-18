@@ -34,7 +34,7 @@ export function NavUser({
 
   const handleLogout = async () => {
     await signOut();
-    router.push("/");
+    // signOut에서 이미 페이지 이동을 처리하므로 추가 router.push 불필요
   };
 
   return (

@@ -7,6 +7,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { Toaster } from "sonner";
+import { headers } from "next/headers";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -35,19 +36,28 @@ export default async function RootLayout({
   } = await supabase.auth.getUser();
   const initialUser = user || null;
 
+  // 현재 경로 확인
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname") || "";
+  const isAuthPage = pathname.startsWith("/auth");
+
   return (
     <html lang="ko">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider initialUser={initialUser}>
-          <SidebarProvider>
-            <AppSidebar variant="inset" />
-            <SidebarInset>
-              <SiteHeader />
-              {children}
-            </SidebarInset>
-          </SidebarProvider>
+          {initialUser && !isAuthPage ? (
+            <SidebarProvider>
+              <AppSidebar variant="inset" />
+              <SidebarInset>
+                <SiteHeader />
+                {children}
+              </SidebarInset>
+            </SidebarProvider>
+          ) : (
+            <div className="min-h-screen">{children}</div>
+          )}
           <Toaster position="top-center" richColors />
         </AuthProvider>
       </body>
