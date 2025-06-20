@@ -47,7 +47,10 @@ export default async function RentalsPage() {
 
     return (
       <div className="container mx-auto py-8">
-        <h1 className="text-2xl font-bold mb-8">예약 목록</h1>
+        <h1 className="text-2xl font-bold mb-2">예약 목록</h1>
+        <p className="text-sm text-gray-500 mb-4">
+          목록을 선택하면 상세 정보 페이지로 이동합니다.
+        </p>
         <div className="bg-white p-2 rounded-lg shadow">
           {rentalsWithDevices.length === 0 ? (
             <div className="text-gray-500 text-center py-8">
