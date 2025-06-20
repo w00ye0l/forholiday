@@ -209,11 +209,11 @@ export default function RentalOutPage() {
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="all" className="text-xs">
+            <TabsTrigger value="all" className="text-sm">
               전체 ({getLocationCount("all")})
             </TabsTrigger>
             {pickupMethods.map((method) => (
-              <TabsTrigger key={method} value={method} className="text-xs">
+              <TabsTrigger key={method} value={method} className="text-sm">
                 {locationLabels[method]} ({getLocationCount(method)})
               </TabsTrigger>
             ))}
