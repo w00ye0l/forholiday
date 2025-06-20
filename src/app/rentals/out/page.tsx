@@ -17,6 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
@@ -31,11 +32,11 @@ export default function RentalOutPage() {
     []
   );
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
 
   // 검색 상태
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
-  const [locationFilter, setLocationFilter] = useState("all");
 
   const loadData = async () => {
     setLoading(true);
@@ -60,44 +61,6 @@ export default function RentalOutPage() {
     setLoading(false);
   };
 
-  // 검색 필터링 로직
-  useEffect(() => {
-    let filtered = rentals;
-
-    // 날짜 필터
-    if (dateFilter) {
-      const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      filtered = filtered.filter((rental) =>
-        rental.pickup_date.includes(filterDateString)
-      );
-    }
-
-    // 위치 필터
-    if (locationFilter && locationFilter !== "all") {
-      filtered = filtered.filter(
-        (rental) => rental.pickup_method === locationFilter
-      );
-    }
-
-    // 이름/기기명 검색
-    if (searchTerm && searchTerm.trim() !== "") {
-      const term = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter(
-        (rental) =>
-          rental.renter_name.toLowerCase().includes(term) ||
-          rental.device_category.toLowerCase().includes(term) ||
-          (rental.device_tag_name &&
-            rental.device_tag_name.toLowerCase().includes(term))
-      );
-    }
-
-    setFilteredRentals(filtered);
-  }, [rentals, searchTerm, dateFilter, locationFilter]);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
   // PickupMethod 타입에서 위치 목록 생성
   const pickupMethods: PickupMethod[] = [
     "T1",
@@ -116,10 +79,53 @@ export default function RentalOutPage() {
     direct: "직접수령",
   };
 
+  // 검색 필터링 로직
+  useEffect(() => {
+    let filtered = rentals;
+
+    // 날짜 필터
+    if (dateFilter) {
+      const filterDateString = format(dateFilter, "yyyy-MM-dd");
+      filtered = filtered.filter((rental) =>
+        rental.pickup_date.includes(filterDateString)
+      );
+    }
+
+    // 탭별 위치 필터
+    if (activeTab !== "all") {
+      filtered = filtered.filter(
+        (rental) => rental.pickup_method === activeTab
+      );
+    }
+
+    // 이름/기기명 검색
+    if (searchTerm && searchTerm.trim() !== "") {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(
+        (rental) =>
+          rental.renter_name.toLowerCase().includes(term) ||
+          rental.device_category.toLowerCase().includes(term) ||
+          (rental.device_tag_name &&
+            rental.device_tag_name.toLowerCase().includes(term))
+      );
+    }
+
+    setFilteredRentals(filtered);
+  }, [rentals, searchTerm, dateFilter, activeTab]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const handleReset = () => {
     setSearchTerm("");
     setDateFilter(undefined);
-    setLocationFilter("all");
+  };
+
+  // 각 위치별 예약 개수 계산
+  const getLocationCount = (location: PickupMethod | "all") => {
+    if (location === "all") return rentals.length;
+    return rentals.filter((rental) => rental.pickup_method === location).length;
   };
 
   return (
@@ -130,7 +136,7 @@ export default function RentalOutPage() {
 
       {/* 검색 필터 */}
       <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           {/* 이름/기기명 검색 */}
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
@@ -166,21 +172,6 @@ export default function RentalOutPage() {
             </PopoverContent>
           </Popover>
 
-          {/* 위치 필터 */}
-          <Select value={locationFilter} onValueChange={setLocationFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="수령 위치" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">전체 위치</SelectItem>
-              {pickupMethods.map((method) => (
-                <SelectItem key={method} value={method}>
-                  {locationLabels[method]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           {/* 초기화 버튼 */}
           <Button
             variant="outline"
@@ -193,7 +184,7 @@ export default function RentalOutPage() {
         </div>
 
         <div className="text-sm text-gray-600">
-          총 {filteredRentals.length}개의 예약 ({rentals.length}개 중)
+          총 {filteredRentals.length}개의 예약
         </div>
       </div>
 
@@ -216,7 +207,28 @@ export default function RentalOutPage() {
       {loading ? (
         <div className="text-center py-8">로딩 중...</div>
       ) : (
-        <OutgoingList rentals={filteredRentals} devices={devices} />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="all" className="text-xs">
+              전체 ({getLocationCount("all")})
+            </TabsTrigger>
+            {pickupMethods.map((method) => (
+              <TabsTrigger key={method} value={method} className="text-xs">
+                {locationLabels[method]} ({getLocationCount(method)})
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <TabsContent value="all" className="mt-4">
+            <OutgoingList rentals={filteredRentals} devices={devices} />
+          </TabsContent>
+
+          {pickupMethods.map((method) => (
+            <TabsContent key={method} value={method} className="mt-4">
+              <OutgoingList rentals={filteredRentals} devices={devices} />
+            </TabsContent>
+          ))}
+        </Tabs>
       )}
     </div>
   );
