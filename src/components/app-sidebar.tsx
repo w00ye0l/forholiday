@@ -23,6 +23,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import Image from "next/image";
 
@@ -51,18 +52,18 @@ const data = {
   ],
   storageMenu: [
     {
-      title: "짐보관 현황",
-      url: "/storages",
+      title: "짐보관 관리",
+      url: "/storage",
       icon: CalendarIcon,
     },
     {
-      title: "짐보관 등록",
-      url: "/storages/new",
+      title: "보관 예약",
+      url: "/storage/new",
       icon: PlusCircleIcon,
     },
     {
       title: "입출고 관리",
-      url: "/storages/manage",
+      url: "/storage/logistics",
       icon: PackageIcon,
     },
   ],
@@ -86,6 +87,13 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { setOpenMobile } = useSidebar();
+
+  const handleLogoClick = () => {
+    // 모바일에서 로고 클릭 시 사이드바 닫기
+    setOpenMobile(false);
+  };
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -95,7 +103,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="/">
+              <a href="/" onClick={handleLogoClick}>
                 <Image
                   src="/images/forholiday.png"
                   alt="FORHOLIDAY"

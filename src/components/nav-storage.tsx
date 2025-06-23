@@ -10,6 +10,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 interface NavStorageProps {
@@ -23,24 +24,31 @@ interface NavStorageProps {
 
 export function NavStorage({ items, className }: NavStorageProps) {
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
+
+  const handleLinkClick = () => {
+    // 모바일에서 링크 클릭 시 사이드바 닫기
+    setOpenMobile(false);
+  };
 
   return (
     <SidebarGroup className={className}>
       <SidebarGroupContent className="flex flex-col gap-2">
-        <SidebarGroupLabel>짐 보관</SidebarGroupLabel>
+        <SidebarGroupLabel className="text-base">짐 보관</SidebarGroupLabel>
         <SidebarMenu>
           {items.map((item) => {
             const isActive = pathname === item.url;
             return (
               <SidebarMenuItem key={item.url}>
                 <SidebarMenuButton
+                  size="lg"
                   asChild
                   className={cn(
-                    "data-[slot=sidebar-menu-button]:!p-1.5",
-                    isActive && "bg-gray-100"
+                    "data-[slot=sidebar-menu-button]:!p-1.5 text-base",
+                    isActive && "bg-gray-200 hover:bg-gray-200 text-gray-900"
                   )}
                 >
-                  <Link href={item.url}>
+                  <Link href={item.url} onClick={handleLinkClick}>
                     <item.icon className="h-4 w-4" />
                     <span>{item.title}</span>
                   </Link>
