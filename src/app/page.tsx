@@ -322,7 +322,7 @@ export default function Page() {
               오늘 출고 예정
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-3 md:p-6 pt-0">
+          <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
             <div className="text-2xl font-bold mb-2">
               {stats.todayRentals.length}건
             </div>
@@ -382,7 +382,7 @@ export default function Page() {
               내일 출고 예정
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-3 md:p-6 pt-0">
+          <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
             <div className="text-2xl font-bold mb-2">
               {stats.tomorrowRentals.length}건
             </div>
@@ -442,7 +442,7 @@ export default function Page() {
               오늘 보관 업무
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-3 md:p-6 pt-0">
+          <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
             <div className="text-2xl font-bold mb-2">
               {stats.todayStorage.length}건
             </div>
@@ -479,7 +479,7 @@ export default function Page() {
               이용 가능 기기
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-3 md:p-6 pt-0">
+          <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
             <div className="text-2xl font-bold mb-2">
               {stats.totalDevicesAvailable}대
             </div>
@@ -530,7 +530,7 @@ export default function Page() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="p-3 md:p-6 pt-0">
+          <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
             <Textarea
               placeholder="T1 터미널의 특이사항이나 중요한 공지사항을 입력하세요..."
               value={terminalNotes.T1}
@@ -567,7 +567,7 @@ export default function Page() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="p-3 md:p-6 pt-0">
+          <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
             <Textarea
               placeholder="T2 터미널의 특이사항이나 중요한 공지사항을 입력하세요..."
               value={terminalNotes.T2}
@@ -590,7 +590,7 @@ export default function Page() {
               오늘 출고 예정 상세 ({stats.todayRentals.length}건)
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-3 md:p-6 pt-0">
+          <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
             <div className="grid md:grid-cols-2 gap-3 md:gap-6">
               {/* T1 터미널 */}
               <div>
@@ -633,7 +633,7 @@ export default function Page() {
               내일 출고 예정 상세 ({stats.tomorrowRentals.length}건)
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-3 md:p-6 pt-0">
+          <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
             <div className="grid md:grid-cols-2 gap-3 md:gap-6">
               {/* T1 터미널 */}
               <div>
