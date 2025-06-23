@@ -21,6 +21,7 @@ import {
 import type { RentalReservation } from "@/types/rental";
 import type { StorageReservation } from "@/types/storage";
 import { DEVICE_CATEGORY_LABELS } from "@/types/device";
+import { toast } from "sonner";
 
 interface DashboardStats {
   todayRentals: RentalReservation[];
@@ -131,11 +132,16 @@ export default function Page() {
     setSavingNotes((prev) => ({ ...prev, [terminal]: true }));
 
     try {
-      const { error } = await supabase.from("terminal_notes").upsert({
-        terminal_id: terminal,
-        notes: terminalNotes[terminal],
-        updated_at: new Date().toISOString(),
-      });
+      const { error } = await supabase.from("terminal_notes").upsert(
+        {
+          terminal_id: terminal,
+          notes: terminalNotes[terminal],
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "terminal_id",
+        }
+      );
 
       if (error) {
         throw error;
@@ -144,6 +150,7 @@ export default function Page() {
       // 성공 피드백
       setTimeout(() => {
         setSavingNotes((prev) => ({ ...prev, [terminal]: false }));
+        toast.success("특이사항이 저장되었습니다.");
       }, 1000);
     } catch (error) {
       console.error("특이사항 저장 실패:", error);
