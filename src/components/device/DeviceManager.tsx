@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { Badge } from "../ui/badge";
 
 interface DeviceManagerProps {
   devices?: Device[];
@@ -76,7 +77,11 @@ export default function DeviceManager({
           <TableRow key={device.id}>
             <TableCell className="font-medium">{device.tag_name}</TableCell>
             <TableCell>{DEVICE_CATEGORY_LABELS[device.category]}</TableCell>
-            <TableCell>{DEVICE_STATUS_LABELS[device.status]}</TableCell>
+            <TableCell>
+              <Badge variant="outline">
+                {DEVICE_STATUS_LABELS[device.status]}
+              </Badge>
+            </TableCell>
             <TableCell>{device.created_at.slice(0, 10)}</TableCell>
             <TableCell className="text-right">
               <div className="flex justify-end gap-2">
