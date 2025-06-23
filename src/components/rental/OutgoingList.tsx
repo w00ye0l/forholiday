@@ -172,7 +172,7 @@ export function OutgoingList({
   };
 
   return (
-    <div className="space-y-1 sm:space-y-3">
+    <div className="grid gap-2 md:gap-4 md:grid-cols-2 xl:grid-cols-3">
       {rentals.map((rental) => (
         <Card
           key={rental.id}
@@ -342,7 +342,7 @@ export function OutgoingList({
       ))}
 
       {rentals.length === 0 && (
-        <div className="text-center py-6 text-gray-500 text-sm">
+        <div className="col-span-full text-center py-6 text-gray-500 text-sm">
           출고할 예약이 없습니다.
         </div>
       )}

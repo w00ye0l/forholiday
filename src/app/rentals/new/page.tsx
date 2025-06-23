@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus, RotateCcw, X } from "lucide-react";
 import { RentalForm } from "@/components/rental/RentalForm";
 import { CreateRentalReservationDto } from "@/types/rental";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Device } from "@/types/device";
 
 interface FormData {
   id: string;
@@ -14,38 +13,9 @@ interface FormData {
 }
 
 export default function NewRentalPage() {
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [forms, setForms] = useState<FormData[]>([
     { id: Date.now().toString(), isSubmitting: false },
   ]);
-
-  // 기기 목록 조회
-  useEffect(() => {
-    async function fetchDevices() {
-      try {
-        const supabase = createClient();
-        const { data, error } = await supabase
-          .from("devices")
-          .select("id, tag_name, category, status, created_at, updated_at")
-          .eq("status", "available");
-
-        if (error) {
-          setError(error.message);
-        } else {
-          setDevices(data || []);
-        }
-      } catch (err) {
-        setError("기기 목록을 불러오는데 실패했습니다.");
-        console.error("기기 조회 에러:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchDevices();
-  }, []);
 
   // 새 폼 추가
   const handleAddForm = () => {
@@ -76,6 +46,14 @@ export default function NewRentalPage() {
     );
   };
 
+  // 예약 번호 생성 함수
+  const generateReservationId = () => {
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `RT${dateStr}${randomStr}`;
+  };
+
   // 예약 생성 함수
   const createRental = async (
     formId: string,
@@ -85,7 +63,10 @@ export default function NewRentalPage() {
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.from("rental_reservations").insert(data);
+      const { error } = await supabase.from("rental_reservations").insert({
+        ...data,
+        reservation_id: generateReservationId(),
+      });
 
       if (error) {
         throw new Error(error.message);
@@ -102,36 +83,8 @@ export default function NewRentalPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="text-center">기기 목록을 불러오는 중...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="text-red-500 p-4 border border-red-300 rounded">
-          기기 목록을 불러오는데 실패했습니다: {error}
-        </div>
-      </div>
-    );
-  }
-
-  if (devices.length === 0) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="text-yellow-600 p-4 border border-yellow-300 rounded">
-          현재 사용 가능한 기기가 없습니다.
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8 max-w-4xl">
       <div className="flex sm:flex-row flex-col justify-between items-center mb-4 gap-2">
         <h1 className="text-2xl font-bold">새 기기 렌탈 예약</h1>
         <div className="flex gap-2">
@@ -178,7 +131,6 @@ export default function NewRentalPage() {
             <RentalForm
               key={form.id} // key를 추가하여 각 폼이 독립적으로 관리되도록 함
               onSubmit={(data) => createRental(form.id, data)}
-              devices={devices}
               isSubmitting={form.isSubmitting}
             />
           </div>

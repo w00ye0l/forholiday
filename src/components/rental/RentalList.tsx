@@ -41,6 +41,7 @@ export function RentalList({ rentals }: RentalListProps) {
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead>예약번호</TableHead>
           <TableHead>고객명</TableHead>
           <TableHead>대여기기</TableHead>
           <TableHead>수령일</TableHead>
@@ -55,6 +56,9 @@ export function RentalList({ rentals }: RentalListProps) {
             onClick={() => handleRowClick(rental.id)}
             className="cursor-pointer hover:bg-gray-50 transition-colors"
           >
+            <TableCell className="font-medium text-blue-600">
+              {rental.reservation_id}
+            </TableCell>
             <TableCell>{rental.renter_name}</TableCell>
             <TableCell>
               <div>

@@ -45,6 +45,7 @@ import {
   DEVICE_CATEGORY_LABELS,
 } from "@/types/device";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 /**
  * 예약 폼 스키마
@@ -125,7 +126,6 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface RentalFormProps {
   onSubmit: (data: CreateRentalReservationDto) => Promise<void>;
-  devices: Array<Device>;
   isSubmitting?: boolean;
 }
 
@@ -162,11 +162,7 @@ const RESERVATION_SITE_LABELS: Record<ReservationSite, string> = {
   hanatour: "하나투어",
 };
 
-export function RentalForm({
-  onSubmit,
-  devices,
-  isSubmitting,
-}: RentalFormProps) {
+export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   // 30분 단위 시간 옵션 생성
@@ -618,13 +614,15 @@ export function RentalForm({
           )}
         />
 
-        <Button
-          type="submit"
-          disabled={isLoading || isSubmitting}
-          className="w-full"
-        >
-          {isLoading || isSubmitting ? "예약 중..." : "예약하기"}
-        </Button>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" asChild>
+            <Link href="/rentals">취소</Link>
+          </Button>
+
+          <Button type="submit" disabled={isLoading || isSubmitting}>
+            {isLoading || isSubmitting ? "예약 중..." : "예약하기"}
+          </Button>
+        </div>
       </form>
     </Form>
   );

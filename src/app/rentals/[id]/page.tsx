@@ -208,7 +208,11 @@ export default function RentalDetailPage() {
                   수령일
                 </td>
                 <td className="px-4 py-3 text-gray-700">
-                  {rental.pickup_date} 오후 {rental.pickup_time}
+                  {rental.pickup_date}{" "}
+                  {parseInt(rental.pickup_time.slice(0, 2)) > 12
+                    ? "오후"
+                    : "오전"}{" "}
+                  {rental.pickup_time}
                 </td>
               </tr>
               <tr className="border-b">
@@ -216,7 +220,11 @@ export default function RentalDetailPage() {
                   반납일
                 </td>
                 <td className="px-4 py-3 text-gray-700">
-                  {rental.return_date} 오후 {rental.return_time}
+                  {rental.return_date}{" "}
+                  {parseInt(rental.return_time.slice(0, 2)) > 12
+                    ? "오후"
+                    : "오전"}{" "}
+                  {rental.return_time}
                 </td>
               </tr>
               <tr className="border-b">

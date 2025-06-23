@@ -72,11 +72,11 @@ export default function RentalOutPage() {
 
   // 위치별 한글 표시명 매핑
   const locationLabels: Record<PickupMethod, string> = {
-    T1: "터미널1",
-    T2: "터미널2",
+    T1: "T1",
+    T2: "T2",
     delivery: "택배",
     office: "사무실",
-    direct: "직접수령",
+    direct: "대면",
   };
 
   // 검색 필터링 로직
@@ -208,7 +208,7 @@ export default function RentalOutPage() {
         <div className="text-center py-8">로딩 중...</div>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto">
             <TabsTrigger value="all" className="text-sm">
               전체 ({getLocationCount("all")})
             </TabsTrigger>

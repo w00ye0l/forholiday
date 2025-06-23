@@ -40,7 +40,7 @@ export async function checkReservation(
     const { data, error } = await supabase
       .from("rental_reservations")
       .select("*")
-      .eq("id", reservationId.trim())
+      .eq("reservation_id", reservationId.trim())
       .eq("renter_phone", phoneNumber.trim())
       .single();
 
