@@ -11,6 +11,7 @@ import {
   RotateCcwIcon,
   SettingsIcon,
   UserIcon,
+  PlaneIcon,
 } from "lucide-react";
 
 import { NavStorage } from "@/components/nav-storage";
@@ -77,6 +78,11 @@ const data = {
       title: "고객 조회 페이지",
       url: "/check-reservation",
       icon: UserIcon,
+    },
+    {
+      title: "도착 체크인",
+      url: "/arrival-checkin",
+      icon: PlaneIcon,
     },
     // {
     //   title: "환경설정",

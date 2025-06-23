@@ -40,12 +40,20 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // 로그인이 필요 없는 페이지들
-  const publicPaths = ["/auth", "/check-reservation"];
+  const publicPaths = ["/auth", "/check-reservation", "/arrival-checkin"];
+
+  // API 경로는 별도로 체크 (공개 API들)
+  const publicApiPaths = ["/api/arrival-checkin"];
+
   const isPublicPath = publicPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );
 
-  if (!user && !isPublicPath) {
+  const isPublicApiPath = publicApiPaths.some((path) =>
+    request.nextUrl.pathname.startsWith(path)
+  );
+
+  if (!user && !isPublicPath && !isPublicApiPath) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
