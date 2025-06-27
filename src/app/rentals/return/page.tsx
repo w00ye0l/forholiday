@@ -14,7 +14,8 @@ import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import type { RentalReservation } from "@/types/rental";
+import type { RentalReservation, ReturnMethod } from "@/types/rental";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function RentalReturnPage() {
   const [rentals, setRentals] = useState<RentalReservation[]>([]);
@@ -26,6 +27,9 @@ export default function RentalReturnPage() {
   // 검색 상태 - 오늘 날짜를 기본값으로 설정
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(new Date());
+  const [activeLocationTab, setActiveLocationTab] = useState<
+    ReturnMethod | "all"
+  >("all");
 
   const loadData = async () => {
     setLoading(true);
@@ -55,6 +59,13 @@ export default function RentalReturnPage() {
       );
     }
 
+    // 장소별 필터 (반납 방법 기준)
+    if (activeLocationTab !== "all") {
+      filtered = filtered.filter(
+        (rental) => rental.return_method === activeLocationTab
+      );
+    }
+
     // 이름/기기명/예약번호 검색
     if (searchTerm && searchTerm.trim() !== "") {
       const term = searchTerm.toLowerCase().trim();
@@ -69,7 +80,7 @@ export default function RentalReturnPage() {
     }
 
     setFilteredRentals(filtered);
-  }, [rentals, searchTerm, dateFilter]);
+  }, [rentals, searchTerm, dateFilter, activeLocationTab]);
 
   useEffect(() => {
     loadData();
@@ -78,6 +89,7 @@ export default function RentalReturnPage() {
   const handleReset = () => {
     setSearchTerm("");
     setDateFilter(undefined);
+    setActiveLocationTab("all");
   };
 
   // 상태 업데이트 콜백 함수
@@ -85,23 +97,74 @@ export default function RentalReturnPage() {
     loadData();
   };
 
-  // 전체 상태별 개수 계산
-  const getTotalStatusCounts = () => {
+  // 장소별 개수 계산 (검색과 날짜 필터만 적용, 장소 필터는 제외)
+  const getLocationCounts = () => {
+    let baseFiltered = rentals;
+
+    // 날짜 필터 적용
+    if (dateFilter) {
+      const filterDateString = format(dateFilter, "yyyy-MM-dd");
+      baseFiltered = baseFiltered.filter((rental) =>
+        rental.return_date.includes(filterDateString)
+      );
+    }
+
+    // 검색 필터 적용
+    if (searchTerm && searchTerm.trim() !== "") {
+      const term = searchTerm.toLowerCase().trim();
+      baseFiltered = baseFiltered.filter(
+        (rental) =>
+          rental.renter_name.toLowerCase().includes(term) ||
+          rental.device_category.toLowerCase().includes(term) ||
+          rental.reservation_id.toLowerCase().includes(term) ||
+          (rental.device_tag_name &&
+            rental.device_tag_name.toLowerCase().includes(term))
+      );
+    }
+
     return {
-      picked_up: filteredRentals.filter(
-        (rental) => rental.status === "picked_up"
+      all: baseFiltered.length,
+      T1: baseFiltered.filter((rental) => rental.return_method === "T1").length,
+      T2: baseFiltered.filter((rental) => rental.return_method === "T2").length,
+      delivery: baseFiltered.filter(
+        (rental) => rental.return_method === "delivery"
       ).length,
-      not_picked_up: filteredRentals.filter(
-        (rental) => rental.status === "not_picked_up"
-      ).length,
+      office: baseFiltered.filter((rental) => rental.return_method === "office")
+        .length,
+      hotel: baseFiltered.filter((rental) => rental.return_method === "hotel")
+        .length,
     };
+  };
+
+  // 장소별 라벨 매핑
+  const LOCATION_LABELS = {
+    all: "전체",
+    T1: "T1",
+    T2: "T2",
+    delivery: "택배",
+    office: "사무실",
+    hotel: "호텔",
   };
 
   return (
     <div className="container mx-auto py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">반납 관리</h1>
-        <p className="text-sm text-gray-500 mt-2">기기 반납 및 상태 관리</p>
+        <h1 className="text-2xl font-bold">
+          반납 관리
+          {activeLocationTab !== "all" && (
+            <span className="text-lg text-blue-600 ml-2">
+              - {LOCATION_LABELS[activeLocationTab]}
+            </span>
+          )}
+        </h1>
+        <p className="text-sm text-gray-500 mt-2">
+          기기 반납 및 상태 관리
+          {activeLocationTab !== "all" && (
+            <span className="ml-2 text-blue-500">
+              ({LOCATION_LABELS[activeLocationTab]} 전용)
+            </span>
+          )}
+        </p>
       </div>
 
       {/* 검색 필터 */}
@@ -164,6 +227,56 @@ export default function RentalReturnPage() {
               <span className="font-medium text-blue-600">전체 기간</span>
             )}
             <span className="ml-2">총 {filteredRentals.length}개의 예약</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 장소별 탭 */}
+      <div className="mb-6">
+        <Tabs
+          value={activeLocationTab}
+          onValueChange={(value) =>
+            setActiveLocationTab(value as ReturnMethod | "all")
+          }
+        >
+          <TabsList className="grid w-full h-auto grid-cols-3 md:grid-cols-6">
+            {Object.entries(LOCATION_LABELS).map(([key, label]) => {
+              const count =
+                getLocationCounts()[key as keyof typeof LOCATION_LABELS];
+              return (
+                <TabsTrigger key={key} value={key} className="text-sm">
+                  <span className="font-medium text-center leading-tight">
+                    {label} ({count})
+                  </span>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
+
+        {/* 현재 선택된 탭 정보 */}
+        <div className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+          <div className="flex items-center justify-between">
+            <span>
+              <strong>{LOCATION_LABELS[activeLocationTab]}</strong> 반납 예정:{" "}
+              <span className="font-medium text-blue-600">
+                {filteredRentals.length}건
+              </span>
+            </span>
+            {activeLocationTab !== "all" && (
+              <span className="text-xs">
+                📍{" "}
+                {activeLocationTab === "T1"
+                  ? "인천공항 터미널1"
+                  : activeLocationTab === "T2"
+                  ? "인천공항 터미널2"
+                  : activeLocationTab === "delivery"
+                  ? "택배 반납"
+                  : activeLocationTab === "office"
+                  ? "사무실 반납"
+                  : "대면 반납"}
+              </span>
+            )}
           </div>
         </div>
       </div>
