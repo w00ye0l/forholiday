@@ -275,48 +275,13 @@ export default function RentalOutPage() {
         <div className="text-center py-8">로딩 중...</div>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto">
-            <TabsTrigger
-              value="all"
-              className="text-sm flex flex-col py-2 h-auto"
-            >
-              <span className="font-medium">전체</span>
-              <span className="text-xs text-gray-500">
-                {getLocationCount("all")}건
-              </span>
-              <div className="flex gap-1 text-xs mt-1">
-                <span className="text-gray-600">
-                  {getStatusCount("pending")}
-                </span>
-                <span className="text-blue-600">
-                  {getStatusCount("picked_up")}
-                </span>
-                <span className="text-red-600">
-                  {getStatusCount("not_picked_up")}
-                </span>
-              </div>
+          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
+            <TabsTrigger value="all" className="text-sm">
+              전체 ({getLocationCount("all")})
             </TabsTrigger>
             {pickupMethods.map((method) => (
-              <TabsTrigger
-                key={method}
-                value={method}
-                className="text-sm flex flex-col py-2 h-auto"
-              >
-                <span className="font-medium">{locationLabels[method]}</span>
-                <span className="text-xs text-gray-500">
-                  {getLocationCount(method)}건
-                </span>
-                <div className="flex gap-1 text-xs mt-1">
-                  <span className="text-gray-600">
-                    {getStatusCount("pending", method)}
-                  </span>
-                  <span className="text-blue-600">
-                    {getStatusCount("picked_up", method)}
-                  </span>
-                  <span className="text-red-600">
-                    {getStatusCount("not_picked_up", method)}
-                  </span>
-                </div>
+              <TabsTrigger key={method} value={method} className="text-sm">
+                {locationLabels[method]} ({getLocationCount(method)})
               </TabsTrigger>
             ))}
           </TabsList>
