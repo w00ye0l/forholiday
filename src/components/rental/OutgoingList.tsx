@@ -402,31 +402,31 @@ export function OutgoingList({
                       }))
                     }
                     placeholder="비고"
-                    className="h-7 text-xs w-fit"
+                    className="h-7 text-sm flex-1 min-w-0 bg-white border-gray-400"
                   />
                   <Button
                     size="sm"
                     onClick={() => handleNotesUpdate(rental.id)}
-                    className="h-7 w-7 p-0 text-xs"
+                    className="h-7 w-7 p-0 text-xs flex-shrink-0"
                   >
                     ✓
                   </Button>
                 </>
               ) : (
                 <>
-                  <div
-                    className="text-sm text-gray-600 truncate w-fit"
+                  <p
+                    className="text-sm text-gray-600 break-all min-w-0"
                     title={rental.description || "비고 없음"}
                   >
                     비고: {rental.description || "비고 없음"}
-                  </div>
+                  </p>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                     onClick={() =>
                       startEditingNotes(rental.id, rental.description)
                     }
-                    className="h-7 w-7 p-0 text-xs"
+                    className="h-7 w-7 p-0 text-xs flex-shrink-0"
                   >
                     <PencilIcon className="w-3 h-3" />
                   </Button>
@@ -434,7 +434,7 @@ export function OutgoingList({
               )}
 
               {isUpdating[rental.id] && (
-                <div className="animate-spin h-3 w-3 border border-blue-500 border-t-transparent rounded-full ml-1"></div>
+                <div className="animate-spin h-3 w-3 border border-blue-500 border-t-transparent rounded-full ml-1 flex-shrink-0"></div>
               )}
             </div>
           </div>
