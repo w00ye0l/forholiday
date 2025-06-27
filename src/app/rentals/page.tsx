@@ -7,20 +7,39 @@ import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   SearchIcon,
   RefreshCwIcon,
   ListIcon,
   BarChart3Icon,
   DownloadIcon,
+  CalendarIcon,
+  XIcon,
 } from "lucide-react";
 import { RentalReservation } from "@/types/rental";
 import {
   exportToExcel,
   transformRentalDataForExcel,
   transformRentalStatsForExcel,
+  cn,
 } from "@/lib/utils";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
 
 type RentalWithDevice = RentalReservation & {
   devices: {
@@ -31,6 +50,12 @@ type RentalWithDevice = RentalReservation & {
   };
 };
 
+const statusMap = {
+  pending: { label: "수령전", variant: "secondary" },
+  picked_up: { label: "수령완료", variant: "default" },
+  not_picked_up: { label: "미수령", variant: "destructive" },
+} as const;
+
 export default function RentalsPage() {
   const [rentals, setRentals] = useState<RentalWithDevice[]>([]);
   const [filteredRentals, setFilteredRentals] = useState<RentalWithDevice[]>(
@@ -38,9 +63,17 @@ export default function RentalsPage() {
   );
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("list");
   const [exporting, setExporting] = useState(false);
+
+  // Popover 상태 관리
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [endDateOpen, setEndDateOpen] = useState(false);
 
   const supabase = createClient();
 
@@ -95,26 +128,68 @@ export default function RentalsPage() {
     }
   };
 
-  // 검색 필터링 로직
+  // 검색 및 필터링 로직
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredRentals(rentals);
-      return;
+    let filtered = [...rentals];
+
+    // 텍스트 검색 필터링
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter((rental) => {
+        return (
+          rental.renter_name.toLowerCase().includes(term) ||
+          rental.renter_phone.includes(term) ||
+          rental.reservation_id.toLowerCase().includes(term) ||
+          (rental.device_tag_name &&
+            rental.device_tag_name.toLowerCase().includes(term))
+        );
+      });
     }
 
-    const term = searchTerm.toLowerCase().trim();
-    const filtered = rentals.filter((rental) => {
-      return (
-        rental.renter_name.toLowerCase().includes(term) ||
-        rental.renter_phone.includes(term) ||
-        rental.reservation_id.toLowerCase().includes(term) ||
-        (rental.device_tag_name &&
-          rental.device_tag_name.toLowerCase().includes(term))
-      );
-    });
+    // 날짜 필터링
+    if (startDate || endDate) {
+      filtered = filtered.filter((rental) => {
+        const pickupDate = new Date(rental.pickup_date);
+
+        // 시작일만 설정된 경우
+        if (startDate && !endDate) {
+          return pickupDate >= startDate;
+        }
+        // 종료일만 설정된 경우
+        if (!startDate && endDate) {
+          return pickupDate <= endDate;
+        }
+        // 둘 다 설정된 경우
+        if (startDate && endDate) {
+          return pickupDate >= startDate && pickupDate <= endDate;
+        }
+        return true;
+      });
+    }
+
+    // 카테고리 필터링
+    if (selectedCategory !== "all") {
+      filtered = filtered.filter((rental) => {
+        return rental.devices.category === selectedCategory;
+      });
+    }
+
+    // 상태 필터링
+    if (selectedStatus !== "all") {
+      filtered = filtered.filter((rental) => {
+        return rental.status === selectedStatus;
+      });
+    }
 
     setFilteredRentals(filtered);
-  }, [searchTerm, rentals]);
+  }, [
+    searchTerm,
+    startDate,
+    endDate,
+    selectedCategory,
+    selectedStatus,
+    rentals,
+  ]);
 
   useEffect(() => {
     fetchRentals();
@@ -122,6 +197,21 @@ export default function RentalsPage() {
 
   const handleReset = () => {
     setSearchTerm("");
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setSelectedCategory("all");
+    setSelectedStatus("all");
+  };
+
+  // 개별 날짜 초기화 함수
+  const clearStartDate = () => {
+    setStartDate(undefined);
+    setStartDateOpen(false);
+  };
+
+  const clearEndDate = () => {
+    setEndDate(undefined);
+    setEndDateOpen(false);
   };
 
   // 엑셀 출력 핸들러
@@ -132,10 +222,37 @@ export default function RentalsPage() {
       // 현재 필터링된 데이터를 엑셀 형식으로 변환
       const excelData = transformRentalDataForExcel(filteredRentals);
 
+      // 검색 조건 생성
+      const searchConditions = [];
+      if (searchTerm.trim()) {
+        searchConditions.push(`검색어: ${searchTerm}`);
+      }
+      if (startDate) {
+        searchConditions.push(
+          `시작일-${format(startDate, "yyyy-MM-dd", { locale: ko })}`
+        );
+      }
+      if (endDate) {
+        searchConditions.push(
+          `종료일-${format(endDate, "yyyy-MM-dd", { locale: ko })}`
+        );
+      }
+      if (selectedCategory !== "all") {
+        searchConditions.push(`카테고리-${selectedCategory}`);
+      }
+      if (selectedStatus !== "all") {
+        searchConditions.push(`상태-${selectedStatus}`);
+      }
+
+      const searchDescription =
+        searchConditions.length > 0
+          ? searchConditions.join(" | ")
+          : "전체 데이터";
+
       // 통계 데이터 생성
       const statsData = transformRentalStatsForExcel(
         filteredRentals,
-        searchTerm.trim() ? `검색: ${searchTerm}` : "전체 데이터"
+        searchDescription
       );
 
       // 엑셀 파일 생성 및 다운로드
@@ -156,6 +273,61 @@ export default function RentalsPage() {
     } finally {
       setExporting(false);
     }
+  };
+
+  // 고유한 카테고리 목록 추출
+  const getUniqueCategories = () => {
+    const categories = rentals
+      .map((rental) => rental.devices.category)
+      .filter((category) => category)
+      .filter((category, index, arr) => arr.indexOf(category) === index)
+      .sort();
+    return categories;
+  };
+
+  // 고유한 상태 목록 추출
+  const getUniqueStatuses = () => {
+    const statuses = rentals
+      .map((rental) => rental.status)
+      .filter((status) => status)
+      .filter((status, index, arr) => arr.indexOf(status) === index)
+      .sort();
+    return statuses;
+  };
+
+  // 필터 조건 표시 함수
+  const getFilterDescription = () => {
+    const conditions = [];
+
+    if (searchTerm.trim()) {
+      conditions.push(`검색: "${searchTerm}"`);
+    }
+
+    if (startDate && endDate) {
+      conditions.push(
+        `${format(startDate, "yyyy-MM-dd", { locale: ko })} ~ ${format(
+          endDate,
+          "yyyy-MM-dd",
+          { locale: ko }
+        )}`
+      );
+    } else if (startDate) {
+      conditions.push(
+        `${format(startDate, "yyyy-MM-dd", { locale: ko })} 이후`
+      );
+    } else if (endDate) {
+      conditions.push(`${format(endDate, "yyyy-MM-dd", { locale: ko })} 이전`);
+    }
+
+    if (selectedCategory !== "all") {
+      conditions.push(`카테고리-${selectedCategory}`);
+    }
+
+    if (selectedStatus !== "all") {
+      conditions.push(`상태-${selectedStatus}`);
+    }
+
+    return conditions.length > 0 ? conditions.join(" | ") : null;
   };
 
   if (error) {
@@ -198,11 +370,12 @@ export default function RentalsPage() {
 
         {/* 예약 목록 탭 */}
         <TabsContent value="list" className="space-y-6">
-          {/* 검색 필터 */}
+          {/* 검색 및 필터 */}
           <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* 검색 입력 */}
-              <div className="relative flex-1">
+            {/* 검색 및 필터 한 줄 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-center">
+              {/* 텍스트 검색 */}
+              <div className="relative lg:col-span-2">
                 <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
                 <Input
                   placeholder="고객명, 전화번호, 예약번호, 기기명으로 검색..."
@@ -212,9 +385,104 @@ export default function RentalsPage() {
                 />
               </div>
 
+              {/* 시작일 선택 */}
+              <div>
+                <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                  <div className="relative">
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal pr-8",
+                          !startDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {startDate ? (
+                          format(startDate, "yyyy-MM-dd", { locale: ko })
+                        ) : (
+                          <span>시작일 선택</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    {startDate && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-red-100"
+                        onClick={clearStartDate}
+                      >
+                        <XIcon className="h-3 w-3 text-gray-500 hover:text-red-500" />
+                      </Button>
+                    )}
+                  </div>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={startDate}
+                      onSelect={(date) => {
+                        setStartDate(date);
+                        setStartDateOpen(false);
+                      }}
+                      disabled={(date) => (endDate ? date > endDate : false)}
+                      locale={ko}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* 종료일 선택 */}
+              <div>
+                <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                  <div className="relative">
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal pr-8",
+                          !endDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {endDate ? (
+                          format(endDate, "yyyy-MM-dd", { locale: ko })
+                        ) : (
+                          <span>종료일 선택</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    {endDate && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-red-100"
+                        onClick={clearEndDate}
+                      >
+                        <XIcon className="h-3 w-3 text-gray-500 hover:text-red-500" />
+                      </Button>
+                    )}
+                  </div>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={endDate}
+                      onSelect={(date) => {
+                        setEndDate(date);
+                        setEndDateOpen(false);
+                      }}
+                      disabled={(date) =>
+                        startDate ? date < startDate : false
+                      }
+                      locale={ko}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
               {/* 버튼 그룹 */}
-              <div className="flex gap-2">
-                {/* 초기화 버튼 */}
+              <div className="flex gap-2 lg:col-span-2">
                 <Button
                   variant="outline"
                   onClick={handleReset}
@@ -224,7 +492,6 @@ export default function RentalsPage() {
                   초기화
                 </Button>
 
-                {/* 엑셀 출력 버튼 */}
                 <Button
                   variant="outline"
                   onClick={handleExportToExcel}
@@ -237,25 +504,66 @@ export default function RentalsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-sm text-gray-600">
-              <span>
-                {searchTerm.trim() ? (
-                  <>
-                    '
-                    <span className="font-medium text-blue-600">
-                      {searchTerm}
+            {/* 카테고리 및 상태 필터 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 카테고리 필터 */}
+              <div>
+                <Select
+                  value={selectedCategory}
+                  onValueChange={setSelectedCategory}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="카테고리 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체 카테고리</SelectItem>
+                    {getUniqueCategories().map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 상태 필터 */}
+              <div>
+                <Select
+                  value={selectedStatus}
+                  onValueChange={setSelectedStatus}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="상태 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체 상태</SelectItem>
+                    {getUniqueStatuses().map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {statusMap[status].label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* 필터 결과 표시 */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
+              <div className="space-y-1">
+                <span className="block">
+                  총 {filteredRentals.length}개의 예약
+                  {rentals.length !== filteredRentals.length && (
+                    <span className="text-gray-400 ml-2">
+                      (전체 {rentals.length}건 중)
                     </span>
-                    ' 검색 결과: {filteredRentals.length}건
-                  </>
-                ) : (
-                  <>총 {filteredRentals.length}개의 예약</>
-                )}
-              </span>
-              {searchTerm.trim() && (
-                <span className="text-xs">
-                  전체 {rentals.length}건 중 {filteredRentals.length}건 표시
+                  )}
                 </span>
-              )}
+                {getFilterDescription() && (
+                  <span className="block text-xs text-blue-600 font-medium">
+                    필터 조건: {getFilterDescription()}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
