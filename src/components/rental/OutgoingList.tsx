@@ -129,15 +129,40 @@ export function OutgoingList({
   };
 
   const handleDeviceSelect = async (id: string, selectedTagName: string) => {
-    if (!selectedTagName) return;
-
     try {
       setIsUpdating((prev) => ({ ...prev, [id]: true }));
 
+      // 플레이스홀더 선택 시 기기 할당 해제
+      if (selectedTagName === "placeholder") {
+        const { error } = await supabase
+          .from("rental_reservations")
+          .update({
+            device_tag_name: null,
+          })
+          .eq("id", id);
+
+        if (error) throw error;
+
+        setRentals((prev) =>
+          prev.map((rental) =>
+            rental.id === id
+              ? {
+                  ...rental,
+                  device_tag_name: undefined,
+                }
+              : rental
+          )
+        );
+
+        setSelectedDevices((prev) => ({ ...prev, [id]: "placeholder" }));
+        toast.success("기기 선택이 해제되었습니다.");
+        return;
+      }
+
+      // 실제 기기 할당
       const { error } = await supabase
         .from("rental_reservations")
         .update({
-          status: "picked_up",
           device_tag_name: selectedTagName,
         })
         .eq("id", id);
@@ -149,14 +174,60 @@ export function OutgoingList({
           rental.id === id
             ? {
                 ...rental,
-                status: "picked_up" as ReservationStatus,
                 device_tag_name: selectedTagName,
               }
             : rental
         )
       );
 
-      setSelectedDevices((prev) => ({ ...prev, [id]: "" }));
+      setSelectedDevices((prev) => ({ ...prev, [id]: selectedTagName }));
+      toast.success("기기가 할당되었습니다.");
+    } catch (error) {
+      console.error("기기 할당/해제 실패:", error);
+      toast.error("기기 할당/해제에 실패했습니다.");
+    } finally {
+      setIsUpdating((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  // 수령 완료 처리 함수 추가 (확인 단계 포함)
+  const handleCompletePickup = async (id: string) => {
+    const rental = rentals.find((r) => r.id === id);
+    if (!rental?.device_tag_name) {
+      toast.error("먼저 기기를 선택해주세요.");
+      return;
+    }
+
+    // 확인 단계 추가
+    const confirmed = window.confirm(
+      `${rental.renter_name}님의 ${rental.device_tag_name} 기기 수령을 완료 처리하시겠습니까?\n\n처리 후에는 상태가 '수령완료'로 변경됩니다.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsUpdating((prev) => ({ ...prev, [id]: true }));
+
+      const { error } = await supabase
+        .from("rental_reservations")
+        .update({
+          status: "picked_up",
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setRentals((prev) =>
+        prev.map((rental) =>
+          rental.id === id
+            ? {
+                ...rental,
+                status: "picked_up" as ReservationStatus,
+              }
+            : rental
+        )
+      );
+
       toast.success("수령 완료 처리되었습니다.");
     } catch (error) {
       console.error("수령 완료 처리 실패:", error);
@@ -210,25 +281,42 @@ export function OutgoingList({
                 </div>
               </div>
 
-              <div className="flex flex-col items-end gap-3 text-sm">
+              <div className="flex flex-col items-end gap-2 text-sm">
                 {/* 기기 선택/표시 */}
                 <div className="w-36">
                   {rental.status === "pending" ? (
                     <Select
-                      value={selectedDevices[rental.id] || ""}
-                      onValueChange={(value) =>
-                        handleDeviceSelect(rental.id, value)
+                      value={
+                        rental.device_tag_name ||
+                        selectedDevices[rental.id] ||
+                        "placeholder"
                       }
+                      onValueChange={(value) => {
+                        setSelectedDevices((prev) => ({
+                          ...prev,
+                          [rental.id]: value,
+                        }));
+                        handleDeviceSelect(rental.id, value);
+                      }}
                       disabled={isUpdating[rental.id]}
                     >
                       <SelectTrigger className="h-7 text-sm bg-white border-gray-400">
-                        <SelectValue
-                          placeholder={`${
-                            DEVICE_CATEGORY_LABELS[rental.device_category]
-                          } 선택`}
-                        />
+                        <SelectValue>
+                          {rental.device_tag_name ||
+                            (selectedDevices[rental.id] &&
+                            selectedDevices[rental.id] !== "placeholder"
+                              ? selectedDevices[rental.id]
+                              : `${
+                                  DEVICE_CATEGORY_LABELS[rental.device_category]
+                                } 선택`)}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="placeholder">
+                          {`${
+                            DEVICE_CATEGORY_LABELS[rental.device_category]
+                          } 선택`}
+                        </SelectItem>
                         {devices
                           .filter(
                             (device) =>
@@ -251,7 +339,19 @@ export function OutgoingList({
                   )}
                 </div>
 
-                {/* 상태 관리 */}
+                {/* 수령 완료 버튼 (pending 상태이고 기기가 할당된 경우에만 표시) */}
+                {rental.status === "pending" && rental.device_tag_name && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleCompletePickup(rental.id)}
+                    disabled={isUpdating[rental.id]}
+                    className="h-7 w-36 text-xs bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isUpdating[rental.id] ? "처리중..." : "수령 완료"}
+                  </Button>
+                )}
+
+                {/* 상태 수동 변경 (개발자/관리자용) */}
                 <div className="w-24">
                   <Select
                     value={rental.status}
@@ -260,7 +360,7 @@ export function OutgoingList({
                     }
                     disabled={isUpdating[rental.id]}
                   >
-                    <SelectTrigger className="h-7 text-sm bg-white border-gray-400">
+                    <SelectTrigger className="h-6 text-xs bg-white border-gray-300">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

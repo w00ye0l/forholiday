@@ -113,6 +113,33 @@ export default function RentalOutPage() {
     setFilteredRentals(filtered);
   }, [rentals, searchTerm, dateFilter, activeTab]);
 
+  // 탭 개수 계산용 필터링 (activeTab 제외, 검색 필터만 적용)
+  const getBaseFilteredRentals = () => {
+    let filtered = rentals;
+
+    // 날짜 필터
+    if (dateFilter) {
+      const filterDateString = format(dateFilter, "yyyy-MM-dd");
+      filtered = filtered.filter((rental) =>
+        rental.pickup_date.includes(filterDateString)
+      );
+    }
+
+    // 이름/기기명 검색
+    if (searchTerm && searchTerm.trim() !== "") {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(
+        (rental) =>
+          rental.renter_name.toLowerCase().includes(term) ||
+          rental.device_category.toLowerCase().includes(term) ||
+          (rental.device_tag_name &&
+            rental.device_tag_name.toLowerCase().includes(term))
+      );
+    }
+
+    return filtered;
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -122,16 +149,18 @@ export default function RentalOutPage() {
     setDateFilter(undefined);
   };
 
-  // 현재 필터링된 예약 기준으로 개수 계산 (실시간 업데이트)
+  // 탭 개수 계산 (검색 필터만 적용, activeTab 무관)
   const getLocationCount = (location: PickupMethod | "all") => {
-    if (location === "all") return filteredRentals.length;
-    return filteredRentals.filter((rental) => rental.pickup_method === location)
+    const baseFiltered = getBaseFilteredRentals();
+    if (location === "all") return baseFiltered.length;
+    return baseFiltered.filter((rental) => rental.pickup_method === location)
       .length;
   };
 
-  // 상태별 예약 개수 계산 (현재 필터링된 결과 기준)
+  // 상태별 예약 개수 계산 (검색 필터만 적용, activeTab 무관)
   const getStatusCount = (status: string, location?: PickupMethod | "all") => {
-    let filtered = filteredRentals.filter((rental) => rental.status === status);
+    const baseFiltered = getBaseFilteredRentals();
+    let filtered = baseFiltered.filter((rental) => rental.status === status);
 
     if (location && location !== "all") {
       filtered = filtered.filter((rental) => rental.pickup_method === location);
@@ -140,15 +169,15 @@ export default function RentalOutPage() {
     return filtered.length;
   };
 
-  // 전체 상태별 개수 (현재 필터링된 결과 기준)
+  // 전체 상태별 개수 (검색 필터만 적용)
   const getTotalStatusCounts = () => {
+    const baseFiltered = getBaseFilteredRentals();
     return {
-      pending: filteredRentals.filter((rental) => rental.status === "pending")
+      pending: baseFiltered.filter((rental) => rental.status === "pending")
         .length,
-      picked_up: filteredRentals.filter(
-        (rental) => rental.status === "picked_up"
-      ).length,
-      not_picked_up: filteredRentals.filter(
+      picked_up: baseFiltered.filter((rental) => rental.status === "picked_up")
+        .length,
+      not_picked_up: baseFiltered.filter(
         (rental) => rental.status === "not_picked_up"
       ).length,
     };
