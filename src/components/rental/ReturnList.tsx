@@ -1,0 +1,372 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { RentalReservation, ReservationStatus } from "@/types/rental";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
+import {
+  CalendarIcon,
+  PencilIcon,
+  PhoneIcon,
+  MapPinIcon,
+  CheckCircle,
+} from "lucide-react";
+
+interface ReturnListProps {
+  rentals: RentalReservation[];
+  onStatusUpdate?: () => void;
+}
+
+// 상태 라벨 매핑
+const STATUS_LABELS: Record<ReservationStatus, string> = {
+  pending: "수령전",
+  picked_up: "수령완료",
+  not_picked_up: "미수령",
+};
+
+// 상태별 색상 매핑 (배지용)
+const STATUS_COLORS: Record<ReservationStatus, string> = {
+  pending: "bg-gray-50 text-gray-800",
+  picked_up: "bg-blue-100 text-blue-800",
+  not_picked_up: "bg-red-100 text-red-800",
+};
+
+// 상태별 카드 배경 색상
+const CARD_BORDER_COLORS: Record<ReservationStatus, string> = {
+  pending: "border-gray-200",
+  picked_up: "border-blue-400",
+  not_picked_up: "border-red-400",
+};
+
+// 반납 방법 라벨
+const RETURN_METHOD_LABELS = {
+  T1: "터미널1",
+  T2: "터미널2",
+  delivery: "택배",
+  office: "사무실",
+  hotel: "호텔",
+};
+
+export function ReturnList({
+  rentals: initialRentals,
+  onStatusUpdate,
+}: ReturnListProps) {
+  const [rentals, setRentals] = useState(initialRentals);
+  const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
+
+  const supabase = createClient();
+
+  // props가 변경될 때 내부 상태 업데이트
+  useEffect(() => {
+    setRentals(initialRentals);
+  }, [initialRentals]);
+
+  const handleStatusChange = async (
+    id: string,
+    newStatus: ReservationStatus
+  ) => {
+    try {
+      setIsUpdating((prev) => ({ ...prev, [id]: true }));
+
+      const { error } = await supabase
+        .from("rental_reservations")
+        .update({ status: newStatus })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setRentals((prev) =>
+        prev.map((rental) =>
+          rental.id === id ? { ...rental, status: newStatus } : rental
+        )
+      );
+
+      toast.success("상태가 업데이트되었습니다.");
+      onStatusUpdate?.();
+    } catch (error) {
+      console.error("상태 업데이트 실패:", error);
+      toast.error("상태 업데이트에 실패했습니다.");
+    } finally {
+      setIsUpdating((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handleNotesUpdate = async (id: string) => {
+    try {
+      const noteText = notes[id] || "";
+
+      const { error } = await supabase
+        .from("rental_reservations")
+        .update({ description: noteText })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setRentals((prev) =>
+        prev.map((rental) =>
+          rental.id === id ? { ...rental, description: noteText } : rental
+        )
+      );
+
+      setEditingNotes((prev) => ({ ...prev, [id]: false }));
+      toast.success("비고가 업데이트되었습니다.");
+    } catch (error) {
+      console.error("비고 업데이트 실패:", error);
+      toast.error("비고 업데이트에 실패했습니다.");
+    }
+  };
+
+  // 반납 완료 처리 함수
+  const handleCompleteReturn = async (id: string) => {
+    const rental = rentals.find((r) => r.id === id);
+    if (!rental) return;
+
+    // 확인 단계 추가
+    const confirmed = window.confirm(
+      `${rental.renter_name}님의 ${
+        rental.device_tag_name || rental.device_category
+      } 기기 반납을 완료 처리하시겠습니까?\n\n처리 후에는 상태가 '반납완료'로 변경됩니다.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsUpdating((prev) => ({ ...prev, [id]: true }));
+
+      // 여기서는 일단 picked_up 상태를 유지하고, 추후 returned 상태 추가 시 변경
+      const { error } = await supabase
+        .from("rental_reservations")
+        .update({
+          // status: "returned", // 추후 returned 상태 추가 시 사용
+          description: (rental.description || "") + " [반납완료]",
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setRentals((prev) =>
+        prev.map((rental) =>
+          rental.id === id
+            ? {
+                ...rental,
+                description: (rental.description || "") + " [반납완료]",
+              }
+            : rental
+        )
+      );
+
+      toast.success("반납 완료 처리되었습니다.");
+      onStatusUpdate?.();
+    } catch (error) {
+      console.error("반납 완료 처리 실패:", error);
+      toast.error("반납 완료 처리에 실패했습니다.");
+    } finally {
+      setIsUpdating((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const startEditingNotes = (id: string, currentDescription?: string) => {
+    setEditingNotes((prev) => ({ ...prev, [id]: true }));
+    setNotes((prev) => ({ ...prev, [id]: currentDescription || "" }));
+  };
+
+  // 지연 반납 여부 확인 (오늘 기준)
+  const isOverdue = (returnDate: string) => {
+    const today = new Date();
+    const returnDateObj = new Date(returnDate);
+    return returnDateObj < today;
+  };
+
+  return (
+    <div className="grid gap-2 md:gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {rentals.map((rental) => (
+        <Card
+          key={rental.id}
+          className={`border-2 ${CARD_BORDER_COLORS[rental.status]} ${
+            STATUS_COLORS[rental.status]
+          } ${
+            isOverdue(rental.return_date) ? "border-red-500 bg-red-50" : ""
+          } p-3`}
+        >
+          <div className="flex flex-col gap-2 text-sm">
+            {/* 지연 반납 표시 */}
+            {isOverdue(rental.return_date) && (
+              <div className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded font-medium">
+                ⚠️ 지연 반납
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-between">
+              {/* 메인 정보 (이름, 연락처, 시간) */}
+              <div className="flex flex-col justify-between gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base">
+                    {rental.renter_name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <PhoneIcon className="w-3 h-3" />
+                  <span className="text-xs text-gray-600">
+                    {rental.renter_phone}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-600 flex gap-2 items-center">
+                  <MapPinIcon className="w-3 h-3" />
+                  <span>{RETURN_METHOD_LABELS[rental.return_method]}</span>
+                </div>
+                <div className="text-xs text-gray-600 flex gap-2 items-center">
+                  <CalendarIcon className="w-3 h-3" />
+                  <span>
+                    반납:{" "}
+                    {format(new Date(rental.return_date), "yyyy.MM.dd", {
+                      locale: ko,
+                    })}{" "}
+                    {rental.return_time.slice(0, 5)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-end gap-2 text-sm">
+                {/* 기기 정보 표시 */}
+                <div className="w-36">
+                  <div className="text-sm font-mono bg-white px-2 py-1 rounded border text-center">
+                    {rental.device_tag_name || rental.device_category}
+                  </div>
+                </div>
+
+                {/* 반납 완료 버튼 (picked_up 상태인 경우에만 표시) */}
+                {rental.status === "picked_up" &&
+                  !rental.description?.includes("[반납완료]") && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleCompleteReturn(rental.id)}
+                      disabled={isUpdating[rental.id]}
+                      className="h-7 w-36 text-xs bg-green-600 hover:bg-green-700"
+                    >
+                      {isUpdating[rental.id] ? "처리중..." : "반납 완료"}
+                    </Button>
+                  )}
+
+                {/* 반납 완료 표시 */}
+                {rental.description?.includes("[반납완료]") && (
+                  <div className="w-36">
+                    <Badge className="w-full justify-center text-xs bg-green-100 text-green-800 border-green-200">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      반납완료
+                    </Badge>
+                  </div>
+                )}
+
+                {/* 상태 수동 변경 (개발자/관리자용) */}
+                <div className="w-24">
+                  <Select
+                    value={rental.status}
+                    onValueChange={(value: ReservationStatus) =>
+                      handleStatusChange(rental.id, value)
+                    }
+                    disabled={isUpdating[rental.id]}
+                  >
+                    <SelectTrigger className="h-6 text-xs bg-white border-gray-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(STATUS_LABELS).map(([status, label]) => (
+                        <SelectItem key={status} value={status}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* SD 카드, 데이터 전송 옵션 */}
+            <div>
+              {rental.sd_option && (
+                <Badge variant="secondary" className="border-gray-400">
+                  SD카드 {rental.sd_option}
+                </Badge>
+              )}
+              {rental.data_transmission && (
+                <Badge variant="secondary" className="border-gray-400">
+                  데이터 전송
+                </Badge>
+              )}
+            </div>
+
+            {/* 비고 및 로딩 */}
+            <div className="flex items-center gap-1">
+              {editingNotes[rental.id] ? (
+                <>
+                  <Input
+                    value={notes[rental.id] || ""}
+                    onChange={(e) =>
+                      setNotes((prev) => ({
+                        ...prev,
+                        [rental.id]: e.target.value,
+                      }))
+                    }
+                    placeholder="비고"
+                    className="h-7 text-sm flex-1 min-w-0 bg-white border-gray-400"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => handleNotesUpdate(rental.id)}
+                    className="h-7 w-7 p-0 text-xs flex-shrink-0"
+                  >
+                    ✓
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p
+                    className="text-sm text-gray-600 break-all min-w-0"
+                    title={rental.description || "비고 없음"}
+                  >
+                    비고: {rental.description || "비고 없음"}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      startEditingNotes(rental.id, rental.description)
+                    }
+                    className="h-7 w-7 p-0 text-xs flex-shrink-0"
+                  >
+                    <PencilIcon className="w-3 h-3" />
+                  </Button>
+                </>
+              )}
+
+              {isUpdating[rental.id] && (
+                <div className="animate-spin h-3 w-3 border border-blue-500 border-t-transparent rounded-full ml-1 flex-shrink-0"></div>
+              )}
+            </div>
+          </div>
+        </Card>
+      ))}
+
+      {rentals.length === 0 && (
+        <div className="col-span-full text-center py-6 text-gray-500 text-sm">
+          반납할 예약이 없습니다.
+        </div>
+      )}
+    </div>
+  );
+}
