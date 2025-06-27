@@ -23,6 +23,7 @@ import { CalendarIcon, PencilIcon, PhoneIcon, MapPinIcon } from "lucide-react";
 interface OutgoingListProps {
   rentals: RentalReservation[];
   devices: Device[];
+  onStatusUpdate?: () => void;
 }
 
 // 상태 라벨 매핑
@@ -58,6 +59,7 @@ const PICKUP_METHOD_LABELS = {
 export function OutgoingList({
   rentals: initialRentals,
   devices,
+  onStatusUpdate,
 }: OutgoingListProps) {
   const [rentals, setRentals] = useState(initialRentals);
   const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
@@ -95,6 +97,7 @@ export function OutgoingList({
       );
 
       toast.success("상태가 업데이트되었습니다.");
+      onStatusUpdate?.();
     } catch (error) {
       console.error("상태 업데이트 실패:", error);
       toast.error("상태 업데이트에 실패했습니다.");
@@ -229,6 +232,7 @@ export function OutgoingList({
       );
 
       toast.success("수령 완료 처리되었습니다.");
+      onStatusUpdate?.();
     } catch (error) {
       console.error("수령 완료 처리 실패:", error);
       toast.error("수령 완료 처리에 실패했습니다.");
