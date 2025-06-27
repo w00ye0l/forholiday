@@ -34,9 +34,9 @@ export default function RentalOutPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
 
-  // 검색 상태
+  // 검색 상태 - 오늘 날짜를 기본값으로 설정
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState<Date | undefined>();
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(new Date());
 
   const loadData = async () => {
     setLoading(true);
@@ -122,16 +122,45 @@ export default function RentalOutPage() {
     setDateFilter(undefined);
   };
 
-  // 각 위치별 예약 개수 계산
+  // 현재 필터링된 예약 기준으로 개수 계산 (실시간 업데이트)
   const getLocationCount = (location: PickupMethod | "all") => {
-    if (location === "all") return rentals.length;
-    return rentals.filter((rental) => rental.pickup_method === location).length;
+    if (location === "all") return filteredRentals.length;
+    return filteredRentals.filter((rental) => rental.pickup_method === location)
+      .length;
+  };
+
+  // 상태별 예약 개수 계산 (현재 필터링된 결과 기준)
+  const getStatusCount = (status: string, location?: PickupMethod | "all") => {
+    let filtered = filteredRentals.filter((rental) => rental.status === status);
+
+    if (location && location !== "all") {
+      filtered = filtered.filter((rental) => rental.pickup_method === location);
+    }
+
+    return filtered.length;
+  };
+
+  // 전체 상태별 개수 (현재 필터링된 결과 기준)
+  const getTotalStatusCounts = () => {
+    return {
+      pending: filteredRentals.filter((rental) => rental.status === "pending")
+        .length,
+      picked_up: filteredRentals.filter(
+        (rental) => rental.status === "picked_up"
+      ).length,
+      not_picked_up: filteredRentals.filter(
+        (rental) => rental.status === "not_picked_up"
+      ).length,
+    };
   };
 
   return (
     <div className="container mx-auto py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">출고 관리</h1>
+        <p className="text-sm text-gray-500 mt-2">
+          기기 출고 및 수령 상태 관리
+        </p>
       </div>
 
       {/* 검색 필터 */}
@@ -183,24 +212,33 @@ export default function RentalOutPage() {
           </Button>
         </div>
 
-        <div className="text-sm text-gray-600">
-          총 {filteredRentals.length}개의 예약
-        </div>
-      </div>
+        {/* 필터링된 결과 및 상태별 개수 */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
+          <div>
+            {dateFilter ? (
+              <span className="font-medium text-blue-600">
+                {format(dateFilter, "yyyy년 MM월 dd일", { locale: ko })} 기준
+              </span>
+            ) : (
+              <span className="font-medium text-blue-600">전체 기간</span>
+            )}
+            <span className="ml-2">총 {filteredRentals.length}개의 예약</span>
+          </div>
 
-      {/* 상태 범례 */}
-      <div className="mb-4 flex justify-end gap-4 text-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-gray-500 rounded"></div>
-          <span>수령전</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-blue-500 rounded"></div>
-          <span>수령완료</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-red-500 rounded"></div>
-          <span>미수령</span>
+          <div className="flex gap-4 text-xs">
+            <span className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+              수령전: {getTotalStatusCounts().pending}
+            </span>
+            <span className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              수령완료: {getTotalStatusCounts().picked_up}
+            </span>
+            <span className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+              미수령: {getTotalStatusCounts().not_picked_up}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -209,12 +247,47 @@ export default function RentalOutPage() {
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto">
-            <TabsTrigger value="all" className="text-sm">
-              전체 ({getLocationCount("all")})
+            <TabsTrigger
+              value="all"
+              className="text-sm flex flex-col py-2 h-auto"
+            >
+              <span className="font-medium">전체</span>
+              <span className="text-xs text-gray-500">
+                {getLocationCount("all")}건
+              </span>
+              <div className="flex gap-1 text-xs mt-1">
+                <span className="text-gray-600">
+                  {getStatusCount("pending")}
+                </span>
+                <span className="text-blue-600">
+                  {getStatusCount("picked_up")}
+                </span>
+                <span className="text-red-600">
+                  {getStatusCount("not_picked_up")}
+                </span>
+              </div>
             </TabsTrigger>
             {pickupMethods.map((method) => (
-              <TabsTrigger key={method} value={method} className="text-sm">
-                {locationLabels[method]} ({getLocationCount(method)})
+              <TabsTrigger
+                key={method}
+                value={method}
+                className="text-sm flex flex-col py-2 h-auto"
+              >
+                <span className="font-medium">{locationLabels[method]}</span>
+                <span className="text-xs text-gray-500">
+                  {getLocationCount(method)}건
+                </span>
+                <div className="flex gap-1 text-xs mt-1">
+                  <span className="text-gray-600">
+                    {getStatusCount("pending", method)}
+                  </span>
+                  <span className="text-blue-600">
+                    {getStatusCount("picked_up", method)}
+                  </span>
+                  <span className="text-red-600">
+                    {getStatusCount("not_picked_up", method)}
+                  </span>
+                </div>
               </TabsTrigger>
             ))}
           </TabsList>
