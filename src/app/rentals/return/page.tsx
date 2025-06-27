@@ -10,7 +10,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
+import {
+  SearchIcon,
+  RefreshCwIcon,
+  CalendarIcon,
+  EyeIcon,
+  EyeOffIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -30,16 +36,17 @@ export default function RentalReturnPage() {
   const [activeLocationTab, setActiveLocationTab] = useState<
     ReturnMethod | "all"
   >("all");
+  const [showReturned, setShowReturned] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
     const supabase = createClient();
 
-    // 반납 예정 및 완료된 예약 목록 조회
+    // 반납 예정 및 완료된 예약 목록 조회 (반납완료 포함)
     const { data: rentalsData } = await supabase
       .from("rental_reservations")
       .select("*")
-      .in("status", ["picked_up", "not_picked_up"])
+      .in("status", ["picked_up", "not_picked_up", "returned"])
       .order("return_date", { ascending: true })
       .order("return_time", { ascending: true });
 
@@ -50,6 +57,14 @@ export default function RentalReturnPage() {
   // 검색 필터링 로직
   useEffect(() => {
     let filtered = rentals;
+
+    // 반납 완료 항목 표시/숨김 처리
+    if (!showReturned) {
+      // 기본적으로 반납 완료 항목 숨김 (날짜 선택 시에만 표시)
+      if (!dateFilter) {
+        filtered = filtered.filter((rental) => rental.status !== "returned");
+      }
+    }
 
     // 날짜 필터 (반납일 기준)
     if (dateFilter) {
@@ -79,8 +94,15 @@ export default function RentalReturnPage() {
       );
     }
 
+    // 정렬: 반납 완료 항목은 하단에 배치
+    filtered.sort((a, b) => {
+      if (a.status === "returned" && b.status !== "returned") return 1;
+      if (a.status !== "returned" && b.status === "returned") return -1;
+      return 0;
+    });
+
     setFilteredRentals(filtered);
-  }, [rentals, searchTerm, dateFilter, activeLocationTab]);
+  }, [rentals, searchTerm, dateFilter, activeLocationTab, showReturned]);
 
   useEffect(() => {
     loadData();
@@ -90,6 +112,7 @@ export default function RentalReturnPage() {
     setSearchTerm("");
     setDateFilter(undefined);
     setActiveLocationTab("all");
+    setShowReturned(false);
   };
 
   // 상태 업데이트 콜백 함수
@@ -228,6 +251,47 @@ export default function RentalReturnPage() {
             )}
             <span className="ml-2">총 {filteredRentals.length}개의 예약</span>
           </div>
+
+          {/* 반납 완료 항목 표시/숨김 토글 */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowReturned(!showReturned)}
+              className="flex items-center gap-2 text-xs"
+            >
+              {showReturned ? (
+                <>
+                  <EyeOffIcon className="w-3 h-3" />
+                  반납완료 숨김
+                </>
+              ) : (
+                <>
+                  <EyeIcon className="w-3 h-3" />
+                  반납완료 표시
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* 상태별 개수 표시 */}
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+            수령완료:{" "}
+            {filteredRentals.filter((r) => r.status === "picked_up").length}건
+          </span>
+          <span className="bg-red-100 text-red-800 px-2 py-1 rounded">
+            미수령:{" "}
+            {filteredRentals.filter((r) => r.status === "not_picked_up").length}
+            건
+          </span>
+          {(showReturned || dateFilter) && (
+            <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+              반납완료:{" "}
+              {filteredRentals.filter((r) => r.status === "returned").length}건
+            </span>
+          )}
         </div>
       </div>
 
@@ -278,6 +342,14 @@ export default function RentalReturnPage() {
               </span>
             )}
           </div>
+
+          {/* 반납 완료 항목 표시 안내 */}
+          {!showReturned && !dateFilter && (
+            <div className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+              💡 반납 완료된 항목은 기본적으로 숨겨집니다. 날짜를 선택하거나
+              "반납완료 표시" 버튼을 클릭하면 확인할 수 있습니다.
+            </div>
+          )}
         </div>
       </div>
 

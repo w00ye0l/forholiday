@@ -35,6 +35,7 @@ const STATUS_LABELS: Record<ReservationStatus, string> = {
   pending: "수령전",
   picked_up: "수령완료",
   not_picked_up: "미수령",
+  returned: "반납완료",
 };
 
 // 상태별 색상 매핑 (배지용)
@@ -42,6 +43,7 @@ const STATUS_COLORS: Record<ReservationStatus, string> = {
   pending: "bg-gray-50 text-gray-800",
   picked_up: "bg-blue-100 text-blue-800",
   not_picked_up: "bg-red-100 text-red-800",
+  returned: "bg-green-100 text-green-800",
 };
 
 // 상태별 카드 배경 색상
@@ -49,6 +51,7 @@ const CARD_BORDER_COLORS: Record<ReservationStatus, string> = {
   pending: "border-gray-200",
   picked_up: "border-blue-400",
   not_picked_up: "border-red-400",
+  returned: "border-green-400",
 };
 
 // 반납 방법 라벨
@@ -148,12 +151,11 @@ export function ReturnList({
     try {
       setIsUpdating((prev) => ({ ...prev, [id]: true }));
 
-      // 여기서는 일단 picked_up 상태를 유지하고, 추후 returned 상태 추가 시 변경
+      // 상태를 returned로 변경
       const { error } = await supabase
         .from("rental_reservations")
         .update({
-          // status: "returned", // 추후 returned 상태 추가 시 사용
-          description: (rental.description || "") + " [반납완료]",
+          status: "returned",
         })
         .eq("id", id);
 
@@ -164,7 +166,7 @@ export function ReturnList({
           rental.id === id
             ? {
                 ...rental,
-                description: (rental.description || "") + " [반납완료]",
+                status: "returned" as ReservationStatus,
               }
             : rental
         )
@@ -250,20 +252,19 @@ export function ReturnList({
                 </div>
 
                 {/* 반납 완료 버튼 (picked_up 상태인 경우에만 표시) */}
-                {rental.status === "picked_up" &&
-                  !rental.description?.includes("[반납완료]") && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleCompleteReturn(rental.id)}
-                      disabled={isUpdating[rental.id]}
-                      className="h-7 w-36 text-xs bg-green-600 hover:bg-green-700"
-                    >
-                      {isUpdating[rental.id] ? "처리중..." : "반납 완료"}
-                    </Button>
-                  )}
+                {rental.status === "picked_up" && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleCompleteReturn(rental.id)}
+                    disabled={isUpdating[rental.id]}
+                    className="h-7 w-36 text-xs bg-green-600 hover:bg-green-700"
+                  >
+                    {isUpdating[rental.id] ? "처리중..." : "반납 완료"}
+                  </Button>
+                )}
 
                 {/* 반납 완료 표시 */}
-                {rental.description?.includes("[반납완료]") && (
+                {rental.status === "returned" && (
                   <div className="w-36">
                     <Badge className="w-full justify-center text-xs bg-green-100 text-green-800 border-green-200">
                       <CheckCircle className="w-3 h-3 mr-1" />
