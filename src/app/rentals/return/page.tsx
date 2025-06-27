@@ -94,11 +94,25 @@ export default function RentalReturnPage() {
       );
     }
 
-    // 정렬: 반납 완료 항목은 하단에 배치
+    // 정렬: 지연 반납 우선, 반납 완료 항목은 하단에 배치
     filtered.sort((a, b) => {
+      const today = new Date();
+      const aReturnDate = new Date(`${a.return_date} ${a.return_time}`);
+      const bReturnDate = new Date(`${b.return_date} ${b.return_time}`);
+
+      const aIsOverdue = aReturnDate < today && a.status !== "returned";
+      const bIsOverdue = bReturnDate < today && b.status !== "returned";
+
+      // 1. 반납 완료 항목은 맨 아래
       if (a.status === "returned" && b.status !== "returned") return 1;
       if (a.status !== "returned" && b.status === "returned") return -1;
-      return 0;
+
+      // 2. 지연 반납 항목은 맨 위
+      if (aIsOverdue && !bIsOverdue) return -1;
+      if (!aIsOverdue && bIsOverdue) return 1;
+
+      // 3. 같은 카테고리 내에서는 시간순 정렬
+      return aReturnDate.getTime() - bReturnDate.getTime();
     });
 
     setFilteredRentals(filtered);
@@ -169,22 +183,93 @@ export default function RentalReturnPage() {
     hotel: "호텔",
   };
 
+  // 지연 반납 건수 계산
+  const getOverdueCounts = () => {
+    const today = new Date();
+    let baseFiltered = rentals;
+
+    // 날짜 필터 적용
+    if (dateFilter) {
+      const filterDateString = format(dateFilter, "yyyy-MM-dd");
+      baseFiltered = baseFiltered.filter((rental) =>
+        rental.return_date.includes(filterDateString)
+      );
+    }
+
+    // 검색 필터 적용
+    if (searchTerm && searchTerm.trim() !== "") {
+      const term = searchTerm.toLowerCase().trim();
+      baseFiltered = baseFiltered.filter(
+        (rental) =>
+          rental.renter_name.toLowerCase().includes(term) ||
+          rental.device_category.toLowerCase().includes(term) ||
+          rental.reservation_id.toLowerCase().includes(term) ||
+          (rental.device_tag_name &&
+            rental.device_tag_name.toLowerCase().includes(term))
+      );
+    }
+
+    // 장소별 필터 적용
+    if (activeLocationTab !== "all") {
+      baseFiltered = baseFiltered.filter(
+        (rental) => rental.return_method === activeLocationTab
+      );
+    }
+
+    // 반납 완료 항목 제외하고 지연 건수 계산
+    const overdueRentals = baseFiltered.filter((rental) => {
+      if (rental.status === "returned") return false;
+      const returnDateTime = new Date(
+        `${rental.return_date} ${rental.return_time}`
+      );
+      return returnDateTime < today;
+    });
+
+    return {
+      total: overdueRentals.length,
+      byLocation: {
+        T1: overdueRentals.filter((r) => r.return_method === "T1").length,
+        T2: overdueRentals.filter((r) => r.return_method === "T2").length,
+        delivery: overdueRentals.filter((r) => r.return_method === "delivery")
+          .length,
+        office: overdueRentals.filter((r) => r.return_method === "office")
+          .length,
+        hotel: overdueRentals.filter((r) => r.return_method === "hotel").length,
+      },
+    };
+  };
+
   return (
     <div className="container mx-auto py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">
-          반납 관리
-          {activeLocationTab !== "all" && (
-            <span className="text-lg text-blue-600 ml-2">
-              - {LOCATION_LABELS[activeLocationTab]}
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">
+            반납 관리
+            {activeLocationTab !== "all" && (
+              <span className="text-lg text-blue-600 ml-2">
+                - {LOCATION_LABELS[activeLocationTab]}
+              </span>
+            )}
+          </h1>
+
+          {/* 메인 제목 옆 지연 건수 표시 */}
+          {getOverdueCounts().total > 0 && (
+            <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium animate-pulse">
+              지연 {getOverdueCounts().total}건
             </span>
           )}
-        </h1>
+        </div>
+
         <p className="text-sm text-gray-500 mt-2">
           기기 반납 및 상태 관리
           {activeLocationTab !== "all" && (
             <span className="ml-2 text-blue-500">
               ({LOCATION_LABELS[activeLocationTab]} 전용)
+            </span>
+          )}
+          {getOverdueCounts().total > 0 && (
+            <span className="ml-2 text-red-600 font-medium">
+              • 지연 반납 항목이 상단에 우선 표시됩니다
             </span>
           )}
         </p>
@@ -277,6 +362,13 @@ export default function RentalReturnPage() {
 
         {/* 상태별 개수 표시 */}
         <div className="flex flex-wrap gap-2 text-xs">
+          {/* 지연 반납 건수 (우선 표시) */}
+          {getOverdueCounts().total > 0 && (
+            <span className="bg-red-200 text-red-900 px-2 py-1 rounded font-medium border border-red-300">
+              ⚠️ 지연 반납: {getOverdueCounts().total}건
+            </span>
+          )}
+
           <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
             수령완료:{" "}
             {filteredRentals.filter((r) => r.status === "picked_up").length}건
@@ -321,12 +413,32 @@ export default function RentalReturnPage() {
         {/* 현재 선택된 탭 정보 */}
         <div className="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
           <div className="flex items-center justify-between">
-            <span>
-              <strong>{LOCATION_LABELS[activeLocationTab]}</strong> 반납 예정:{" "}
-              <span className="font-medium text-blue-600">
-                {filteredRentals.length}건
+            <div className="flex items-center gap-3">
+              <span>
+                <strong>{LOCATION_LABELS[activeLocationTab]}</strong> 반납 예정:{" "}
+                <span className="font-medium text-blue-600">
+                  {filteredRentals.length}건
+                </span>
               </span>
-            </span>
+
+              {/* 현재 탭의 지연 건수 표시 */}
+              {(() => {
+                const overdueCounts = getOverdueCounts();
+                const overdueCount =
+                  activeLocationTab === "all"
+                    ? overdueCounts.total
+                    : overdueCounts.byLocation[
+                        activeLocationTab as keyof typeof overdueCounts.byLocation
+                      ];
+
+                return overdueCount > 0 ? (
+                  <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium">
+                    지연 {overdueCount}건
+                  </span>
+                ) : null;
+              })()}
+            </div>
+
             {activeLocationTab !== "all" && (
               <span className="text-xs">
                 📍{" "}
@@ -350,18 +462,24 @@ export default function RentalReturnPage() {
               "반납완료 표시" 버튼을 클릭하면 확인할 수 있습니다.
             </div>
           )}
+
+          {/* 지연 반납 안내 메시지 */}
+          {getOverdueCounts().total === 0 && filteredRentals.length > 0 && (
+            <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded">
+              ✅ 현재 지연 반납 건이 없습니다. 모든 반납이 일정대로 진행되고
+              있습니다.
+            </div>
+          )}
         </div>
       </div>
 
       {loading ? (
         <div className="text-center py-8">로딩 중...</div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <ReturnList
-            rentals={filteredRentals}
-            onStatusUpdate={handleStatusUpdate}
-          />
-        </div>
+        <ReturnList
+          rentals={filteredRentals}
+          onStatusUpdate={handleStatusUpdate}
+        />
       )}
     </div>
   );
