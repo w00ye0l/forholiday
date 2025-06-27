@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 // 에러 상태 타입을 정의합니다.
 interface RegisterState {
   error: string | null;
+  success: boolean;
 }
 
 export async function register(
@@ -27,10 +28,10 @@ export async function register(
     .maybeSingle();
 
   if (checkError) {
-    return { error: "회원가입 중 오류가 발생했습니다" };
+    return { error: "회원가입 중 오류가 발생했습니다", success: false };
   }
   if (existingUser) {
-    return { error: "이미 사용 중인 아이디입니다" };
+    return { error: "이미 사용 중인 아이디입니다", success: false };
   }
 
   // 회원가입 진행
@@ -46,11 +47,11 @@ export async function register(
   });
 
   if (signUpError) {
-    return { error: signUpError.message };
+    return { error: signUpError.message, success: false };
   }
   if (!signUpData.user) {
-    return { error: "회원가입에 실패했습니다" };
+    return { error: "회원가입에 실패했습니다", success: false };
   }
 
-  redirect("/auth/login");
+  return { error: null, success: true };
 }
