@@ -22,6 +22,7 @@ interface RentalListProps {
       status: string;
     };
   })[];
+  searchTerm?: string;
 }
 
 const statusMap = {
@@ -30,7 +31,28 @@ const statusMap = {
   not_picked_up: { label: "미수령", variant: "destructive" },
 } as const;
 
-export function RentalList({ rentals }: RentalListProps) {
+// 검색어 하이라이트 함수
+const highlightText = (text: string, searchTerm: string) => {
+  if (!searchTerm.trim()) return text;
+
+  const regex = new RegExp(
+    `(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+    "gi"
+  );
+  const parts = text.split(regex);
+
+  return parts.map((part, index) =>
+    regex.test(part) ? (
+      <span key={index} className="bg-yellow-200 font-semibold">
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  );
+};
+
+export function RentalList({ rentals, searchTerm = "" }: RentalListProps) {
   const router = useRouter();
 
   const handleRowClick = (rentalId: string) => {
@@ -43,6 +65,7 @@ export function RentalList({ rentals }: RentalListProps) {
         <TableRow>
           <TableHead>예약번호</TableHead>
           <TableHead>고객명</TableHead>
+          <TableHead>연락처</TableHead>
           <TableHead>대여기기</TableHead>
           <TableHead>수령일</TableHead>
           <TableHead>반납일</TableHead>
@@ -57,9 +80,14 @@ export function RentalList({ rentals }: RentalListProps) {
             className="cursor-pointer hover:bg-gray-50 transition-colors"
           >
             <TableCell className="font-medium text-blue-600">
-              {rental.reservation_id}
+              {highlightText(rental.reservation_id || rental.id, searchTerm)}
             </TableCell>
-            <TableCell>{rental.renter_name}</TableCell>
+            <TableCell>
+              {highlightText(rental.renter_name, searchTerm)}
+            </TableCell>
+            <TableCell>
+              {highlightText(rental.renter_phone, searchTerm)}
+            </TableCell>
             <TableCell>
               <div>
                 <div className="font-medium">
@@ -67,7 +95,9 @@ export function RentalList({ rentals }: RentalListProps) {
                     rental.device_category}
                 </div>
                 <div className="text-sm text-gray-500">
-                  {rental.device_tag_name || "미배정"}
+                  {rental.device_tag_name
+                    ? highlightText(rental.device_tag_name, searchTerm)
+                    : "미배정"}
                 </div>
               </div>
             </TableCell>
