@@ -67,7 +67,7 @@ export default function RentalOutPage() {
     "T2",
     "delivery",
     "office",
-    "direct",
+    "hotel",
   ];
 
   // 위치별 한글 표시명 매핑
@@ -76,7 +76,7 @@ export default function RentalOutPage() {
     T2: "T2",
     delivery: "택배",
     office: "사무실",
-    direct: "대면",
+    hotel: "호텔",
   };
 
   // 검색 필터링 로직

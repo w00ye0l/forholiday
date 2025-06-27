@@ -2,11 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { RentalList } from "@/components/rental/RentalList";
+import { RentalStatistics } from "@/components/rental/RentalStatistics";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { SearchIcon, RefreshCwIcon } from "lucide-react";
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  SearchIcon,
+  RefreshCwIcon,
+  ListIcon,
+  BarChart3Icon,
+} from "lucide-react";
 import { RentalReservation } from "@/types/rental";
 
 type RentalWithDevice = RentalReservation & {
@@ -26,6 +32,7 @@ export default function RentalsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("list");
 
   const supabase = createClient();
 
@@ -128,70 +135,99 @@ export default function RentalsPage() {
   return (
     <div className="container mx-auto py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">예약 목록</h1>
+        <h1 className="text-2xl font-bold mb-2">예약 관리</h1>
         <p className="text-sm text-gray-500 mb-4">
-          목록을 선택하면 상세 정보 페이지로 이동합니다.
+          예약 목록을 확인하고 출고 통계를 분석할 수 있습니다.
         </p>
       </div>
 
-      {/* 검색 필터 */}
-      <div className="mb-6 bg-white p-4 rounded-lg border border-gray-200 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* 검색 입력 */}
-          <div className="relative flex-1">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
-            <Input
-              placeholder="고객명, 전화번호, 예약번호, 기기명으로 검색..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
+      {/* 탭 네비게이션 */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="list" className="flex items-center gap-2">
+            <ListIcon className="w-4 h-4" />
+            예약 목록
+          </TabsTrigger>
+          <TabsTrigger value="statistics" className="flex items-center gap-2">
+            <BarChart3Icon className="w-4 h-4" />
+            출고 통계
+          </TabsTrigger>
+        </TabsList>
+
+        {/* 예약 목록 탭 */}
+        <TabsContent value="list" className="space-y-6">
+          {/* 검색 필터 */}
+          <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* 검색 입력 */}
+              <div className="relative flex-1">
+                <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
+                <Input
+                  placeholder="고객명, 전화번호, 예약번호, 기기명으로 검색..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              {/* 초기화 버튼 */}
+              <Button
+                variant="outline"
+                onClick={handleReset}
+                className="flex items-center gap-2"
+              >
+                <RefreshCwIcon className="w-4 h-4" />
+                초기화
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <span>
+                {searchTerm.trim() ? (
+                  <>
+                    '
+                    <span className="font-medium text-blue-600">
+                      {searchTerm}
+                    </span>
+                    ' 검색 결과: {filteredRentals.length}건
+                  </>
+                ) : (
+                  <>총 {filteredRentals.length}개의 예약</>
+                )}
+              </span>
+              {searchTerm.trim() && (
+                <span className="text-xs">
+                  전체 {rentals.length}건 중 {filteredRentals.length}건 표시
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* 초기화 버튼 */}
-          <Button
-            variant="outline"
-            onClick={handleReset}
-            className="flex items-center gap-2"
-          >
-            <RefreshCwIcon className="w-4 h-4" />
-            초기화
-          </Button>
-        </div>
-
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <span>
-            {searchTerm.trim() ? (
-              <>
-                '<span className="font-medium text-blue-600">{searchTerm}</span>
-                ' 검색 결과: {filteredRentals.length}건
-              </>
+          {/* 예약 목록 */}
+          <div className="bg-white p-2 rounded-lg shadow">
+            {loading ? (
+              <div className="text-center py-8 text-gray-500">로딩 중...</div>
+            ) : filteredRentals.length === 0 ? (
+              <div className="text-gray-500 text-center py-8">
+                {searchTerm.trim()
+                  ? `'${searchTerm}' 검색 결과가 없습니다.`
+                  : "예약된 기기가 없습니다."}
+              </div>
             ) : (
-              <>총 {filteredRentals.length}개의 예약</>
+              <RentalList rentals={filteredRentals} searchTerm={searchTerm} />
             )}
-          </span>
-          {searchTerm.trim() && (
-            <span className="text-xs">
-              전체 {rentals.length}건 중 {filteredRentals.length}건 표시
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* 예약 목록 */}
-      <div className="bg-white p-2 rounded-lg shadow">
-        {loading ? (
-          <div className="text-center py-8 text-gray-500">로딩 중...</div>
-        ) : filteredRentals.length === 0 ? (
-          <div className="text-gray-500 text-center py-8">
-            {searchTerm.trim()
-              ? `'${searchTerm}' 검색 결과가 없습니다.`
-              : "예약된 기기가 없습니다."}
           </div>
-        ) : (
-          <RentalList rentals={filteredRentals} searchTerm={searchTerm} />
-        )}
-      </div>
+        </TabsContent>
+
+        {/* 출고 통계 탭 */}
+        <TabsContent value="statistics" className="space-y-6">
+          {loading ? (
+            <div className="text-center py-8 text-gray-500">로딩 중...</div>
+          ) : (
+            <RentalStatistics rentals={rentals} />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
