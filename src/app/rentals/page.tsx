@@ -12,8 +12,15 @@ import {
   RefreshCwIcon,
   ListIcon,
   BarChart3Icon,
+  DownloadIcon,
 } from "lucide-react";
 import { RentalReservation } from "@/types/rental";
+import {
+  exportToExcel,
+  transformRentalDataForExcel,
+  transformRentalStatsForExcel,
+} from "@/lib/utils";
+import { toast } from "sonner";
 
 type RentalWithDevice = RentalReservation & {
   devices: {
@@ -33,6 +40,7 @@ export default function RentalsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("list");
+  const [exporting, setExporting] = useState(false);
 
   const supabase = createClient();
 
@@ -116,6 +124,40 @@ export default function RentalsPage() {
     setSearchTerm("");
   };
 
+  // 엑셀 출력 핸들러
+  const handleExportToExcel = async () => {
+    try {
+      setExporting(true);
+
+      // 현재 필터링된 데이터를 엑셀 형식으로 변환
+      const excelData = transformRentalDataForExcel(filteredRentals);
+
+      // 통계 데이터 생성
+      const statsData = transformRentalStatsForExcel(
+        filteredRentals,
+        searchTerm.trim() ? `검색: ${searchTerm}` : "전체 데이터"
+      );
+
+      // 엑셀 파일 생성 및 다운로드
+      const result = await exportToExcel(excelData, "예약목록", {
+        sheetName: "예약 목록",
+        includeStats: true,
+        statsData: statsData,
+      });
+
+      if (result.success) {
+        toast.success(`엑셀 파일이 다운로드되었습니다: ${result.filename}`);
+      } else {
+        toast.error(`엑셀 출력 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error("엑셀 출력 에러:", error);
+      toast.error("엑셀 출력 중 오류가 발생했습니다.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (error) {
     return (
       <div className="container mx-auto py-8">
@@ -170,15 +212,29 @@ export default function RentalsPage() {
                 />
               </div>
 
-              {/* 초기화 버튼 */}
-              <Button
-                variant="outline"
-                onClick={handleReset}
-                className="flex items-center gap-2"
-              >
-                <RefreshCwIcon className="w-4 h-4" />
-                초기화
-              </Button>
+              {/* 버튼 그룹 */}
+              <div className="flex gap-2">
+                {/* 초기화 버튼 */}
+                <Button
+                  variant="outline"
+                  onClick={handleReset}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCwIcon className="w-4 h-4" />
+                  초기화
+                </Button>
+
+                {/* 엑셀 출력 버튼 */}
+                <Button
+                  variant="outline"
+                  onClick={handleExportToExcel}
+                  disabled={exporting || filteredRentals.length === 0}
+                  className="flex items-center gap-2"
+                >
+                  <DownloadIcon className="w-4 h-4" />
+                  {exporting ? "출력 중..." : "엑셀 출력"}
+                </Button>
+              </div>
             </div>
 
             <div className="flex items-center justify-between text-sm text-gray-600">
@@ -204,28 +260,16 @@ export default function RentalsPage() {
           </div>
 
           {/* 예약 목록 */}
-          <div className="bg-white p-2 rounded-lg shadow">
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">로딩 중...</div>
-            ) : filteredRentals.length === 0 ? (
-              <div className="text-gray-500 text-center py-8">
-                {searchTerm.trim()
-                  ? `'${searchTerm}' 검색 결과가 없습니다.`
-                  : "예약된 기기가 없습니다."}
-              </div>
-            ) : (
-              <RentalList rentals={filteredRentals} searchTerm={searchTerm} />
-            )}
-          </div>
+          <RentalList
+            rentals={filteredRentals}
+            loading={loading}
+            searchTerm={searchTerm}
+          />
         </TabsContent>
 
         {/* 출고 통계 탭 */}
         <TabsContent value="statistics" className="space-y-6">
-          {loading ? (
-            <div className="text-center py-8 text-gray-500">로딩 중...</div>
-          ) : (
-            <RentalStatistics rentals={rentals} />
-          )}
+          <RentalStatistics rentals={filteredRentals} />
         </TabsContent>
       </Tabs>
     </div>
