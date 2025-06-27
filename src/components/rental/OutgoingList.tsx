@@ -52,7 +52,7 @@ const PICKUP_METHOD_LABELS = {
   T2: "터미널2",
   delivery: "택배",
   office: "사무실",
-  direct: "직접수령",
+  hotel: "호텔",
 };
 
 export function OutgoingList({

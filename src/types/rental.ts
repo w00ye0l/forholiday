@@ -2,8 +2,8 @@ export type ReservationStatus =
   | "pending" // 수령전
   | "picked_up" // 수령완료
   | "not_picked_up"; // 미수령
-export type PickupMethod = "T1" | "T2" | "delivery" | "office" | "direct";
-export type ReturnMethod = "T1" | "T2" | "delivery" | "office" | "direct";
+export type PickupMethod = "T1" | "T2" | "delivery" | "office" | "hotel";
+export type ReturnMethod = "T1" | "T2" | "delivery" | "office" | "hotel";
 export type ReservationSite =
   | "naver"
   | "forholiday"

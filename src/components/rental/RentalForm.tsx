@@ -38,12 +38,7 @@ import {
   ReturnMethod,
   ReservationSite,
 } from "@/types/rental";
-import {
-  Device,
-  DeviceCategory,
-  DEVICE_FEATURES,
-  DEVICE_CATEGORY_LABELS,
-} from "@/types/device";
+import { DEVICE_FEATURES, DEVICE_CATEGORY_LABELS } from "@/types/device";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -98,8 +93,8 @@ const formSchema = z.object({
     required_error: "반납 날짜를 선택해주세요",
   }),
   return_time: z.string().min(1, "반납 시간을 선택해주세요"),
-  pickup_method: z.enum(["T1", "T2", "delivery", "office", "direct"] as const),
-  return_method: z.enum(["T1", "T2", "delivery", "office", "direct"] as const),
+  pickup_method: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const),
+  return_method: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const),
   renter_name: z.string().min(1, "대여자 이름을 입력해주세요"),
   renter_phone: z.string().min(1, "연락처를 입력해주세요"),
   renter_address: z.string().min(1, "주소를 입력해주세요"),
@@ -135,7 +130,7 @@ const PICKUP_METHOD_LABELS: Record<PickupMethod, string> = {
   T2: "터미널2",
   delivery: "택배",
   office: "사무실",
-  direct: "대면",
+  hotel: "호텔",
 };
 
 const RETURN_METHOD_LABELS: Record<ReturnMethod, string> = {
@@ -143,7 +138,7 @@ const RETURN_METHOD_LABELS: Record<ReturnMethod, string> = {
   T2: "터미널2",
   delivery: "택배",
   office: "사무실",
-  direct: "대면",
+  hotel: "호텔",
 };
 
 // 예약 사이트 라벨

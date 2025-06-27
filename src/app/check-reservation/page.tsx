@@ -72,7 +72,7 @@ const translations = {
       T2: "터미널2",
       delivery: "택배",
       office: "사무실",
-      direct: "직접수령",
+      hotel: "호텔",
     },
 
     // 도움말
@@ -124,7 +124,7 @@ const translations = {
       T2: "Terminal 2",
       delivery: "Delivery",
       office: "Office",
-      direct: "Direct Pickup",
+      hotel: "Hotel",
     },
 
     // Help text
