@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   DEVICE_CATEGORY_LABELS,
-  DEVICE_STATUS_LABELS,
+  DEVICE_STATUS_MAP,
   Device,
 } from "@/types/device";
 import {
@@ -78,8 +78,8 @@ export default function DeviceManager({
             <TableCell className="font-medium">{device.tag_name}</TableCell>
             <TableCell>{DEVICE_CATEGORY_LABELS[device.category]}</TableCell>
             <TableCell>
-              <Badge variant="outline">
-                {DEVICE_STATUS_LABELS[device.status]}
+              <Badge variant={DEVICE_STATUS_MAP[device.status].variant as any}>
+                {DEVICE_STATUS_MAP[device.status].label}
               </Badge>
             </TableCell>
             <TableCell>{device.created_at.slice(0, 10)}</TableCell>

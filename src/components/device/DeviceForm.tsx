@@ -14,9 +14,13 @@ import {
   DeviceCategory,
   DeviceStatus,
   DEVICE_CATEGORY_LABELS,
-  DEVICE_STATUS_LABELS,
+  DEVICE_STATUS_MAP,
   Device,
 } from "@/types/device";
+
+// 기본 값들
+const DEFAULT_DEVICE_STATUS: DeviceStatus = "available";
+const DEFAULT_DEVICE_CATEGORY: DeviceCategory = "GP13";
 import { createClient } from "@/lib/supabase/client";
 
 interface DeviceFormProps {
@@ -33,8 +37,8 @@ export default function DeviceForm({
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     tag_name: "",
-    category: "GP13" as DeviceCategory,
-    status: "available" as DeviceStatus,
+    category: DEFAULT_DEVICE_CATEGORY,
+    status: DEFAULT_DEVICE_STATUS,
   });
   const [loading, setLoading] = useState(false);
 
@@ -51,8 +55,8 @@ export default function DeviceForm({
     } else {
       setForm({
         tag_name: "",
-        category: "GP13" as DeviceCategory,
-        status: "available" as DeviceStatus,
+        category: DEFAULT_DEVICE_CATEGORY,
+        status: DEFAULT_DEVICE_STATUS,
       });
     }
   }, [device]);
@@ -68,8 +72,8 @@ export default function DeviceForm({
       setShowForm(false);
       setForm({
         tag_name: "",
-        category: "GP13" as DeviceCategory,
-        status: "available" as DeviceStatus,
+        category: DEFAULT_DEVICE_CATEGORY,
+        status: DEFAULT_DEVICE_STATUS,
       });
     }
   };
@@ -121,8 +125,8 @@ export default function DeviceForm({
         } else {
           setForm({
             tag_name: "",
-            category: "GP13" as DeviceCategory,
-            status: "available" as DeviceStatus,
+            category: DEFAULT_DEVICE_CATEGORY,
+            status: DEFAULT_DEVICE_STATUS,
           });
           setShowForm(false);
           onCreated?.();
@@ -200,10 +204,10 @@ export default function DeviceForm({
                   <SelectValue placeholder="상태" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(DEVICE_STATUS_LABELS).map(
-                    ([value, label]) => (
+                  {Object.entries(DEVICE_STATUS_MAP).map(
+                    ([value, statusInfo]) => (
                       <SelectItem key={value} value={value}>
-                        {label}
+                        {statusInfo.label}
                       </SelectItem>
                     )
                   )}

@@ -4,59 +4,23 @@ import { NextRequest, NextResponse } from "next/server";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-// 언어별 서비스 타입 번역
-const serviceTypeTranslations = {
-  ko: {
-    rentalReturn: "대여 - 반납",
-    rentalPickup: "대여 - 수령",
-    storageDropoff: "짐보관 - 맡기기",
-    storagePickup: "짐보관 - 찾기",
-  },
-  en: {
-    rentalReturn: "Rental - Return",
-    rentalPickup: "Rental - Pickup",
-    storageDropoff: "Storage - Drop-off",
-    storagePickup: "Storage - Pickup",
-  },
-  ja: {
-    rentalReturn: "レンタル - 返却",
-    rentalPickup: "レンタル - 受取",
-    storageDropoff: "荷物保管 - 預ける",
-    storagePickup: "荷物保管 - 受取",
-  },
+// 한국어 고정 텍스트
+const serviceTypeTexts = {
+  rentalReturn: "대여 - 반납",
+  rentalPickup: "대여 - 수령",
+  storageDropoff: "짐보관 - 맡기기",
+  storagePickup: "짐보관 - 찾기",
 };
 
-const terminalTranslations = {
-  ko: {
-    terminal1: "제 1터미널",
-    terminal2: "제 2터미널",
-  },
-  en: {
-    terminal1: "Terminal 1",
-    terminal2: "Terminal 2",
-  },
-  ja: {
-    terminal1: "第1ターミナル",
-    terminal2: "第2ターミナル",
-  },
+const terminalTexts = {
+  terminal1: "T1",
+  terminal2: "T2",
 };
 
-const arrivalStatusTranslations = {
-  ko: {
-    thirtyMinBefore: "도착 30분 전(예정)",
-    tenMinBefore: "도착 10분 전(예정)",
-    atCounter: "카운터 도착",
-  },
-  en: {
-    thirtyMinBefore: "30 minutes before arrival (scheduled)",
-    tenMinBefore: "10 minutes before arrival (scheduled)",
-    atCounter: "Arrived at counter",
-  },
-  ja: {
-    thirtyMinBefore: "到着30分前（予定）",
-    tenMinBefore: "到着10分前（予定）",
-    atCounter: "カウンター到着",
-  },
+const arrivalStatusTexts = {
+  thirtyMinBefore: "도착 30분 전(예정)",
+  tenMinBefore: "도착 10분 전(예정)",
+  atCounter: "카운터 도착",
 };
 
 interface CheckinData {
@@ -64,47 +28,21 @@ interface CheckinData {
   terminal: string;
   arrivalStatus: string;
   serviceType: string;
-  language: string;
   tagName?: string;
 }
 
 function formatMessage(data: CheckinData) {
-  const { name, terminal, arrivalStatus, serviceType, language, tagName } =
-    data;
+  const { name, terminal, arrivalStatus, serviceType, tagName } = data;
 
-  // 안전한 타입 캐스팅을 위한 헬퍼 함수들
-  const getServiceTypeText = () => {
-    const langTranslations =
-      serviceTypeTranslations[language as keyof typeof serviceTypeTranslations];
-    if (langTranslations && serviceType in langTranslations) {
-      return langTranslations[serviceType as keyof typeof langTranslations];
-    }
-    return serviceType;
-  };
-
-  const getTerminalText = () => {
-    const langTranslations =
-      terminalTranslations[language as keyof typeof terminalTranslations];
-    if (langTranslations && terminal in langTranslations) {
-      return langTranslations[terminal as keyof typeof langTranslations];
-    }
-    return terminal;
-  };
-
-  const getArrivalStatusText = () => {
-    const langTranslations =
-      arrivalStatusTranslations[
-        language as keyof typeof arrivalStatusTranslations
-      ];
-    if (langTranslations && arrivalStatus in langTranslations) {
-      return langTranslations[arrivalStatus as keyof typeof langTranslations];
-    }
-    return arrivalStatus;
-  };
-
-  const serviceTypeText = getServiceTypeText();
-  const terminalText = getTerminalText();
-  const arrivalStatusText = getArrivalStatusText();
+  // 한국어 고정 텍스트 변환
+  const serviceTypeText =
+    serviceTypeTexts[serviceType as keyof typeof serviceTypeTexts] ||
+    serviceType;
+  const terminalText =
+    terminalTexts[terminal as keyof typeof terminalTexts] || terminal;
+  const arrivalStatusText =
+    arrivalStatusTexts[arrivalStatus as keyof typeof arrivalStatusTexts] ||
+    arrivalStatus;
 
   const currentTime = new Date().toLocaleString("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -118,17 +56,10 @@ function formatMessage(data: CheckinData) {
 
   const tagInfo = tagName ? `\n🏷️ *태그 번호*: ${tagName}` : "";
 
-  return `🔔 *도착 체크인 알림*
-
-👤 *고객명*: ${name}
-🏢 *터미널*: ${terminalText}
-📋 *서비스*: ${serviceTypeText}${tagInfo}
+  return `✈️ [${terminalText}/${serviceTypeText}]
+👤 *고객명*: ${name}${tagInfo}
 ⏱️ *도착 상태*: ${arrivalStatusText}
-🌐 *언어*: ${language.toUpperCase()}
-⏰ *접수 시간*: ${currentTime}
-
-━━━━━━━━━━━━━━━━━━━━━
-직원분들께서 준비해 주세요! 🚀`;
+⏰ *접수 시간*: ${currentTime}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -145,8 +76,7 @@ export async function POST(request: NextRequest) {
     const data = await request.json();
 
     // 필수 필드 검증
-    const { name, terminal, arrivalStatus, serviceType, language, tagName } =
-      data;
+    const { name, terminal, arrivalStatus, serviceType, tagName } = data;
     if (!name || !terminal || !arrivalStatus || !serviceType) {
       return NextResponse.json(
         { error: "필수 필드가 누락되었습니다." },

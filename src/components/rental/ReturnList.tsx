@@ -18,31 +18,31 @@ import {
   RentalReservation,
   ReservationStatus,
   STATUS_MAP,
-  PICKUP_METHOD_LABELS,
+  RETURN_METHOD_LABELS,
   CARD_BORDER_COLORS,
 } from "@/types/rental";
-import { Device, DEVICE_CATEGORY_LABELS } from "@/types/device";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { CalendarIcon, PencilIcon, PhoneIcon, MapPinIcon } from "lucide-react";
+import {
+  CalendarIcon,
+  PencilIcon,
+  PhoneIcon,
+  MapPinIcon,
+  CheckCircle,
+} from "lucide-react";
 
-interface OutgoingListProps {
+interface ReturnListProps {
   rentals: RentalReservation[];
-  devices: Device[];
   onStatusUpdate?: () => void;
 }
 
-export function OutgoingList({
+export function ReturnList({
   rentals: initialRentals,
-  devices,
   onStatusUpdate,
-}: OutgoingListProps) {
+}: ReturnListProps) {
   const [rentals, setRentals] = useState(initialRentals);
   const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [selectedDevices, setSelectedDevices] = useState<
-    Record<string, string>
-  >({});
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
 
   const supabase = createClient();
@@ -107,79 +107,16 @@ export function OutgoingList({
     }
   };
 
-  const handleDeviceSelect = async (id: string, selectedTagName: string) => {
-    try {
-      setIsUpdating((prev) => ({ ...prev, [id]: true }));
-
-      // 플레이스홀더 선택 시 기기 할당 해제
-      if (selectedTagName === "placeholder") {
-        const { error } = await supabase
-          .from("rental_reservations")
-          .update({
-            device_tag_name: null,
-          })
-          .eq("id", id);
-
-        if (error) throw error;
-
-        setRentals((prev) =>
-          prev.map((rental) =>
-            rental.id === id
-              ? {
-                  ...rental,
-                  device_tag_name: undefined,
-                }
-              : rental
-          )
-        );
-
-        setSelectedDevices((prev) => ({ ...prev, [id]: "placeholder" }));
-        toast.success("기기 선택이 해제되었습니다.");
-        return;
-      }
-
-      // 실제 기기 할당
-      const { error } = await supabase
-        .from("rental_reservations")
-        .update({
-          device_tag_name: selectedTagName,
-        })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      setRentals((prev) =>
-        prev.map((rental) =>
-          rental.id === id
-            ? {
-                ...rental,
-                device_tag_name: selectedTagName,
-              }
-            : rental
-        )
-      );
-
-      setSelectedDevices((prev) => ({ ...prev, [id]: selectedTagName }));
-      toast.success("기기가 할당되었습니다.");
-    } catch (error) {
-      console.error("기기 할당/해제 실패:", error);
-      toast.error("기기 할당/해제에 실패했습니다.");
-    } finally {
-      setIsUpdating((prev) => ({ ...prev, [id]: false }));
-    }
-  };
-
-  // 수령 완료 처리 함수 추가 (확인 단계 포함)
-  const handleCompletePickup = async (id: string) => {
+  // 반납 완료 처리 함수
+  const handleCompleteReturn = async (id: string) => {
     const rental = rentals.find((r) => r.id === id);
-    if (!rental?.device_tag_name) {
-      toast.error("먼저 기기를 선택해주세요.");
-      return;
-    }
+    if (!rental) return;
 
     // 확인 단계 추가
     const confirmed = window.confirm(
-      `${rental.renter_name}님의 ${rental.device_tag_name} 기기 수령을 완료 처리하시겠습니까?\n\n처리 후에는 상태가 '수령완료'로 변경됩니다.`
+      `${rental.renter_name}님의 ${
+        rental.device_tag_name || rental.device_category
+      } 기기 반납을 완료 처리하시겠습니까?\n\n처리 후에는 상태가 '반납완료'로 변경됩니다.`
     );
 
     if (!confirmed) return;
@@ -187,10 +124,11 @@ export function OutgoingList({
     try {
       setIsUpdating((prev) => ({ ...prev, [id]: true }));
 
+      // 상태를 returned로 변경
       const { error } = await supabase
         .from("rental_reservations")
         .update({
-          status: "picked_up",
+          status: "returned",
         })
         .eq("id", id);
 
@@ -201,17 +139,17 @@ export function OutgoingList({
           rental.id === id
             ? {
                 ...rental,
-                status: "picked_up" as ReservationStatus,
+                status: "returned" as ReservationStatus,
               }
             : rental
         )
       );
 
-      toast.success("수령 완료 처리되었습니다.");
+      toast.success("반납 완료 처리되었습니다.");
       onStatusUpdate?.();
     } catch (error) {
-      console.error("수령 완료 처리 실패:", error);
-      toast.error("수령 완료 처리에 실패했습니다.");
+      console.error("반납 완료 처리 실패:", error);
+      toast.error("반납 완료 처리에 실패했습니다.");
     } finally {
       setIsUpdating((prev) => ({ ...prev, [id]: false }));
     }
@@ -227,9 +165,9 @@ export function OutgoingList({
       {rentals.map((rental) => (
         <Card
           key={rental.id}
-          className={`border-2 ${CARD_BORDER_COLORS[rental.status]} ${
-            STATUS_MAP[rental.status].color
-          } p-3`}
+          className={`!border-2 shadow-sm ${
+            CARD_BORDER_COLORS[rental.status]
+          } ${STATUS_MAP[rental.status].color} p-3`}
         >
           <div className="flex flex-col gap-2 text-sm">
             <div className="flex gap-2 justify-between">
@@ -248,87 +186,48 @@ export function OutgoingList({
                 </div>
                 <div className="text-xs text-gray-600 flex gap-2 items-center">
                   <MapPinIcon className="w-3 h-3" />
-                  <span>{PICKUP_METHOD_LABELS[rental.pickup_method]}</span>
+                  <span>{RETURN_METHOD_LABELS[rental.return_method]}</span>
                 </div>
                 <div className="text-xs text-gray-600 flex gap-2 items-center">
                   <CalendarIcon className="w-3 h-3" />
                   <span>
-                    {format(new Date(rental.pickup_date), "yyyy.MM.dd", {
+                    반납:{" "}
+                    {format(new Date(rental.return_date), "yyyy.MM.dd", {
                       locale: ko,
                     })}{" "}
-                    {rental.pickup_time.slice(0, 5)}
+                    {rental.return_time.slice(0, 5)}
                   </span>
                 </div>
               </div>
 
               <div className="flex flex-col items-end gap-2 text-sm">
-                {/* 기기 선택/표시 */}
+                {/* 기기 정보 표시 */}
                 <div className="w-36">
-                  {rental.status === "pending" ? (
-                    <Select
-                      value={
-                        rental.device_tag_name ||
-                        selectedDevices[rental.id] ||
-                        "placeholder"
-                      }
-                      onValueChange={(value) => {
-                        setSelectedDevices((prev) => ({
-                          ...prev,
-                          [rental.id]: value,
-                        }));
-                        handleDeviceSelect(rental.id, value);
-                      }}
-                      disabled={isUpdating[rental.id]}
-                    >
-                      <SelectTrigger className="h-7 text-sm bg-white border-gray-400">
-                        <SelectValue>
-                          {rental.device_tag_name ||
-                            (selectedDevices[rental.id] &&
-                            selectedDevices[rental.id] !== "placeholder"
-                              ? selectedDevices[rental.id]
-                              : `${
-                                  DEVICE_CATEGORY_LABELS[rental.device_category]
-                                } 선택`)}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="placeholder">
-                          {`${
-                            DEVICE_CATEGORY_LABELS[rental.device_category]
-                          } 선택`}
-                        </SelectItem>
-                        {devices
-                          .filter(
-                            (device) =>
-                              device.category === rental.device_category
-                          )
-                          .map((device) => (
-                            <SelectItem
-                              key={device.tag_name}
-                              value={device.tag_name}
-                            >
-                              {device.tag_name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="text-sm font-mono bg-white px-2 py-1 rounded border text-center">
-                      {rental.device_tag_name || rental.device_category}
-                    </div>
-                  )}
+                  <div className="text-sm font-mono bg-white px-2 py-1 rounded border text-center">
+                    {rental.device_tag_name || rental.device_category}
+                  </div>
                 </div>
 
-                {/* 수령 완료 버튼 (pending 상태이고 기기가 할당된 경우에만 표시) */}
-                {rental.status === "pending" && rental.device_tag_name && (
+                {/* 반납 완료 버튼 (picked_up 상태인 경우에만 표시) */}
+                {rental.status === "picked_up" && (
                   <Button
                     size="sm"
-                    onClick={() => handleCompletePickup(rental.id)}
+                    onClick={() => handleCompleteReturn(rental.id)}
                     disabled={isUpdating[rental.id]}
-                    className="h-7 w-36 text-xs bg-blue-600 hover:bg-blue-700"
+                    className="h-7 w-36 text-xs bg-green-600 hover:bg-green-700"
                   >
-                    {isUpdating[rental.id] ? "처리중..." : "수령 완료"}
+                    {isUpdating[rental.id] ? "처리중..." : "반납 완료"}
                   </Button>
+                )}
+
+                {/* 반납 완료 표시 */}
+                {rental.status === "returned" && (
+                  <div className="w-36">
+                    <Badge className="w-full justify-center text-xs bg-green-100 text-green-800 border-green-200">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      반납완료
+                    </Badge>
+                  </div>
                 )}
 
                 {/* 상태 수동 변경 (개발자/관리자용) */}
@@ -425,7 +324,7 @@ export function OutgoingList({
 
       {rentals.length === 0 && (
         <div className="col-span-full text-center py-6 text-gray-500 text-sm">
-          출고할 예약이 없습니다.
+          반납할 예약이 없습니다.
         </div>
       )}
     </div>

@@ -261,7 +261,7 @@ export default function ArrivalCheckinPage() {
                 className={`border-green-500 ${
                   formData.serviceType === key
                     ? "bg-green-500 text-white"
-                    : "text-green-500 hover:bg-green-50"
+                    : "text-green-700 hover:bg-green-100"
                 }`}
                 onClick={() => setFormData({ ...formData, serviceType: key })}
               >
