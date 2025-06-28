@@ -64,6 +64,7 @@ const translations = {
       pending: "수령 전",
       picked_up: "수령 완료",
       not_picked_up: "미수령",
+      returned: "반납 완료",
     },
 
     // 수령/반납 방법 라벨
@@ -116,6 +117,7 @@ const translations = {
       pending: "Pending Pickup",
       picked_up: "Picked Up",
       not_picked_up: "Not Picked Up",
+      returned: "Returned",
     },
 
     // Pickup/return method labels
@@ -281,6 +283,8 @@ export default function CheckReservationPage() {
                     reservation.status === "pending"
                       ? "secondary"
                       : reservation.status === "picked_up"
+                      ? "default"
+                      : reservation.status === "returned"
                       ? "default"
                       : "destructive"
                   }
