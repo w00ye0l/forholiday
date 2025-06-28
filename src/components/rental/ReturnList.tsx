@@ -160,32 +160,16 @@ export function ReturnList({
     setNotes((prev) => ({ ...prev, [id]: currentDescription || "" }));
   };
 
-  // 지연 반납 여부 확인 (오늘 기준)
-  const isOverdue = (returnDate: string) => {
-    const today = new Date();
-    const returnDateObj = new Date(returnDate);
-    return returnDateObj < today;
-  };
-
   return (
     <div className="grid gap-2 md:gap-4 md:grid-cols-2 xl:grid-cols-3">
       {rentals.map((rental) => (
         <Card
           key={rental.id}
-          className={`border-2 ${CARD_BORDER_COLORS[rental.status]} ${
-            STATUS_MAP[rental.status].color
-          } ${
-            isOverdue(rental.return_date) ? "border-red-500 bg-red-50" : ""
-          } p-3`}
+          className={`!border-2 shadow-sm ${
+            CARD_BORDER_COLORS[rental.status]
+          } ${STATUS_MAP[rental.status].color} p-3`}
         >
           <div className="flex flex-col gap-2 text-sm">
-            {/* 지연 반납 표시 */}
-            {isOverdue(rental.return_date) && (
-              <div className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded font-medium">
-                ⚠️ 지연 반납
-              </div>
-            )}
-
             <div className="flex gap-2 justify-between">
               {/* 메인 정보 (이름, 연락처, 시간) */}
               <div className="flex flex-col justify-between gap-1">
