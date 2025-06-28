@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { RentalReservation } from "@/types/rental";
+import { RentalReservation, STATUS_MAP } from "@/types/rental";
 import { DEVICE_CATEGORY_LABELS } from "@/types/device";
 import {
   Table,
@@ -25,12 +25,6 @@ interface RentalListProps {
   searchTerm?: string;
   loading?: boolean;
 }
-
-const statusMap = {
-  pending: { label: "수령전", variant: "secondary" },
-  picked_up: { label: "수령완료", variant: "default" },
-  not_picked_up: { label: "미수령", variant: "destructive" },
-} as const;
 
 // 검색어 하이라이트 함수
 const highlightText = (text: string, searchTerm: string) => {
@@ -144,8 +138,8 @@ export function RentalList({
                 </div>
               </TableCell>
               <TableCell className="text-center">
-                <Badge variant={statusMap[rental.status].variant as any}>
-                  {statusMap[rental.status].label}
+                <Badge variant={STATUS_MAP[rental.status].variant as any}>
+                  {STATUS_MAP[rental.status].label}
                 </Badge>
               </TableCell>
             </TableRow>

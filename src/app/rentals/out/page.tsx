@@ -24,7 +24,7 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import type { RentalReservation, PickupMethod } from "@/types/rental";
-import type { Device } from "@/types/device";
+import type { Device, DeviceStatus } from "@/types/device";
 
 export default function RentalOutPage() {
   const [rentals, setRentals] = useState<RentalReservation[]>([]);
@@ -52,10 +52,11 @@ export default function RentalOutPage() {
       .order("pickup_time", { ascending: true });
 
     // 사용 가능한 기기 목록 조회
+    const availableStatus: DeviceStatus = "available";
     const { data: devicesData } = await supabase
       .from("devices")
       .select("*")
-      .eq("status", "available")
+      .eq("status", availableStatus)
       .order("tag_name");
 
     setRentals(rentalsData || []);

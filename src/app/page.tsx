@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import type { RentalReservation } from "@/types/rental";
 import type { StorageReservation } from "@/types/storage";
-import { DEVICE_CATEGORY_LABELS } from "@/types/device";
+import { DEVICE_CATEGORY_LABELS, DeviceStatus } from "@/types/device";
 import { toast } from "sonner";
 
 interface DashboardStats {
@@ -95,10 +95,11 @@ export default function Page() {
           .in("status", ["pending", "stored"]);
 
         // 이용 가능한 기기 수
+        const availableStatus: DeviceStatus = "available";
         const { count: availableDevices } = await supabase
           .from("devices")
           .select("*", { count: "exact", head: true })
-          .eq("status", "available");
+          .eq("status", availableStatus);
 
         // 터미널 특이사항 로드
         const { data: terminalNotesData } = await supabase

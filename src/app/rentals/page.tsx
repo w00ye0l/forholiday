@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -30,7 +29,7 @@ import {
   CalendarIcon,
   XIcon,
 } from "lucide-react";
-import { RentalReservation } from "@/types/rental";
+import { RentalReservation, STATUS_MAP } from "@/types/rental";
 import {
   exportToExcel,
   transformRentalDataForExcel,
@@ -50,11 +49,7 @@ type RentalWithDevice = RentalReservation & {
   };
 };
 
-const statusMap = {
-  pending: { label: "수령전", variant: "secondary" },
-  picked_up: { label: "수령완료", variant: "default" },
-  not_picked_up: { label: "미수령", variant: "destructive" },
-} as const;
+// statusMap은 이제 STATUS_MAP으로 대체됨
 
 export default function RentalsPage() {
   const [rentals, setRentals] = useState<RentalWithDevice[]>([]);
@@ -539,7 +534,7 @@ export default function RentalsPage() {
                     <SelectItem value="all">전체 상태</SelectItem>
                     {getUniqueStatuses().map((status) => (
                       <SelectItem key={status} value={status}>
-                        {statusMap[status].label}
+                        {STATUS_MAP[status].label}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -14,7 +14,13 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { RentalReservation, ReservationStatus } from "@/types/rental";
+import {
+  RentalReservation,
+  ReservationStatus,
+  STATUS_MAP,
+  PICKUP_METHOD_LABELS,
+  CARD_BORDER_COLORS,
+} from "@/types/rental";
 import { Device, DEVICE_CATEGORY_LABELS } from "@/types/device";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -25,36 +31,6 @@ interface OutgoingListProps {
   devices: Device[];
   onStatusUpdate?: () => void;
 }
-
-// 상태 라벨 매핑
-const STATUS_LABELS: Record<ReservationStatus, string> = {
-  pending: "수령전",
-  picked_up: "수령완료",
-  not_picked_up: "미수령",
-};
-
-// 상태별 색상 매핑 (배지용)
-const STATUS_COLORS: Record<ReservationStatus, string> = {
-  pending: "bg-gray-50 text-gray-800",
-  picked_up: "bg-blue-100 text-blue-800",
-  not_picked_up: "bg-red-100 text-red-800",
-};
-
-// 상태별 카드 배경 색상
-const CARD_BORDER_COLORS: Record<ReservationStatus, string> = {
-  pending: "border-gray-200",
-  picked_up: "border-blue-400",
-  not_picked_up: "border-red-400",
-};
-
-// 수령 방법 라벨
-const PICKUP_METHOD_LABELS = {
-  T1: "터미널1",
-  T2: "터미널2",
-  delivery: "택배",
-  office: "사무실",
-  hotel: "호텔",
-};
 
 export function OutgoingList({
   rentals: initialRentals,
@@ -252,7 +228,7 @@ export function OutgoingList({
         <Card
           key={rental.id}
           className={`border-2 ${CARD_BORDER_COLORS[rental.status]} ${
-            STATUS_COLORS[rental.status]
+            STATUS_MAP[rental.status].color
           } p-3`}
         >
           <div className="flex flex-col gap-2 text-sm">
@@ -368,11 +344,13 @@ export function OutgoingList({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(STATUS_LABELS).map(([status, label]) => (
-                        <SelectItem key={status} value={status}>
-                          {label}
-                        </SelectItem>
-                      ))}
+                      {Object.entries(STATUS_MAP).map(
+                        ([status, statusInfo]) => (
+                          <SelectItem key={status} value={status}>
+                            {statusInfo.label}
+                          </SelectItem>
+                        )
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

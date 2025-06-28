@@ -6,7 +6,13 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RentalReservation } from "@/types/rental";
+import {
+  RentalReservation,
+  STATUS_MAP,
+  PICKUP_METHOD_LABELS,
+  RETURN_METHOD_LABELS,
+  RESERVATION_SITE_LABELS,
+} from "@/types/rental";
 
 interface RentalDetail extends RentalReservation {
   devices: {
@@ -17,42 +23,7 @@ interface RentalDetail extends RentalReservation {
   };
 }
 
-const statusMap = {
-  pending: { label: "수령전", variant: "secondary" },
-  picked_up: { label: "수령완료", variant: "default" },
-  not_picked_up: { label: "미수령", variant: "destructive" },
-} as const;
-
-const PICKUP_METHOD_LABELS = {
-  T1: "터미널1",
-  T2: "터미널2",
-  delivery: "택배",
-  office: "사무실",
-  direct: "대면",
-} as const;
-
-const RETURN_METHOD_LABELS = {
-  T1: "터미널1",
-  T2: "터미널2",
-  delivery: "택배",
-  office: "사무실",
-  direct: "대면",
-} as const;
-
-const RESERVATION_SITE_LABELS = {
-  naver: "네이버",
-  forholiday: "포할리데이 홈페이지",
-  creatrip: "Creatrip",
-  klook: "Klook",
-  seoulpass: "Seoulpass",
-  trip_com: "Trip.com",
-  rakuten: "Rakuten",
-  triple: "Triple",
-  forholidayg: "forholidayg.com",
-  myrealtrip: "마이리얼트립",
-  waug: "와그",
-  hanatour: "하나투어",
-} as const;
+// 모든 라벨 매핑은 이제 @/types/rental에서 import됨
 
 export default function RentalDetailPage() {
   const params = useParams();
@@ -256,8 +227,8 @@ export default function RentalDetailPage() {
                   상태
                 </td>
                 <td className="px-4 py-3">
-                  <Badge variant={statusMap[rental.status].variant as any}>
-                    {statusMap[rental.status].label}
+                  <Badge variant={STATUS_MAP[rental.status].variant as any}>
+                    {STATUS_MAP[rental.status].label}
                   </Badge>
                 </td>
               </tr>

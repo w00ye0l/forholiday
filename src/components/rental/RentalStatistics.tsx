@@ -12,14 +12,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Calendar,
-  BarChart3,
-  PieChart as PieChartIcon,
-  Package2,
-  TrendingUp,
-  CalendarDays,
-} from "lucide-react";
+import { BarChart3, Package2, TrendingUp } from "lucide-react";
 import { RentalReservation } from "@/types/rental";
 import { DEVICE_CATEGORY_LABELS } from "@/types/device";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

@@ -9,6 +9,10 @@ import {
   ReturnMethod,
   ReservationSite,
   ReservationStatus,
+  STATUS_MAP,
+  PICKUP_METHOD_LABELS,
+  RETURN_METHOD_LABELS,
+  RESERVATION_SITE_LABELS,
 } from "@/types/rental";
 
 export function cn(...inputs: ClassValue[]) {
@@ -71,57 +75,38 @@ export const exportToExcel = (
   }
 };
 
-// 수령 방법 라벨 변환
+// 수령 방법 라벨 변환 (공항 표시를 위해 확장)
 const getPickupMethodLabel = (method: PickupMethod): string => {
-  const labels: Record<PickupMethod, string> = {
+  const extendedLabels: Record<PickupMethod, string> = {
     T1: "인천공항 T1",
     T2: "인천공항 T2",
     delivery: "택배",
     office: "사무실",
     hotel: "호텔",
   };
-  return labels[method] || method;
+  return extendedLabels[method] || PICKUP_METHOD_LABELS[method] || method;
 };
 
-// 반납 방법 라벨 변환
+// 반납 방법 라벨 변환 (공항 표시를 위해 확장)
 const getReturnMethodLabel = (method: ReturnMethod): string => {
-  const labels: Record<ReturnMethod, string> = {
+  const extendedLabels: Record<ReturnMethod, string> = {
     T1: "인천공항 T1",
     T2: "인천공항 T2",
     delivery: "택배",
     office: "사무실",
     hotel: "호텔",
   };
-  return labels[method] || method;
+  return extendedLabels[method] || RETURN_METHOD_LABELS[method] || method;
 };
 
 // 예약 사이트 라벨 변환
 const getReservationSiteLabel = (site: ReservationSite): string => {
-  const labels: Record<ReservationSite, string> = {
-    naver: "네이버",
-    forholiday: "포홀리데이",
-    creatrip: "크리에이트립",
-    klook: "클룩",
-    seoulpass: "서울패스",
-    trip_com: "Trip.com",
-    rakuten: "라쿠텐",
-    triple: "트리플",
-    forholidayg: "포홀리데이G",
-    myrealtrip: "마이리얼트립",
-    waug: "와그",
-    hanatour: "하나투어",
-  };
-  return labels[site] || site;
+  return RESERVATION_SITE_LABELS[site] || site;
 };
 
 // 예약 상태 라벨 변환
 const getStatusLabel = (status: ReservationStatus): string => {
-  const labels: Record<ReservationStatus, string> = {
-    pending: "수령전",
-    picked_up: "수령완료",
-    not_picked_up: "미수령",
-  };
-  return labels[status] || status;
+  return STATUS_MAP[status]?.label || status;
 };
 
 // 렌탈 데이터 엑셀 출력용 변환 함수

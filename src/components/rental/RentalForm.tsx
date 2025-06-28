@@ -34,9 +34,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
   CreateRentalReservationDto,
-  PickupMethod,
-  ReturnMethod,
-  ReservationSite,
+  PICKUP_METHOD_LABELS,
+  RETURN_METHOD_LABELS,
+  RESERVATION_SITE_LABELS,
 } from "@/types/rental";
 import { DEVICE_FEATURES, DEVICE_CATEGORY_LABELS } from "@/types/device";
 import { useRouter } from "next/navigation";
@@ -124,38 +124,7 @@ interface RentalFormProps {
   isSubmitting?: boolean;
 }
 
-// 수령/반납 방법 라벨
-const PICKUP_METHOD_LABELS: Record<PickupMethod, string> = {
-  T1: "터미널1",
-  T2: "터미널2",
-  delivery: "택배",
-  office: "사무실",
-  hotel: "호텔",
-};
-
-const RETURN_METHOD_LABELS: Record<ReturnMethod, string> = {
-  T1: "터미널1",
-  T2: "터미널2",
-  delivery: "택배",
-  office: "사무실",
-  hotel: "호텔",
-};
-
-// 예약 사이트 라벨
-const RESERVATION_SITE_LABELS: Record<ReservationSite, string> = {
-  naver: "네이버",
-  forholiday: "포할리데이 홈페이지",
-  creatrip: "Creatrip",
-  klook: "Klook",
-  seoulpass: "Seoulpass",
-  trip_com: "Trip.com",
-  rakuten: "Rakuten",
-  triple: "Triple",
-  forholidayg: "forholidayg.com",
-  myrealtrip: "마이리얼트립",
-  waug: "와그",
-  hanatour: "하나투어",
-};
+// 모든 라벨 매핑은 이제 @/types/rental에서 import됨
 
 export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
   const [isLoading, setIsLoading] = useState(false);
