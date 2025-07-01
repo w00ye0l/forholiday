@@ -47,7 +47,11 @@ const translations = {
     submit: "전송",
     sending: "전송 중...",
     success: "체크인이 완료되었습니다. 직원이 곧 찾아뵙겠습니다!",
+    successEarly:
+      "체크인이 완료되었습니다. 직원이 찾아가겠습니다. 2~3분 걸릴 수 있습니다!",
     error: "전송에 실패했습니다. 다시 시도해주세요.",
+    confirmMessage:
+      "아직 도착 전이라면 전송 시 혼선이 발생할 수 있습니다. 계속 하시겠습니까?",
   },
   en: {
     selectLanguage: "Select Language",
@@ -80,7 +84,11 @@ const translations = {
     submit: "Submit",
     sending: "Sending...",
     success: "Check-in completed. Our staff will meet you soon!",
+    successEarly:
+      "Check-in completed. Our staff will come to find you. It may take 2-3 minutes!",
     error: "Failed to send. Please try again.",
+    confirmMessage:
+      "If you haven't arrived yet, sending now may cause confusion. Do you want to continue?",
   },
   ja: {
     selectLanguage: "言語選択",
@@ -112,7 +120,11 @@ const translations = {
     submit: "送信",
     sending: "送信中...",
     success: "チェックインが完了しました。スタッフがすぐにお会いいたします！",
+    successEarly:
+      "チェックインが完了しました。スタッフがお探しいたします。2〜3分かかる場合があります！",
     error: "送信に失敗しました。もう一度お試しください。",
+    confirmMessage:
+      "まだ到着前の場合、送信時に混乱が生じる可能性があります。続行しますか？",
   },
 };
 
@@ -145,8 +157,29 @@ export default function ArrivalCheckinPage() {
 
   const t = translations[language];
 
+  const isEarlyArrival = () => {
+    return (
+      formData.arrivalStatus === "thirtyMinBefore" ||
+      formData.arrivalStatus === "tenMinBefore"
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 아직 도착 전이라면 확인 팝업 표시
+    if (isEarlyArrival()) {
+      const confirmed = window.confirm(t.confirmMessage);
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    // 전송 진행
+    await submitCheckin();
+  };
+
+  const submitCheckin = async () => {
     setIsSubmitting(true);
 
     try {
@@ -165,7 +198,9 @@ export default function ArrivalCheckinPage() {
         throw new Error("Failed to send checkin");
       }
 
-      toast.success(t.success);
+      // 성공 메시지를 도착 상태에 따라 다르게 표시
+      const successMessage = isEarlyArrival() ? t.successEarly : t.success;
+      toast.success(successMessage);
 
       // 폼 초기화
       setFormData({
@@ -221,7 +256,6 @@ export default function ArrivalCheckinPage() {
           <div className="space-y-4">
             <div className="flex flex-col items-center">
               <div className="w-full max-w-xs bg-gray-200 rounded-lg shadow-md flex items-center justify-center mb-2 overflow-hidden">
-                {/* <span className="text-gray-500">Terminal 1 Image</span> */}
                 <Image
                   className="w-full object-contain"
                   src="/images/terminal1.png"
