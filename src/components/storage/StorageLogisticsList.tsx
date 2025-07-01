@@ -23,10 +23,8 @@ import {
   CheckCircle,
   Package,
   Clock,
-  User,
   Phone,
   Calendar as CalendarIcon,
-  Hash,
   FileText,
   Tag,
   Edit2,
@@ -243,12 +241,6 @@ export default function StorageLogisticsList({
     return type === "drop-off" ? "보관 완료" : "픽업 완료";
   };
 
-  const getProcessDescription = () => {
-    return type === "drop-off"
-      ? "고객이 맡긴 짐을 보관소에 저장하세요"
-      : "고객이 찾아갈 짐을 준비하고 전달하세요";
-  };
-
   const getStatusLabel = (status: string) => {
     if (type === "drop-off") {
       switch (status) {
@@ -280,14 +272,6 @@ export default function StorageLogisticsList({
             ] || status
           );
       }
-    }
-  };
-
-  const getDateTimeText = (storage: StorageReservation) => {
-    if (type === "drop-off") {
-      return `${storage.drop_off_date} ${storage.drop_off_time.slice(0, 5)}`;
-    } else {
-      return `${storage.pickup_date} ${storage.pickup_time.slice(0, 5)}`;
     }
   };
 
@@ -402,7 +386,7 @@ export default function StorageLogisticsList({
               </div>
 
               {/* 핵심 정보 */}
-              <div className="space-y-2 pt-1">
+              <div className="space-y-1">
                 {/* 태그 번호 */}
                 <div className="flex items-center gap-1.5 text-xs md:text-sm">
                   <Tag className="w-3 h-3 md:w-4 md:h-4 text-blue-500" />
@@ -796,19 +780,14 @@ export default function StorageLogisticsList({
 
       {storages.length === 0 && (
         <div className="col-span-full">
-          <Card className="border-2 border-dashed border-gray-300">
-            <CardContent className="flex flex-col items-center justify-center py-8 md:py-12">
-              <Package className="w-8 h-8 md:w-12 md:h-12 text-gray-400 mb-2 md:mb-4" />
-              <h3 className="text-base md:text-lg font-medium text-gray-500 mb-1 md:mb-2">
-                {type === "drop-off"
-                  ? "입고할 짐이 없습니다"
-                  : "픽업할 짐이 없습니다"}
-              </h3>
-              <p className="text-xs md:text-sm text-gray-400 text-center">
-                {getProcessDescription()}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col items-center justify-center py-8 md:py-12">
+            <Package className="w-8 h-8 md:w-12 md:h-12 text-gray-400 mb-2 md:mb-4" />
+            <h3 className="text-base md:text-lg font-medium text-gray-500 mb-1 md:mb-2">
+              {type === "drop-off"
+                ? "입고할 짐이 없습니다"
+                : "픽업할 짐이 없습니다"}
+            </h3>
+          </div>
         </div>
       )}
     </div>

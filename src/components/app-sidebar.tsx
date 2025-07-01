@@ -55,7 +55,7 @@ const data = {
   ],
   storageMenu: [
     {
-      title: "짐보관 관리",
+      title: "짐보관 목록",
       url: "/storage",
       icon: CalendarIcon,
     },
