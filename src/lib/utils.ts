@@ -14,6 +14,13 @@ import {
   RETURN_METHOD_LABELS,
   RESERVATION_SITE_LABELS,
 } from "@/types/rental";
+import {
+  StorageReservation,
+  StorageStatus,
+  STORAGE_STATUS_LABELS,
+  ReservationSite as StorageReservationSite,
+  RESERVATION_SITE_LABELS as STORAGE_RESERVATION_SITE_LABELS,
+} from "@/types/storage";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -359,6 +366,143 @@ export const transformRentalStatsForExcel = (
       수령완료: "",
       미수령: "",
       "데이터 전송 예": "",
+      생성일: "",
+    })),
+  ];
+};
+
+// 보관 상태 라벨 변환
+const getStorageStatusLabel = (status: StorageStatus): string => {
+  return STORAGE_STATUS_LABELS[status] || status;
+};
+
+// 보관 예약 사이트 라벨 변환
+const getStorageReservationSiteLabel = (
+  site: StorageReservationSite
+): string => {
+  return STORAGE_RESERVATION_SITE_LABELS[site] || site;
+};
+
+// 보관 데이터 엑셀 출력용 변환 함수
+export const transformStorageDataForExcel = (
+  storages: StorageReservation[]
+) => {
+  return storages.map((storage, index) => ({
+    순번: index + 1,
+    예약번호: storage.reservation_id,
+    고객명: storage.customer_name,
+    연락처: storage.phone_number,
+    물품설명: storage.items_description,
+    개수: storage.quantity,
+    태그번호: storage.tag_number || "-",
+    맡기는날짜: storage.drop_off_date
+      ? format(new Date(storage.drop_off_date), "yyyy-MM-dd", { locale: ko })
+      : "-",
+    맡기는시간: storage.drop_off_time || "-",
+    찾는날짜: storage.pickup_date
+      ? format(new Date(storage.pickup_date), "yyyy-MM-dd", { locale: ko })
+      : "-",
+    찾는시간: storage.pickup_time || "-",
+    "예약 사이트": getStorageReservationSiteLabel(
+      storage.reservation_site as StorageReservationSite
+    ),
+    상태: getStorageStatusLabel(storage.status),
+    메모: storage.notes || "-",
+    생성일: storage.created_at
+      ? format(new Date(storage.created_at), "yyyy-MM-dd HH:mm", { locale: ko })
+      : "-",
+    수정일: storage.updated_at
+      ? format(new Date(storage.updated_at), "yyyy-MM-dd HH:mm", { locale: ko })
+      : "-",
+  }));
+};
+
+// 보관 통계 데이터 변환 함수
+export const transformStorageStatsForExcel = (
+  storages: StorageReservation[],
+  dateRange: string
+) => {
+  // 예약 사이트별 통계
+  const siteStats = new Map<string, { count: number; quantity: number }>();
+  storages.forEach((storage) => {
+    const site = getStorageReservationSiteLabel(
+      storage.reservation_site as StorageReservationSite
+    );
+    const existing = siteStats.get(site) || { count: 0, quantity: 0 };
+    siteStats.set(site, {
+      count: existing.count + 1,
+      quantity: existing.quantity + storage.quantity,
+    });
+  });
+
+  const siteStatsArray = Array.from(siteStats.entries()).map(
+    ([site, stats]) => ({
+      "예약 사이트": site,
+      건수: stats.count,
+      "건수 비율(%)":
+        storages.length > 0
+          ? ((stats.count / storages.length) * 100).toFixed(1)
+          : "0",
+      개수: stats.quantity,
+    })
+  );
+
+  // 상태별 통계
+  const statusCounts = {
+    pending: storages.filter((s) => s.status === "pending").length,
+    stored: storages.filter((s) => s.status === "stored").length,
+    retrieved: storages.filter((s) => s.status === "retrieved").length,
+  };
+
+  const totalQuantity = storages.reduce(
+    (sum, storage) => sum + storage.quantity,
+    0
+  );
+
+  // 전체 통계
+  const summary = [
+    {
+      구분: "전체 통계",
+      "조회 기간": dateRange,
+      "총 보관 건수": storages.length,
+      "총 보관 개수": totalQuantity,
+      대기중: statusCounts.pending,
+      보관중: statusCounts.stored,
+      찾아감: statusCounts.retrieved,
+      생성일: format(new Date(), "yyyy-MM-dd HH:mm", { locale: ko }),
+    },
+  ];
+
+  return [
+    ...summary,
+    {
+      구분: "",
+      "조회 기간": "",
+      "총 보관 건수": "",
+      "총 보관 개수": "",
+      대기중: "",
+      보관중: "",
+      찾아감: "",
+      생성일: "",
+    },
+    {
+      구분: "예약 사이트별 통계",
+      "조회 기간": "",
+      "총 보관 건수": "",
+      "총 보관 개수": "",
+      대기중: "",
+      보관중: "",
+      찾아감: "",
+      생성일: "",
+    },
+    ...siteStatsArray.map((item) => ({
+      구분: item["예약 사이트"],
+      "조회 기간": "",
+      "총 보관 건수": item["건수"],
+      "총 보관 개수": item["개수"],
+      대기중: `${item["건수 비율(%)"]}%`,
+      보관중: "",
+      찾아감: "",
       생성일: "",
     })),
   ];
