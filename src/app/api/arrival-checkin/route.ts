@@ -44,22 +44,12 @@ function formatMessage(data: CheckinData) {
     arrivalStatusTexts[arrivalStatus as keyof typeof arrivalStatusTexts] ||
     arrivalStatus;
 
-  const currentTime = new Date().toLocaleString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  const tagInfo = tagName ? `\n- 태그 번호: ${tagName}` : "";
 
-  const tagInfo = tagName ? `\n🏷️ *태그 번호*: ${tagName}` : "";
-
-  return `✈️ [${terminalText}/${serviceTypeText}]
-👤 *고객명*: ${name}${tagInfo}
-⏱️ *도착 상태*: ${arrivalStatusText}
-⏰ *접수 시간*: ${currentTime}`;
+  return `[${terminalText}/${serviceTypeText}]
+- 이름: ${name}${tagInfo}
+- 위치: ${terminalText}
+- 도착 상태: ${arrivalStatusText}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -106,7 +96,6 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           chat_id: TELEGRAM_CHAT_ID,
           text: message,
-          parse_mode: "Markdown",
         }),
       }
     );
