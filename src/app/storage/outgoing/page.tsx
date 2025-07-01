@@ -220,7 +220,7 @@ export default function StorageOutgoingPage() {
                   placeholder="고객명, 예약번호, 물품명, 태그번호, 메모 검색"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 text-sm"
                 />
               </div>
 
