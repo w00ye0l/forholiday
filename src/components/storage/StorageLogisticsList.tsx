@@ -124,7 +124,47 @@ export default function StorageLogisticsList({
   };
 
   const getActionButtonText = () => {
-    return type === "drop-off" ? "보관 완료" : "찾아감 완료";
+    return type === "drop-off" ? "보관 완료" : "픽업 완료";
+  };
+
+  const getProcessDescription = () => {
+    return type === "drop-off"
+      ? "고객이 맡긴 짐을 보관소에 저장하세요"
+      : "고객이 찾아갈 짐을 준비하고 전달하세요";
+  };
+
+  const getStatusLabel = (status: string) => {
+    if (type === "drop-off") {
+      switch (status) {
+        case "pending":
+          return "보관 전";
+        case "stored":
+          return "보관 완료";
+        case "retrieved":
+          return "찾아감";
+        default:
+          return (
+            STORAGE_STATUS_LABELS[
+              status as keyof typeof STORAGE_STATUS_LABELS
+            ] || status
+          );
+      }
+    } else {
+      switch (status) {
+        case "pending":
+          return "대기중";
+        case "stored":
+          return "픽업 대기";
+        case "retrieved":
+          return "픽업 완료";
+        default:
+          return (
+            STORAGE_STATUS_LABELS[
+              status as keyof typeof STORAGE_STATUS_LABELS
+            ] || status
+          );
+      }
+    }
   };
 
   const getDateTimeText = (storage: StorageReservation) => {
@@ -156,7 +196,7 @@ export default function StorageLogisticsList({
                 variant="outline"
                 className="text-xs md:text-sm font-medium border-2"
               >
-                {STORAGE_STATUS_LABELS[storage.status]}
+                {getStatusLabel(storage.status)}
               </Badge>
             </div>
 
@@ -246,13 +286,11 @@ export default function StorageLogisticsList({
               <Package className="w-8 h-8 md:w-12 md:h-12 text-gray-400 mb-2 md:mb-4" />
               <h3 className="text-base md:text-lg font-medium text-gray-500 mb-1 md:mb-2">
                 {type === "drop-off"
-                  ? "들어올 짐이 없습니다"
-                  : "나갈 짐이 없습니다"}
+                  ? "입고할 짐이 없습니다"
+                  : "픽업할 짐이 없습니다"}
               </h3>
-              <p className="text-xs md:text-sm text-gray-400">
-                {type === "drop-off"
-                  ? "대기중인 보관 예약이 없습니다."
-                  : "찾아갈 준비가 된 짐이 없습니다."}
+              <p className="text-xs md:text-sm text-gray-400 text-center">
+                {getProcessDescription()}
               </p>
             </CardContent>
           </Card>
