@@ -3,6 +3,8 @@
 import * as React from "react";
 import {
   ArrowRightIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
   BoxIcon,
   CalendarIcon,
   FileTextIcon,
@@ -53,7 +55,7 @@ const data = {
   ],
   storageMenu: [
     {
-      title: "짐보관 관리",
+      title: "짐보관 목록",
       url: "/storage",
       icon: CalendarIcon,
     },
@@ -63,9 +65,14 @@ const data = {
       icon: PlusCircleIcon,
     },
     {
-      title: "입출고 관리",
-      url: "/storage/logistics",
-      icon: PackageIcon,
+      title: "입고 관리",
+      url: "/storage/incoming",
+      icon: ArrowDownIcon,
+    },
+    {
+      title: "픽업 관리",
+      url: "/storage/outgoing",
+      icon: ArrowUpIcon,
     },
   ],
   systemMenu: [
