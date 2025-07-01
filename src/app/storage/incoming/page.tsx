@@ -17,6 +17,7 @@ import {
   PackageIcon,
   ArrowDownIcon,
   MapPinIcon,
+  FilterIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
@@ -26,7 +27,7 @@ import StorageLogisticsList from "@/components/storage/StorageLogisticsList";
 import { cn } from "@/lib/utils";
 
 export default function StorageIncomingPage() {
-  const [storages, setStorages] = useState<StorageReservation[]>([]);
+  const [allStorages, setAllStorages] = useState<StorageReservation[]>([]);
   const [filteredStorages, setFilteredStorages] = useState<
     StorageReservation[]
   >([]);
@@ -36,26 +37,25 @@ export default function StorageIncomingPage() {
   // 검색 상태
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
+  const [searchAllData, setSearchAllData] = useState(false); // 전체 데이터 검색 여부
 
   const loadData = async () => {
     setLoading(true);
     const supabase = createClient();
 
+    // 전체 보관 데이터를 로드 (검색을 위해)
     const { data: storagesData } = await supabase
       .from("storage_reservations")
       .select("*")
-      .eq("status", "pending") // 입고 관리는 대기중 상태만
       .order("drop_off_date", { ascending: true })
       .order("drop_off_time", { ascending: true });
 
-    setStorages(storagesData || []);
+    setAllStorages(storagesData || []);
     setLoading(false);
   };
 
   // 장소별 필터링 함수
   const getLocationFromReservation = (storage: StorageReservation): string => {
-    // TODO: 실제 터미널 정보 필드 추가 시 수정 필요
-    // 현재는 예약 사이트나 메모를 통해 추정
     const notes = storage.notes?.toLowerCase() || "";
     const reservationSite = storage.reservation_site?.toLowerCase() || "";
 
@@ -73,13 +73,17 @@ export default function StorageIncomingPage() {
     ) {
       return "T2";
     }
-    // 기본값은 T1으로 설정 (공항이 주요 서비스 지역)
     return "T1";
   };
 
   // 검색 필터링 로직
   useEffect(() => {
-    let filtered = storages;
+    let filtered = allStorages;
+
+    // 기본적으로는 pending 상태만, 전체 검색 시에는 모든 상태
+    if (!searchAllData) {
+      filtered = filtered.filter((storage) => storage.status === "pending");
+    }
 
     // 장소별 필터링
     if (locationTab !== "all") {
@@ -97,7 +101,7 @@ export default function StorageIncomingPage() {
       );
     }
 
-    // 검색 필터
+    // 검색 필터 (전체 데이터에서 검색 가능)
     if (searchTerm && searchTerm.trim() !== "") {
       const term = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(
@@ -112,7 +116,7 @@ export default function StorageIncomingPage() {
     }
 
     setFilteredStorages(filtered);
-  }, [storages, searchTerm, dateFilter, locationTab]);
+  }, [allStorages, searchTerm, dateFilter, locationTab, searchAllData]);
 
   useEffect(() => {
     loadData();
@@ -121,17 +125,30 @@ export default function StorageIncomingPage() {
   const handleReset = () => {
     setSearchTerm("");
     setDateFilter(undefined);
+    setSearchAllData(false);
   };
 
-  // 장소별 개수 계산
+  // 장소별 개수 계산 (기본: pending 상태만)
   const getLocationTabCount = (location: string) => {
+    const pendingStorages = allStorages.filter(
+      (storage) => storage.status === "pending"
+    );
+
     if (location === "all") {
-      return storages.length;
+      return pendingStorages.length;
     }
-    return storages.filter((storage) => {
+    return pendingStorages.filter((storage) => {
       const storageLocation = getLocationFromReservation(storage);
       return storageLocation === location;
     }).length;
+  };
+
+  // 검색 모드에 따른 설명 텍스트
+  const getSearchModeDescription = () => {
+    if (searchAllData) {
+      return "모든 보관 데이터에서 검색 중 (보관 전/보관중/찾아감 포함)";
+    }
+    return "입고 대기 상태의 데이터만 표시 중";
   };
 
   return (
@@ -179,6 +196,22 @@ export default function StorageIncomingPage() {
               </h2>
             </div>
 
+            {/* 전체 데이터 검색 토글 */}
+            <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+              <FilterIcon className="w-4 h-4 text-blue-600" />
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={searchAllData}
+                  onChange={(e) => setSearchAllData(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm font-medium text-blue-700">
+                  전체 보관 데이터에서 검색 (모든 상태 포함)
+                </span>
+              </label>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* 검색 */}
               <div className="relative">
@@ -204,7 +237,7 @@ export default function StorageIncomingPage() {
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dateFilter
                       ? format(dateFilter, "yyyy년 MM월 dd일", { locale: ko })
-                      : "맡기는 날짜 선택"}
+                      : "맡기는 날짜 선택 (선택사항)"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -225,12 +258,18 @@ export default function StorageIncomingPage() {
                 className="flex items-center gap-2"
               >
                 <RefreshCwIcon className="w-4 h-4" />
-                초기화
+                전체 초기화
               </Button>
             </div>
 
-            <div className="text-sm text-gray-600">
-              총 {filteredStorages.length}개의 입고 예정 건
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-600">
+                총 {filteredStorages.length}개의{" "}
+                {searchAllData ? "보관" : "입고 예정"} 건
+              </span>
+              <span className="text-blue-600 font-medium">
+                {getSearchModeDescription()}
+              </span>
             </div>
           </div>
 
@@ -273,6 +312,22 @@ export default function StorageIncomingPage() {
               </h2>
             </div>
 
+            {/* 전체 데이터 검색 토글 */}
+            <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+              <FilterIcon className="w-4 h-4 text-blue-600" />
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={searchAllData}
+                  onChange={(e) => setSearchAllData(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm font-medium text-blue-700">
+                  전체 보관 데이터에서 검색 (모든 상태 포함)
+                </span>
+              </label>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* 검색 */}
               <div className="relative">
@@ -298,7 +353,7 @@ export default function StorageIncomingPage() {
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dateFilter
                       ? format(dateFilter, "yyyy년 MM월 dd일", { locale: ko })
-                      : "맡기는 날짜 선택"}
+                      : "맡기는 날짜 선택 (선택사항)"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -319,12 +374,18 @@ export default function StorageIncomingPage() {
                 className="flex items-center gap-2"
               >
                 <RefreshCwIcon className="w-4 h-4" />
-                초기화
+                전체 초기화
               </Button>
             </div>
 
-            <div className="text-sm text-gray-600">
-              총 {filteredStorages.length}개의 터미널1 입고 예정 건
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-600">
+                총 {filteredStorages.length}개의 터미널1{" "}
+                {searchAllData ? "보관" : "입고 예정"} 건
+              </span>
+              <span className="text-blue-600 font-medium">
+                {getSearchModeDescription()}
+              </span>
             </div>
           </div>
 
@@ -351,6 +412,22 @@ export default function StorageIncomingPage() {
               </h2>
             </div>
 
+            {/* 전체 데이터 검색 토글 */}
+            <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+              <FilterIcon className="w-4 h-4 text-blue-600" />
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={searchAllData}
+                  onChange={(e) => setSearchAllData(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm font-medium text-blue-700">
+                  전체 보관 데이터에서 검색 (모든 상태 포함)
+                </span>
+              </label>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* 검색 */}
               <div className="relative">
@@ -376,7 +453,7 @@ export default function StorageIncomingPage() {
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dateFilter
                       ? format(dateFilter, "yyyy년 MM월 dd일", { locale: ko })
-                      : "맡기는 날짜 선택"}
+                      : "맡기는 날짜 선택 (선택사항)"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -397,12 +474,18 @@ export default function StorageIncomingPage() {
                 className="flex items-center gap-2"
               >
                 <RefreshCwIcon className="w-4 h-4" />
-                초기화
+                전체 초기화
               </Button>
             </div>
 
-            <div className="text-sm text-gray-600">
-              총 {filteredStorages.length}개의 터미널2 입고 예정 건
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-600">
+                총 {filteredStorages.length}개의 터미널2{" "}
+                {searchAllData ? "보관" : "입고 예정"} 건
+              </span>
+              <span className="text-blue-600 font-medium">
+                {getSearchModeDescription()}
+              </span>
             </div>
           </div>
 
