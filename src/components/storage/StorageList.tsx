@@ -20,11 +20,34 @@ import React from "react";
 interface StorageListProps {
   storages?: StorageReservation[];
   onStorageUpdated?: () => void;
+  searchTerm?: string;
 }
+
+// 텍스트 하이라이트 함수
+const highlightText = (text: string, searchTerm: string): React.ReactNode => {
+  if (!searchTerm.trim()) return text;
+
+  const regex = new RegExp(
+    `(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+    "gi"
+  );
+  const parts = text.split(regex);
+
+  return parts.map((part, index) =>
+    regex.test(part) ? (
+      <mark key={index} className="bg-yellow-200 px-0.5 rounded">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+};
 
 export default function StorageList({
   storages = [],
   onStorageUpdated,
+  searchTerm = "",
 }: StorageListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const supabase = createClient();
@@ -91,12 +114,14 @@ export default function StorageList({
                   href={`/storage/${storage.id}`}
                   className="text-blue-600 hover:text-blue-800 hover:underline"
                 >
-                  {storage.reservation_id}
+                  {highlightText(storage.reservation_id, searchTerm)}
                 </Link>
               </TableCell>
-              <TableCell>{storage.customer_name}</TableCell>
+              <TableCell>
+                {highlightText(storage.customer_name, searchTerm)}
+              </TableCell>
               <TableCell className="max-w-32 truncate">
-                {storage.items_description}
+                {highlightText(storage.items_description, searchTerm)}
               </TableCell>
               <TableCell>{storage.quantity}개</TableCell>
               <TableCell>{storage.tag_number || "-"}</TableCell>
@@ -142,7 +167,7 @@ export default function StorageList({
                           <div>
                             <span className="text-gray-600">연락처:</span>{" "}
                             <span className="font-medium">
-                              {storage.phone_number}
+                              {highlightText(storage.phone_number, searchTerm)}
                             </span>
                           </div>
                           <div>
@@ -168,7 +193,10 @@ export default function StorageList({
                         <div className="text-sm">
                           <div className="text-gray-600 mb-1">물품 설명:</div>
                           <div className="font-medium whitespace-pre-wrap bg-white p-2 rounded border">
-                            {storage.items_description}
+                            {highlightText(
+                              storage.items_description,
+                              searchTerm
+                            )}
                           </div>
                         </div>
                       </div>
@@ -182,7 +210,9 @@ export default function StorageList({
         {storages.length === 0 && (
           <TableRow>
             <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-              등록된 보관 예약이 없습니다.
+              {searchTerm
+                ? "검색 결과가 없습니다."
+                : "등록된 보관 예약이 없습니다."}
             </TableCell>
           </TableRow>
         )}
