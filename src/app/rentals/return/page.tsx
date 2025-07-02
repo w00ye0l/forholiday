@@ -42,16 +42,28 @@ export default function RentalReturnPage() {
     setLoading(true);
     const supabase = createClient();
 
-    // 반납 예정 및 완료된 예약 목록 조회 (반납완료 포함)
-    const { data: rentalsData } = await supabase
-      .from("rental_reservations")
-      .select("*")
-      .in("status", ["picked_up", "not_picked_up", "returned"])
-      .order("return_date", { ascending: true })
-      .order("return_time", { ascending: true });
+    try {
+      // 반납 예정 및 완료된 예약 목록 조회 (기존 상태만)
+      const { data: rentalsData, error } = await supabase
+        .from("rental_reservations")
+        .select("*")
+        .in("status", ["picked_up", "not_picked_up", "returned"])
+        .order("return_date", { ascending: true })
+        .order("return_time", { ascending: true });
 
-    setRentals(rentalsData || []);
-    setLoading(false);
+      if (error) {
+        console.error("반납 관리 데이터 로딩 에러:", error);
+        setRentals([]);
+      } else {
+        console.log("반납 관리 데이터 로드됨:", rentalsData?.length, "건");
+        setRentals(rentalsData || []);
+      }
+    } catch (error) {
+      console.error("반납 관리 데이터 로딩 실패:", error);
+      setRentals([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 검색 필터링 로직
@@ -184,6 +196,11 @@ export default function RentalReturnPage() {
       ).length,
       returned: baseFiltered.filter((rental) => rental.status === "returned")
         .length,
+      // 새로운 상태들은 나중에 DB 스키마 업데이트 후 추가
+      // overdue: baseFiltered.filter((rental) => rental.status === "overdue")
+      //   .length,
+      // problem: baseFiltered.filter((rental) => rental.status === "problem")
+      //   .length,
     };
   };
 

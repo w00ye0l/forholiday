@@ -29,7 +29,12 @@ import {
   CalendarIcon,
   XIcon,
 } from "lucide-react";
-import { RentalReservation, STATUS_MAP } from "@/types/rental";
+import {
+  RentalReservation,
+  STATUS_MAP,
+  PICKUP_METHOD_PRIORITY,
+  PICKUP_METHOD_LABELS,
+} from "@/types/rental";
 import {
   exportToExcel,
   transformRentalDataForExcel,
@@ -58,10 +63,13 @@ export default function RentalsPage() {
   );
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
-  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  // 날짜 기본값을 오늘로 설정
+  const [startDate, setStartDate] = useState<Date | undefined>(new Date());
+  const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedPickupMethod, setSelectedPickupMethod] =
+    useState<string>("all");
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("list");
   const [exporting, setExporting] = useState(false);
@@ -71,6 +79,25 @@ export default function RentalsPage() {
   const [endDateOpen, setEndDateOpen] = useState(false);
 
   const supabase = createClient();
+
+  // 출고 관리 정렬 로직
+  const sortRentalsForOutgoing = (rentals: RentalWithDevice[]) => {
+    return rentals.sort((a, b) => {
+      // 1차 정렬: 수령 방법별 우선순위 (터미널1 → 터미널2 → 택배 → 사무실 → 호텔)
+      const priorityA = PICKUP_METHOD_PRIORITY[a.pickup_method];
+      const priorityB = PICKUP_METHOD_PRIORITY[b.pickup_method];
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+
+      // 2차 정렬: 시간순 (픽업 날짜 + 시간)
+      const dateTimeA = new Date(`${a.pickup_date} ${a.pickup_time}`);
+      const dateTimeB = new Date(`${b.pickup_date} ${b.pickup_time}`);
+
+      return dateTimeA.getTime() - dateTimeB.getTime();
+    });
+  };
 
   const fetchRentals = async () => {
     try {
@@ -176,13 +203,23 @@ export default function RentalsPage() {
       });
     }
 
-    setFilteredRentals(filtered);
+    // 수령 방법 필터링
+    if (selectedPickupMethod !== "all") {
+      filtered = filtered.filter((rental) => {
+        return rental.pickup_method === selectedPickupMethod;
+      });
+    }
+
+    // 정렬 적용
+    const sorted = sortRentalsForOutgoing(filtered);
+    setFilteredRentals(sorted);
   }, [
     searchTerm,
     startDate,
     endDate,
     selectedCategory,
     selectedStatus,
+    selectedPickupMethod,
     rentals,
   ]);
 
@@ -192,20 +229,23 @@ export default function RentalsPage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    setStartDate(undefined);
-    setEndDate(undefined);
+    // 날짜를 오늘로 리셋
+    const today = new Date();
+    setStartDate(today);
+    setEndDate(today);
     setSelectedCategory("all");
     setSelectedStatus("all");
+    setSelectedPickupMethod("all");
   };
 
   // 개별 날짜 초기화 함수
   const clearStartDate = () => {
-    setStartDate(undefined);
+    setStartDate(new Date()); // 오늘로 리셋
     setStartDateOpen(false);
   };
 
   const clearEndDate = () => {
-    setEndDate(undefined);
+    setEndDate(new Date()); // 오늘로 리셋
     setEndDateOpen(false);
   };
 
@@ -290,6 +330,36 @@ export default function RentalsPage() {
     return statuses;
   };
 
+  // 상태별 개수 계산
+  const getStatusCounts = () => {
+    const counts = {
+      all: filteredRentals.length,
+      pending: filteredRentals.filter((r) => r.status === "pending").length,
+      picked_up: filteredRentals.filter((r) => r.status === "picked_up").length,
+      not_picked_up: filteredRentals.filter((r) => r.status === "not_picked_up")
+        .length,
+      returned: filteredRentals.filter((r) => r.status === "returned").length,
+      // 새로운 상태들은 DB에 실제 데이터가 있을 때만 카운트
+      overdue:
+        filteredRentals.filter((r) => r.status === "overdue").length || 0,
+      problem:
+        filteredRentals.filter((r) => r.status === "problem").length || 0,
+    };
+    return counts;
+  };
+
+  const statusCounts = getStatusCounts();
+
+  // 고유한 수령 방법 목록 추출
+  const getUniquePickupMethods = () => {
+    const methods = rentals
+      .map((rental) => rental.pickup_method)
+      .filter((method) => method)
+      .filter((method, index, arr) => arr.indexOf(method) === index)
+      .sort((a, b) => PICKUP_METHOD_PRIORITY[a] - PICKUP_METHOD_PRIORITY[b]);
+    return methods;
+  };
+
   // 필터 조건 표시 함수
   const getFilterDescription = () => {
     const conditions = [];
@@ -319,7 +389,13 @@ export default function RentalsPage() {
     }
 
     if (selectedStatus !== "all") {
-      conditions.push(`상태-${selectedStatus}`);
+      conditions.push(
+        `상태-${STATUS_MAP[selectedStatus as keyof typeof STATUS_MAP].label}`
+      );
+    }
+
+    if (selectedPickupMethod !== "all") {
+      conditions.push(`수령방법-${selectedPickupMethod}`);
     }
 
     return conditions.length > 0 ? conditions.join(" | ") : null;
@@ -499,8 +575,8 @@ export default function RentalsPage() {
               </div>
             </div>
 
-            {/* 카테고리 및 상태 필터 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 카테고리, 상태, 수령방법 필터 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* 카테고리 필터 */}
               <div>
                 <Select
@@ -531,10 +607,46 @@ export default function RentalsPage() {
                     <SelectValue placeholder="상태 선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">전체 상태</SelectItem>
-                    {getUniqueStatuses().map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {STATUS_MAP[status].label}
+                    <SelectItem value="all">
+                      전체 상태 ({statusCounts.all})
+                    </SelectItem>
+                    <SelectItem value="pending">
+                      {STATUS_MAP.pending.label} ({statusCounts.pending})
+                    </SelectItem>
+                    <SelectItem value="picked_up">
+                      {STATUS_MAP.picked_up.label} ({statusCounts.picked_up})
+                    </SelectItem>
+                    <SelectItem value="not_picked_up">
+                      {STATUS_MAP.not_picked_up.label} (
+                      {statusCounts.not_picked_up})
+                    </SelectItem>
+                    <SelectItem value="returned">
+                      {STATUS_MAP.returned.label} ({statusCounts.returned})
+                    </SelectItem>
+                    <SelectItem value="overdue">
+                      {STATUS_MAP.overdue.label} ({statusCounts.overdue})
+                    </SelectItem>
+                    <SelectItem value="problem">
+                      {STATUS_MAP.problem.label} ({statusCounts.problem})
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 수령 방법 필터 */}
+              <div>
+                <Select
+                  value={selectedPickupMethod}
+                  onValueChange={setSelectedPickupMethod}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="수령 방법 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체 수령방법</SelectItem>
+                    {getUniquePickupMethods().map((method) => (
+                      <SelectItem key={method} value={method}>
+                        {PICKUP_METHOD_LABELS[method]}
                       </SelectItem>
                     ))}
                   </SelectContent>

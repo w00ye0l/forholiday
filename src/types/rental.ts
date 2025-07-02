@@ -2,7 +2,9 @@ export type ReservationStatus =
   | "pending" // 수령전
   | "picked_up" // 수령완료
   | "not_picked_up" // 미수령
-  | "returned"; // 반납완료
+  | "returned" // 반납완료
+  | "overdue" // 미반납 (반납 예정일 지남)
+  | "problem"; // 문제있음
 
 export type PickupMethod = "T1" | "T2" | "delivery" | "office" | "hotel";
 export type ReturnMethod = "T1" | "T2" | "delivery" | "office" | "hotel";
@@ -42,6 +44,16 @@ export const STATUS_MAP = {
     label: "반납완료",
     variant: "default" as const,
     color: "bg-green-100 text-green-800",
+  },
+  overdue: {
+    label: "미반납",
+    variant: "outline" as const,
+    color: "bg-yellow-100 text-yellow-800",
+  },
+  problem: {
+    label: "문제있음",
+    variant: "destructive" as const,
+    color: "bg-red-100 text-red-800",
   },
 } as const;
 
@@ -85,6 +97,17 @@ export const CARD_BORDER_COLORS: Record<ReservationStatus, string> = {
   picked_up: "border-blue-500",
   not_picked_up: "border-red-500",
   returned: "border-green-500",
+  overdue: "border-yellow-500",
+  problem: "border-red-600",
+} as const;
+
+// 수령 방법별 우선순위 매핑 (숫자가 낮을수록 높은 우선순위)
+export const PICKUP_METHOD_PRIORITY: Record<PickupMethod, number> = {
+  T1: 1, // 터미널1
+  T2: 2, // 터미널2
+  delivery: 3, // 택배
+  office: 4, // 사무실
+  hotel: 5, // 호텔 (대면배송)
 } as const;
 
 import { DeviceCategory } from "./device";
