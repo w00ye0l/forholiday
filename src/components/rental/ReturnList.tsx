@@ -34,11 +34,13 @@ import {
 interface ReturnListProps {
   rentals: RentalReservation[];
   onStatusUpdate?: () => void;
+  getDisplayStatus: (rental: RentalReservation) => ReservationStatus;
 }
 
 export function ReturnList({
   rentals: initialRentals,
   onStatusUpdate,
+  getDisplayStatus,
 }: ReturnListProps) {
   const [rentals, setRentals] = useState(initialRentals);
   const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
@@ -192,7 +194,10 @@ export function ReturnList({
   return (
     <div className="grid gap-2 md:gap-4 md:grid-cols-2 xl:grid-cols-3">
       {rentals.map((rental) => (
-        <Card key={rental.id} className={getCardStyle(rental.status)}>
+        <Card
+          key={rental.id}
+          className={getCardStyle(getDisplayStatus(rental))}
+        >
           <div className="flex flex-col gap-2 text-sm">
             <div className="flex gap-2 justify-between">
               {/* 메인 정보 (이름, 연락처, 시간) */}
@@ -201,6 +206,42 @@ export function ReturnList({
                   <span className="font-bold text-base">
                     {rental.renter_name}
                   </span>
+                  <Badge
+                    variant="outline"
+                    className={`
+                      ${
+                        getDisplayStatus(rental) === "picked_up"
+                          ? "bg-blue-100 text-blue-800 border-blue-300"
+                          : ""
+                      }
+                      ${
+                        getDisplayStatus(rental) === "not_picked_up"
+                          ? "bg-red-100 text-red-800 border-red-300"
+                          : ""
+                      }
+                      ${
+                        getDisplayStatus(rental) === "returned"
+                          ? "bg-green-100 text-green-800 border-green-300"
+                          : ""
+                      }
+                      ${
+                        getDisplayStatus(rental) === "overdue"
+                          ? "bg-yellow-100 text-yellow-800 border-yellow-300"
+                          : ""
+                      }
+                      ${
+                        getDisplayStatus(rental) === "problem"
+                          ? "bg-red-100 text-red-800 border-red-300"
+                          : ""
+                      }
+                    `}
+                  >
+                    {getDisplayStatus(rental) === "picked_up" && "수령완료"}
+                    {getDisplayStatus(rental) === "not_picked_up" && "미수령"}
+                    {getDisplayStatus(rental) === "returned" && "반납완료"}
+                    {getDisplayStatus(rental) === "overdue" && "지연 반납"}
+                    {getDisplayStatus(rental) === "problem" && "문제있음"}
+                  </Badge>
                 </div>
                 <div className="flex items-center gap-2">
                   <PhoneIcon className="w-3 h-3" />
@@ -232,32 +273,10 @@ export function ReturnList({
                   </div>
                 </div>
 
-                {/* 반납 완료 버튼 (picked_up 상태인 경우에만 표시) */}
-                {rental.status === "picked_up" && (
-                  <Button
-                    size="sm"
-                    onClick={() => handleCompleteReturn(rental.id)}
-                    disabled={isUpdating[rental.id]}
-                    className="h-7 w-36 text-xs bg-green-600 hover:bg-green-700"
-                  >
-                    {isUpdating[rental.id] ? "처리중..." : "반납 완료"}
-                  </Button>
-                )}
-
-                {/* 반납 완료 표시 */}
-                {rental.status === "returned" && (
-                  <div className="w-36">
-                    <Badge className="w-full justify-center text-xs bg-green-100 text-green-800 border-green-200">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      반납완료
-                    </Badge>
-                  </div>
-                )}
-
                 {/* 상태 수동 변경 (개발자/관리자용) */}
                 <div className="w-24">
                   <Select
-                    value={rental.status}
+                    value={getDisplayStatus(rental)}
                     onValueChange={(value: ReservationStatus) =>
                       handleStatusChange(rental.id, value)
                     }

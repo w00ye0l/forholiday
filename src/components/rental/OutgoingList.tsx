@@ -342,18 +342,6 @@ export function OutgoingList({
                   )}
                 </div>
 
-                {/* 수령 완료 버튼 (pending 상태이고 기기가 할당된 경우에만 표시) */}
-                {rental.status === "pending" && rental.device_tag_name && (
-                  <Button
-                    size="sm"
-                    onClick={() => handleCompletePickup(rental.id)}
-                    disabled={isUpdating[rental.id]}
-                    className="h-7 w-36 text-xs bg-blue-600 hover:bg-blue-700"
-                  >
-                    {isUpdating[rental.id] ? "처리중..." : "수령 완료"}
-                  </Button>
-                )}
-
                 {/* 상태 수동 변경 (개발자/관리자용) */}
                 <div className="w-24">
                   <Select

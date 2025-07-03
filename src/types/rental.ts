@@ -45,9 +45,9 @@ export const STATUS_MAP = {
     label: "미수령",
     variant: "destructive" as const,
     color: "bg-white text-gray-800 border-gray-200 line-through",
-    badge: "bg-red-100 text-red-800",
+    badge: "bg-gray-50 text-gray-800",
     button:
-      "bg-red-100 hover:bg-red-200 text-red-800 data-[state=on]:bg-red-200 data-[state=on]:border-2 data-[state=on]:border-red-400",
+      "bg-gray-50 hover:bg-gray-100 text-gray-800 data-[state=on]:bg-gray-100 data-[state=on]:border-2 data-[state=on]:border-gray-400",
   },
   returned: {
     label: "반납완료",

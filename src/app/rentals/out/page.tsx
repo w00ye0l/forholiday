@@ -258,9 +258,6 @@ export default function RentalOutPage() {
     <div className="container mx-auto py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-2">출고 관리</h1>
-        <p className="text-sm text-gray-500 mb-4">
-          기기 출고 및 수령 상태를 관리할 수 있습니다.
-        </p>
       </div>
 
       {/* 검색 및 필터 */}
@@ -414,11 +411,23 @@ export default function RentalOutPage() {
               <span className="font-medium text-blue-600">전체 기간</span>
             )}
             <span className="ml-2">총 {filteredRentals.length}개의 예약</span>
-            {/* {getFilterDescription() && (
-              <span className="block text-xs text-blue-600 font-medium mt-1">
-                필터 조건: {getFilterDescription()}
+            {selectedStatus !== "all" && (
+              <span className="ml-2 text-sm font-medium text-purple-600">
+                (
+                {selectedStatus === "pending"
+                  ? "수령전"
+                  : selectedStatus === "picked_up"
+                  ? "수령완료"
+                  : selectedStatus === "not_picked_up"
+                  ? "미수령"
+                  : selectedStatus === "returned"
+                  ? "반납완료"
+                  : selectedStatus === "overdue"
+                  ? "지연 반납"
+                  : "문제있음"}{" "}
+                항목만 표시)
               </span>
-            )} */}
+            )}
           </div>
         </div>
       </div>
