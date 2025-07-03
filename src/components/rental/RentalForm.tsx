@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
+import { cn, uploadContactImage, compressImage } from "@/lib/utils";
 import {
   CreateRentalReservationDto,
   PICKUP_METHOD_LABELS,
@@ -61,43 +61,37 @@ import Link from "next/link";
  */
 
 const formSchema = z.object({
-  device_category: z.enum(
-    [
-      "GP13",
-      "GP12",
-      "GP11",
-      "GP8",
-      "POCKET3",
-      "ACTION5",
-      "S23",
-      "S24",
-      "PS5",
-      "GLAMPAM",
-      "AIRWRAP",
-      "AIRSTRAIGHT",
-      "INSTA360",
-      "STROLLER",
-      "WAGON",
-      "MINIEVO",
-      "ETC",
-    ] as const,
-    {
-      required_error: "기기 카테고리를 선택해주세요",
-    }
-  ),
-  pickup_date: z.date({
-    required_error: "수령 날짜를 선택해주세요",
-  }),
-  pickup_time: z.string().min(1, "수령 시간을 선택해주세요"),
-  return_date: z.date({
-    required_error: "반납 날짜를 선택해주세요",
-  }),
-  return_time: z.string().min(1, "반납 시간을 선택해주세요"),
+  device_category: z.enum([
+    "GP13",
+    "GP12",
+    "GP11",
+    "GP8",
+    "POCKET3",
+    "ACTION5",
+    "S23",
+    "S24",
+    "PS5",
+    "GLAMPAM",
+    "AIRWRAP",
+    "AIRSTRAIGHT",
+    "INSTA360",
+    "STROLLER",
+    "WAGON",
+    "MINIEVO",
+    "ETC",
+  ] as const),
+  pickup_date: z.date(),
+  pickup_time: z.string(),
+  return_date: z.date(),
+  return_time: z.string(),
   pickup_method: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const),
   return_method: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const),
-  renter_name: z.string().min(1, "대여자 이름을 입력해주세요"),
-  renter_phone: z.string().min(1, "연락처를 입력해주세요"),
-  renter_address: z.string().min(1, "주소를 입력해주세요"),
+  renter_name: z.string(),
+  contact_input_type: z.enum(["text", "image"] as const).default("text"),
+  contact_image_url: z.string().optional(),
+  renter_phone: z.string().optional(),
+  renter_email: z.string().optional(),
+  renter_address: z.string(),
   data_transmission: z.boolean().default(false),
   sd_option: z.enum(["대여", "구매", "구매+대여"] as const).optional(),
   reservation_site: z.enum([
@@ -114,6 +108,7 @@ const formSchema = z.object({
     "waug",
     "hanatour",
   ] as const),
+  order_number: z.string().optional(),
   description: z.string().optional(),
 });
 
@@ -128,7 +123,10 @@ interface RentalFormProps {
 
 export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const router = useRouter();
+  const [contactImage, setContactImage] = useState<File | null>(null);
+
   // 30분 단위 시간 옵션 생성
   const generateTimeOptions = () => {
     const times = [];
@@ -159,6 +157,10 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
       data_transmission: false,
       sd_option: undefined,
       reservation_site: undefined,
+      contact_input_type: "text" as const,
+      contact_image_url: "",
+      order_number: "",
+      renter_email: "",
       description: "",
     },
   });
@@ -174,8 +176,28 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
     DEVICE_FEATURES.CAMERA_CATEGORIES.includes(watchedDeviceCategory);
 
   const handleSubmit = async (data: FormValues) => {
+    console.log("click");
     try {
       setIsLoading(true);
+
+      console.log({ data });
+
+      // 이미지 업로드가 필요한 경우
+      if (data.contact_input_type === "image" && contactImage) {
+        try {
+          setUploadingImage(true);
+          // 이미지 압축 (최대 너비 800px, 품질 80%)
+          const compressedImage = await compressImage(contactImage);
+          const imageUrl = await uploadContactImage(compressedImage);
+          data.contact_image_url = imageUrl;
+        } catch (error) {
+          console.error("이미지 업로드 실패:", error);
+          alert("이미지 업로드에 실패했습니다. 다시 시도해주세요.");
+          return;
+        } finally {
+          setUploadingImage(false);
+        }
+      }
 
       // Date 객체를 문자열로 변환
       const formattedData: CreateRentalReservationDto = {
@@ -186,6 +208,7 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
 
       await onSubmit(formattedData);
       form.reset();
+      setContactImage(null);
       router.push("/rentals");
       router.refresh();
     } catch (error) {
@@ -197,8 +220,89 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        {/* 수령 날짜 및 시간 */}
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        {/* 1. 예약 정보 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="reservation_site"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>예약 사이트</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="예약 사이트를 선택해주세요" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {Object.entries(RESERVATION_SITE_LABELS).map(
+                      ([key, label]) => (
+                        <SelectItem key={key} value={key}>
+                          {label}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="order_number"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>예약 번호</FormLabel>
+                <FormControl>
+                  <Input placeholder="예약 번호를 입력해주세요" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* 2. 대여 정보 */}
+        {/* 기기 선택 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="device_category"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>기기 선택</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="기기를 선택해주세요" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {Object.entries(DEVICE_CATEGORY_LABELS).map(
+                      ([key, label]) => (
+                        <SelectItem key={key} value={key}>
+                          {label}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* 수령 날짜/시간 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -230,9 +334,6 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
-                      disabled={(date) =>
-                        date < new Date() || date < new Date("1900-01-01")
-                      }
                     />
                   </PopoverContent>
                 </Popover>
@@ -270,7 +371,7 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
           />
         </div>
 
-        {/* 반납 날짜 및 시간 */}
+        {/* 반납 날짜/시간 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -302,9 +403,6 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
-                      disabled={(date) =>
-                        date < new Date() || date < new Date("1900-01-01")
-                      }
                     />
                   </PopoverContent>
                 </Popover>
@@ -341,133 +439,6 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
             )}
           />
         </div>
-
-        {/* 기기 카테고리 선택 */}
-        <FormField
-          control={form.control}
-          name="device_category"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>기기 카테고리</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="기기 카테고리를 선택해주세요" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {Object.entries(DEVICE_CATEGORY_LABELS).map(
-                    ([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* 대여자 정보 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="renter_name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>대여자 이름</FormLabel>
-                <FormControl>
-                  <Input placeholder="이름을 입력해주세요" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="renter_phone"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>연락처</FormLabel>
-                <FormControl>
-                  <Input placeholder="연락처를 입력해주세요" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        {/* 주소 */}
-        <FormField
-          control={form.control}
-          name="renter_address"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>주소</FormLabel>
-              <FormControl>
-                <Input placeholder="주소를 입력해주세요" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* 데이터 전송 옵션 (핸드폰 기종일 경우만) */}
-        {isPhoneDevice && (
-          <FormField
-            control={form.control}
-            name="data_transmission"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>데이터 전송</FormLabel>
-                  <p className="text-sm text-muted-foreground">
-                    기기 간 데이터 전송이 필요한 경우 체크해주세요.
-                  </p>
-                </div>
-              </FormItem>
-            )}
-          />
-        )}
-
-        {/* SD 카드 옵션 (카메라 기종일 경우만) */}
-        {isCameraDevice && (
-          <FormField
-            control={form.control}
-            name="sd_option"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>SD 카드 옵션</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="SD 카드 옵션을 선택해주세요" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="대여">대여</SelectItem>
-                    <SelectItem value="구매">구매</SelectItem>
-                    <SelectItem value="구매+대여">구매+대여</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
 
         {/* 수령/반납 방법 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -532,44 +503,126 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
           />
         </div>
 
-        {/* 예약 사이트 */}
+        {/* 3. 대여자 정보 */}
+        {/* 대여자 이름 */}
         <FormField
           control={form.control}
-          name="reservation_site"
+          name="renter_name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>예약 사이트</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="예약 사이트를 선택해주세요" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {Object.entries(RESERVATION_SITE_LABELS).map(
-                    ([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
+              <FormLabel>대여자 이름</FormLabel>
+              <FormControl>
+                <Input placeholder="대여자 이름을 입력해주세요" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        {/* 비고 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 연락처 입력 방식 선택 */}
+          <FormField
+            control={form.control}
+            name="contact_input_type"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>연락처 입력 방식</FormLabel>
+                <Select
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    if (value === "text") {
+                      form.setValue("contact_image_url", "");
+                      setContactImage(null);
+                    } else {
+                      form.setValue("renter_phone", "");
+                    }
+                  }}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="연락처 입력 방식을 선택해주세요" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="text">전화번호</SelectItem>
+                    <SelectItem value="image">
+                      이미지 업로드 (외국인 QR코드)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {form.watch("contact_input_type") === "text" ? (
+            <FormField
+              control={form.control}
+              name="renter_phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>연락처</FormLabel>
+                  <FormControl>
+                    <Input placeholder="연락처를 입력해주세요" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ) : (
+            <FormField
+              control={form.control}
+              name="contact_image_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>연락처 QR코드</FormLabel>
+                  <FormControl>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              const compressedFile = await compressImage(file);
+                              setContactImage(compressedFile);
+                            } catch (error) {
+                              console.error("이미지 압축 실패:", error);
+                              alert("이미지 처리 중 오류가 발생했습니다.");
+                            }
+                          }
+                        }}
+                        disabled={isLoading}
+                      />
+                      {contactImage && (
+                        <img
+                          src={URL.createObjectURL(contactImage)}
+                          alt="QR코드"
+                          className="w-20 h-20 object-contain"
+                        />
+                      )}
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+        </div>
+
+        {/* 이메일 */}
         <FormField
           control={form.control}
-          name="description"
+          name="renter_email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>비고 (선택사항)</FormLabel>
+              <FormLabel>이메일</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="기타 요청사항이 있으시면 입력해주세요"
+                  type="email"
+                  placeholder="이메일을 입력해주세요"
                   {...field}
                 />
               </FormControl>
@@ -578,13 +631,99 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
           )}
         />
 
+        {/* 주소 */}
+        <FormField
+          control={form.control}
+          name="renter_address"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>주소</FormLabel>
+              <FormControl>
+                <Input placeholder="주소를 입력해주세요" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* 4. 추가 옵션 (기기별 특수 옵션) */}
+        {/* 데이터 전송 옵션 (핸드폰 기종일 경우) */}
+        {isPhoneDevice && (
+          <FormField
+            control={form.control}
+            name="data_transmission"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel>데이터 전송 필요</FormLabel>
+                </div>
+              </FormItem>
+            )}
+          />
+        )}
+
+        {/* SD 카드 옵션 (카메라 기종일 경우) */}
+        {isCameraDevice && (
+          <FormField
+            control={form.control}
+            name="sd_option"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>SD 카드 옵션</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="SD 카드 옵션을 선택해주세요" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="대여">대여</SelectItem>
+                    <SelectItem value="구매">구매</SelectItem>
+                    <SelectItem value="구매+대여">구매+대여</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        {/* 5. 기타 정보 */}
+        {/* 비고 */}
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>비고</FormLabel>
+              <FormControl>
+                <Input placeholder="비고 사항을 입력해주세요" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" asChild>
+          <Button variant="outline" asChild className="flex-1">
             <Link href="/rentals">취소</Link>
           </Button>
 
-          <Button type="submit" disabled={isLoading || isSubmitting}>
-            {isLoading || isSubmitting ? "예약 중..." : "예약하기"}
+          <Button
+            type="submit"
+            className="flex-1"
+            disabled={isLoading || isSubmitting}
+          >
+            {isLoading || isSubmitting ? "처리중..." : "예약 생성"}
           </Button>
         </div>
       </form>

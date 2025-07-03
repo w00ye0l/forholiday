@@ -148,7 +148,11 @@ export interface RentalReservation {
   reservation_site: ReservationSite;
   renter_name: string;
   renter_phone: string;
+  renter_email?: string;
   renter_address: string;
+  order_number?: string;
+  contact_image_url?: string;
+  contact_input_type: "text" | "image";
   description?: string;
   created_at: string;
   updated_at: string;
@@ -168,8 +172,12 @@ export interface CreateRentalReservationDto {
   sd_option?: "대여" | "구매" | "구매+대여";
   reservation_site: ReservationSite;
   renter_name: string;
-  renter_phone: string;
+  renter_phone?: string;
+  renter_email?: string;
   renter_address: string;
+  order_number?: string;
+  contact_image_url?: string;
+  contact_input_type: "text" | "image";
   description?: string;
 }
 
@@ -188,13 +196,5 @@ export interface DataTransfer {
   issue?: string;
   createdAt: string;
   updatedAt: string;
-  rental?: {
-    renter_name: string;
-    renter_phone: string;
-    renter_email?: string;
-    device_category: string;
-    device_tag_name?: string;
-    return_date: string;
-    description?: string;
-  };
+  rental?: RentalReservation;
 }

@@ -21,6 +21,7 @@ import {
   ReservationSite as StorageReservationSite,
   RESERVATION_SITE_LABELS as STORAGE_RESERVATION_SITE_LABELS,
 } from "@/types/storage";
+import { createClient } from "./supabase/client";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -506,4 +507,90 @@ export const transformStorageStatsForExcel = (
       생성일: "",
     })),
   ];
+};
+
+/**
+ * 연락처 이미지를 Supabase Storage에 업로드합니다.
+ */
+export async function uploadContactImage(file: File): Promise<string> {
+  const supabase = createClient();
+
+  // 파일 이름 생성 (타임스탬프만 사용)
+  const timestamp = format(new Date(), "yyyyMMdd_HHmmss", { locale: ko });
+  const ext = file.name.split(".").pop();
+  const fileName = `contact_${timestamp}.${ext}`;
+
+  try {
+    const { data, error } = await supabase.storage
+      .from("contact-images")
+      .upload(fileName, file);
+
+    if (error) {
+      throw error;
+    }
+
+    // 업로드된 파일의 공개 URL 가져오기
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("contact-images").getPublicUrl(fileName);
+
+    return publicUrl;
+  } catch (error) {
+    console.error("이미지 업로드 실패:", error);
+    throw new Error("이미지 업로드에 실패했습니다.");
+  }
+}
+
+/**
+ * 이미지를 압축하는 유틸리티 함수
+ */
+export const compressImage = async (
+  file: File,
+  maxWidth = 800,
+  quality = 0.8
+): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        // 최대 너비에 맞게 크기 조정
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // 캔버스를 Blob으로 변환
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("이미지 압축 실패"));
+              return;
+            }
+            // 새로운 File 객체 생성
+            const compressedFile = new File([blob], file.name, {
+              type: "image/jpeg",
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = (error) => reject(error);
+    };
+    reader.onerror = (error) => reject(error);
+  });
 };
