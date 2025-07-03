@@ -766,8 +766,8 @@ export default function RentalsPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="statistics">
-          <RentalStatistics rentals={filteredRentals} />
+        <TabsContent value="statistics" className="mt-0">
+          <RentalStatistics rentals={rentals} />
         </TabsContent>
       </Tabs>
     </div>
