@@ -105,11 +105,12 @@ export default function RentalsPage() {
       setLoading(true);
       setError(null);
 
-      // 예약 목록 조회
+      // 예약 목록 조회 - 수령 날짜/시간 기준으로 정렬
       const { data: rentals, error: rentalsError } = await supabase
         .from("rental_reservations")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("pickup_date", { ascending: true })
+        .order("pickup_time", { ascending: true });
 
       if (rentalsError) {
         throw rentalsError;
@@ -141,8 +142,10 @@ export default function RentalsPage() {
           };
         }) || [];
 
-      setRentals(rentalsWithDevices);
-      setFilteredRentals(rentalsWithDevices);
+      // 정렬된 데이터 설정
+      const sortedRentals = sortRentalsForOutgoing(rentalsWithDevices);
+      setRentals(sortedRentals);
+      setFilteredRentals(sortedRentals);
     } catch (error) {
       console.error("예약 목록 조회 에러:", error);
       setError("예약 목록을 불러오는데 실패했습니다.");
@@ -766,6 +769,7 @@ export default function RentalsPage() {
           </div>
         </TabsContent>
 
+        {/* 출고 통계 */}
         <TabsContent value="statistics" className="mt-0">
           <RentalStatistics rentals={rentals} />
         </TabsContent>
