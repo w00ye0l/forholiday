@@ -28,32 +28,50 @@ export const STATUS_MAP = {
   pending: {
     label: "수령전",
     variant: "secondary" as const,
-    color: "bg-gray-100 text-gray-800",
+    color: "bg-white text-gray-800 border-gray-200",
+    badge: "bg-gray-100 text-gray-800",
+    button:
+      "bg-gray-100 hover:bg-gray-200 text-gray-800 data-[state=on]:bg-gray-200 data-[state=on]:border-2 data-[state=on]:border-gray-400",
   },
   picked_up: {
     label: "수령완료",
     variant: "default" as const,
-    color: "bg-blue-100 text-blue-800",
+    color: "bg-blue-50 text-blue-800 border-blue-200",
+    badge: "bg-blue-100 text-blue-800",
+    button:
+      "bg-blue-100 hover:bg-blue-200 text-blue-800 data-[state=on]:bg-blue-200 data-[state=on]:border-2 data-[state=on]:border-blue-400",
   },
   not_picked_up: {
     label: "미수령",
     variant: "destructive" as const,
-    color: "bg-red-100 text-red-800",
+    color: "bg-white text-gray-800 border-gray-200 line-through",
+    badge: "bg-red-100 text-red-800",
+    button:
+      "bg-red-100 hover:bg-red-200 text-red-800 data-[state=on]:bg-red-200 data-[state=on]:border-2 data-[state=on]:border-red-400",
   },
   returned: {
     label: "반납완료",
     variant: "default" as const,
-    color: "bg-green-100 text-green-800",
+    color: "bg-green-50 text-green-800 border-green-200",
+    badge: "bg-green-100 text-green-800",
+    button:
+      "bg-green-100 hover:bg-green-200 text-green-800 data-[state=on]:bg-green-200 data-[state=on]:border-2 data-[state=on]:border-green-400",
   },
   overdue: {
     label: "미반납",
     variant: "outline" as const,
-    color: "bg-yellow-100 text-yellow-800",
+    color: "bg-yellow-50 text-yellow-800 border-yellow-200",
+    badge: "bg-yellow-100 text-yellow-800",
+    button:
+      "bg-yellow-100 hover:bg-yellow-200 text-yellow-800 data-[state=on]:bg-yellow-200 data-[state=on]:border-2 data-[state=on]:border-yellow-400",
   },
   problem: {
     label: "문제있음",
     variant: "destructive" as const,
-    color: "bg-red-100 text-red-800",
+    color: "bg-red-50 text-red-800 border-red-200",
+    badge: "bg-red-100 text-red-800",
+    button:
+      "bg-red-100 hover:bg-red-200 text-red-800 data-[state=on]:bg-red-200 data-[state=on]:border-2 data-[state=on]:border-red-400",
   },
 } as const;
 

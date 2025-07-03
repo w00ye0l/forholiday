@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Popover,
   PopoverContent,
@@ -34,6 +35,7 @@ import {
   STATUS_MAP,
   PICKUP_METHOD_PRIORITY,
   PICKUP_METHOD_LABELS,
+  PickupMethod,
 } from "@/types/rental";
 import {
   exportToExcel,
@@ -63,7 +65,6 @@ export default function RentalsPage() {
   );
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  // 날짜 기본값을 오늘로 설정
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -229,10 +230,8 @@ export default function RentalsPage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    // 날짜를 오늘로 리셋
-    const today = new Date();
-    setStartDate(today);
-    setEndDate(today);
+    setStartDate(undefined);
+    setEndDate(undefined);
     setSelectedCategory("all");
     setSelectedStatus("all");
     setSelectedPickupMethod("all");
@@ -330,25 +329,77 @@ export default function RentalsPage() {
     return statuses;
   };
 
-  // 상태별 개수 계산
+  // 상태별 개수 계산 (필터링된 결과 기준)
   const getStatusCounts = () => {
+    // 상태 필터를 제외한 다른 필터들만 적용된 결과
+    let filtered = [...rentals];
+
+    // 텍스트 검색 필터링
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter((rental) => {
+        return (
+          rental.renter_name.toLowerCase().includes(term) ||
+          rental.renter_phone.includes(term) ||
+          rental.reservation_id.toLowerCase().includes(term) ||
+          (rental.device_tag_name &&
+            rental.device_tag_name.toLowerCase().includes(term))
+        );
+      });
+    }
+
+    // 날짜 필터링
+    if (startDate || endDate) {
+      filtered = filtered.filter((rental) => {
+        const pickupDate = new Date(rental.pickup_date);
+        if (startDate && !endDate) {
+          return pickupDate >= startDate;
+        }
+        if (!startDate && endDate) {
+          return pickupDate <= endDate;
+        }
+        if (startDate && endDate) {
+          return pickupDate >= startDate && pickupDate <= endDate;
+        }
+        return true;
+      });
+    }
+
+    // 카테고리 필터링
+    if (selectedCategory !== "all") {
+      filtered = filtered.filter((rental) => {
+        return rental.devices.category === selectedCategory;
+      });
+    }
+
+    // 수령 방법 필터링
+    if (selectedPickupMethod !== "all") {
+      filtered = filtered.filter((rental) => {
+        return rental.pickup_method === selectedPickupMethod;
+      });
+    }
+
+    // 필터링된 결과에서 상태별 건수 계산
     const counts = {
-      all: filteredRentals.length,
-      pending: filteredRentals.filter((r) => r.status === "pending").length,
-      picked_up: filteredRentals.filter((r) => r.status === "picked_up").length,
-      not_picked_up: filteredRentals.filter((r) => r.status === "not_picked_up")
+      all: filtered.length,
+      pending: filtered.filter((r) => r.status === "pending").length,
+      picked_up: filtered.filter((r) => r.status === "picked_up").length,
+      not_picked_up: filtered.filter((r) => r.status === "not_picked_up")
         .length,
-      returned: filteredRentals.filter((r) => r.status === "returned").length,
-      // 새로운 상태들은 DB에 실제 데이터가 있을 때만 카운트
-      overdue:
-        filteredRentals.filter((r) => r.status === "overdue").length || 0,
-      problem:
-        filteredRentals.filter((r) => r.status === "problem").length || 0,
+      returned: filtered.filter((r) => r.status === "returned").length,
+      overdue: filtered.filter((r) => r.status === "overdue").length,
+      problem: filtered.filter((r) => r.status === "problem").length,
     };
+
     return counts;
   };
 
   const statusCounts = getStatusCounts();
+
+  // 현재 필터링된 건수 표시용
+  const getFilteredCount = () => {
+    return filteredRentals.length;
+  };
 
   // 고유한 수령 방법 목록 추출
   const getUniquePickupMethods = () => {
@@ -395,7 +446,9 @@ export default function RentalsPage() {
     }
 
     if (selectedPickupMethod !== "all") {
-      conditions.push(`수령방법-${selectedPickupMethod}`);
+      conditions.push(
+        `수령방법-${PICKUP_METHOD_LABELS[selectedPickupMethod as PickupMethod]}`
+      );
     }
 
     return conditions.length > 0 ? conditions.join(" | ") : null;
@@ -426,7 +479,6 @@ export default function RentalsPage() {
         </p>
       </div>
 
-      {/* 탭 네비게이션 */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-6">
           <TabsTrigger value="list" className="flex items-center gap-2">
@@ -439,32 +491,30 @@ export default function RentalsPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* 예약 목록 탭 */}
-        <TabsContent value="list" className="space-y-6">
-          {/* 검색 및 필터 */}
-          <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-4">
-            {/* 검색 및 필터 한 줄 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-center">
-              {/* 텍스트 검색 */}
-              <div className="relative lg:col-span-2">
-                <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
-                <Input
-                  placeholder="고객명, 전화번호, 예약번호, 기기명으로 검색..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+        <TabsContent value="list">
+          <div className="space-y-6">
+            {/* 검색 및 필터 */}
+            <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {/* 이름/기기명 검색 */}
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
+                  <Input
+                    placeholder="고객명, 전화번호, 예약번호, 기기명으로 검색..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="text-sm pl-9"
+                  />
+                </div>
 
-              {/* 시작일 선택 */}
-              <div>
-                <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                  <div className="relative">
+                {/* 날짜 필터 */}
+                <div className="flex gap-2">
+                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-start text-left font-normal pr-8",
+                          "flex-1 justify-start text-left font-normal",
                           !startDate && "text-muted-foreground"
                         )}
                       >
@@ -472,46 +522,31 @@ export default function RentalsPage() {
                         {startDate ? (
                           format(startDate, "yyyy-MM-dd", { locale: ko })
                         ) : (
-                          <span>시작일 선택</span>
+                          <span>시작일</span>
                         )}
                       </Button>
                     </PopoverTrigger>
-                    {startDate && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-red-100"
-                        onClick={clearStartDate}
-                      >
-                        <XIcon className="h-3 w-3 text-gray-500 hover:text-red-500" />
-                      </Button>
-                    )}
-                  </div>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={(date) => {
-                        setStartDate(date);
-                        setStartDateOpen(false);
-                      }}
-                      disabled={(date) => (endDate ? date > endDate : false)}
-                      locale={ko}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={(date) => {
+                          setStartDate(date);
+                          setStartDateOpen(false);
+                        }}
+                        disabled={(date) => (endDate ? date > endDate : false)}
+                        locale={ko}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
 
-              {/* 종료일 선택 */}
-              <div>
-                <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-                  <div className="relative">
+                  <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-start text-left font-normal pr-8",
+                          "flex-1 justify-start text-left font-normal",
                           !endDate && "text-muted-foreground"
                         )}
                       >
@@ -519,66 +554,53 @@ export default function RentalsPage() {
                         {endDate ? (
                           format(endDate, "yyyy-MM-dd", { locale: ko })
                         ) : (
-                          <span>종료일 선택</span>
+                          <span>종료일</span>
                         )}
                       </Button>
                     </PopoverTrigger>
-                    {endDate && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-red-100"
-                        onClick={clearEndDate}
-                      >
-                        <XIcon className="h-3 w-3 text-gray-500 hover:text-red-500" />
-                      </Button>
-                    )}
-                  </div>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={endDate}
-                      onSelect={(date) => {
-                        setEndDate(date);
-                        setEndDateOpen(false);
-                      }}
-                      disabled={(date) =>
-                        startDate ? date < startDate : false
-                      }
-                      locale={ko}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate}
+                        onSelect={(date) => {
+                          setEndDate(date);
+                          setEndDateOpen(false);
+                        }}
+                        disabled={(date) =>
+                          startDate ? date < startDate : false
+                        }
+                        locale={ko}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* 버튼 그룹 */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleReset}
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCwIcon className="w-4 h-4" />
+                    초기화
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleExportToExcel}
+                    disabled={exporting || filteredRentals.length === 0}
+                    className="flex items-center gap-2"
+                  >
+                    <DownloadIcon className="w-4 h-4" />
+                    {exporting ? "출력 중..." : "엑셀 출력"}
+                  </Button>
+                </div>
               </div>
 
-              {/* 버튼 그룹 */}
-              <div className="flex gap-2 lg:col-span-2">
-                <Button
-                  variant="outline"
-                  onClick={handleReset}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCwIcon className="w-4 h-4" />
-                  초기화
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={handleExportToExcel}
-                  disabled={exporting || filteredRentals.length === 0}
-                  className="flex items-center gap-2"
-                >
-                  <DownloadIcon className="w-4 h-4" />
-                  {exporting ? "출력 중..." : "엑셀 출력"}
-                </Button>
-              </div>
-            </div>
-
-            {/* 카테고리, 상태, 수령방법 필터 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* 카테고리 필터 */}
-              <div>
+              {/* 카테고리, 수령방법 필터 */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* 카테고리 필터 */}
                 <Select
                   value={selectedCategory}
                   onValueChange={setSelectedCategory}
@@ -595,46 +617,8 @@ export default function RentalsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
 
-              {/* 상태 필터 */}
-              <div>
-                <Select
-                  value={selectedStatus}
-                  onValueChange={setSelectedStatus}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="상태 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">
-                      전체 상태 ({statusCounts.all})
-                    </SelectItem>
-                    <SelectItem value="pending">
-                      {STATUS_MAP.pending.label} ({statusCounts.pending})
-                    </SelectItem>
-                    <SelectItem value="picked_up">
-                      {STATUS_MAP.picked_up.label} ({statusCounts.picked_up})
-                    </SelectItem>
-                    <SelectItem value="not_picked_up">
-                      {STATUS_MAP.not_picked_up.label} (
-                      {statusCounts.not_picked_up})
-                    </SelectItem>
-                    <SelectItem value="returned">
-                      {STATUS_MAP.returned.label} ({statusCounts.returned})
-                    </SelectItem>
-                    <SelectItem value="overdue">
-                      {STATUS_MAP.overdue.label} ({statusCounts.overdue})
-                    </SelectItem>
-                    <SelectItem value="problem">
-                      {STATUS_MAP.problem.label} ({statusCounts.problem})
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* 수령 방법 필터 */}
-              <div>
+                {/* 수령 방법 필터 */}
                 <Select
                   value={selectedPickupMethod}
                   onValueChange={setSelectedPickupMethod}
@@ -652,38 +636,137 @@ export default function RentalsPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            {/* 필터 결과 표시 */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
-              <div className="space-y-1">
-                <span className="block">
-                  총 {filteredRentals.length}개의 예약
-                  {rentals.length !== filteredRentals.length && (
+              {/* 상태별 필터 버튼 그룹 */}
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedStatus("all")}
+                  className={`h-6 px-2 py-1 text-xs ${
+                    selectedStatus === "all"
+                      ? "bg-gray-200 text-gray-900 border-2 border-gray-400"
+                      : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                  }`}
+                >
+                  전체: {statusCounts.all}건
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedStatus("pending")}
+                  className={`h-6 px-2 py-1 text-xs ${
+                    selectedStatus === "pending"
+                      ? STATUS_MAP.pending.button
+                      : STATUS_MAP.pending.badge
+                  }`}
+                >
+                  {STATUS_MAP.pending.label}: {statusCounts.pending}건
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedStatus("picked_up")}
+                  className={`h-6 px-2 py-1 text-xs ${
+                    selectedStatus === "picked_up"
+                      ? STATUS_MAP.picked_up.button
+                      : STATUS_MAP.picked_up.badge
+                  }`}
+                >
+                  {STATUS_MAP.picked_up.label}: {statusCounts.picked_up}건
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedStatus("not_picked_up")}
+                  className={`h-6 px-2 py-1 text-xs ${
+                    selectedStatus === "not_picked_up"
+                      ? STATUS_MAP.not_picked_up.button
+                      : STATUS_MAP.not_picked_up.badge
+                  }`}
+                >
+                  {STATUS_MAP.not_picked_up.label}: {statusCounts.not_picked_up}
+                  건
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedStatus("returned")}
+                  className={`h-6 px-2 py-1 text-xs ${
+                    selectedStatus === "returned"
+                      ? STATUS_MAP.returned.button
+                      : STATUS_MAP.returned.badge
+                  }`}
+                >
+                  {STATUS_MAP.returned.label}: {statusCounts.returned}건
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedStatus("overdue")}
+                  className={`h-6 px-2 py-1 text-xs ${
+                    selectedStatus === "overdue"
+                      ? STATUS_MAP.overdue.button
+                      : STATUS_MAP.overdue.badge
+                  }`}
+                >
+                  {STATUS_MAP.overdue.label}: {statusCounts.overdue}건
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedStatus("problem")}
+                  className={`h-6 px-2 py-1 text-xs ${
+                    selectedStatus === "problem"
+                      ? STATUS_MAP.problem.button
+                      : STATUS_MAP.problem.badge
+                  }`}
+                >
+                  {STATUS_MAP.problem.label}: {statusCounts.problem}건
+                </Button>
+              </div>
+
+              {/* 필터 결과 표시 */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
+                <div>
+                  {startDate || endDate ? (
+                    <span className="font-medium text-blue-600">
+                      {startDate
+                        ? format(startDate, "yyyy년 MM월 dd일", { locale: ko })
+                        : "시작일 없음"}{" "}
+                      ~{" "}
+                      {endDate
+                        ? format(endDate, "yyyy년 MM월 dd일", { locale: ko })
+                        : "종료일 없음"}
+                    </span>
+                  ) : (
+                    <span className="font-medium text-blue-600">전체 기간</span>
+                  )}
+                  <span className="ml-2">총 {getFilteredCount()}개의 예약</span>
+                  {getFilteredCount() !== rentals.length && (
                     <span className="text-gray-400 ml-2">
                       (전체 {rentals.length}건 중)
                     </span>
                   )}
-                </span>
-                {getFilterDescription() && (
-                  <span className="block text-xs text-blue-600 font-medium">
-                    필터 조건: {getFilterDescription()}
-                  </span>
-                )}
+                  {getFilterDescription() && (
+                    <span className="block text-xs text-blue-600 font-medium mt-1">
+                      필터 조건: {getFilterDescription()}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* 예약 목록 */}
-          <RentalList
-            rentals={filteredRentals}
-            loading={loading}
-            searchTerm={searchTerm}
-          />
+            {/* 예약 목록 */}
+            <RentalList
+              rentals={filteredRentals}
+              loading={loading}
+              searchTerm={searchTerm}
+            />
+          </div>
         </TabsContent>
 
-        {/* 출고 통계 탭 */}
-        <TabsContent value="statistics" className="space-y-6">
+        <TabsContent value="statistics">
           <RentalStatistics rentals={filteredRentals} />
         </TabsContent>
       </Tabs>
