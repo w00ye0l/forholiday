@@ -91,12 +91,17 @@ export default function RentalReturnPage() {
   useEffect(() => {
     let filtered = rentals;
 
-    // 날짜 필터 (반납일 기준)
+    // 날짜 필터 (반납일 기준) - 지연 반납은 제외
     if (dateFilter) {
       const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      filtered = filtered.filter((rental) =>
-        rental.return_date.includes(filterDateString)
-      );
+      filtered = filtered.filter((rental) => {
+        const displayStatus = getDisplayStatus(rental);
+        // 지연 반납은 날짜 필터에서 제외
+        if (displayStatus === "overdue") {
+          return true;
+        }
+        return rental.return_date.includes(filterDateString);
+      });
     }
 
     // 장소별 필터 (반납 방법 기준)
@@ -170,12 +175,17 @@ export default function RentalReturnPage() {
   const getBaseFilteredRentals = () => {
     let baseFiltered = rentals;
 
-    // 날짜 필터 적용
+    // 날짜 필터 적용 - 지연 반납은 제외
     if (dateFilter) {
       const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      baseFiltered = baseFiltered.filter((rental) =>
-        rental.return_date.includes(filterDateString)
-      );
+      baseFiltered = baseFiltered.filter((rental) => {
+        const displayStatus = getDisplayStatus(rental);
+        // 지연 반납은 날짜 필터에서 제외
+        if (displayStatus === "overdue") {
+          return true;
+        }
+        return rental.return_date.includes(filterDateString);
+      });
     }
 
     // 검색 필터 적용
