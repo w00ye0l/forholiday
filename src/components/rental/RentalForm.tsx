@@ -258,9 +258,9 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
             name="order_number"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>예약 번호</FormLabel>
+                <FormLabel>주문 번호</FormLabel>
                 <FormControl>
-                  <Input placeholder="예약 번호를 입력해주세요" {...field} />
+                  <Input placeholder="주문 번호를 입력해주세요" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
