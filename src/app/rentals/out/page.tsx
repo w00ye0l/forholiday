@@ -22,7 +22,11 @@ import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import type { RentalReservation, PickupMethod } from "@/types/rental";
+import type {
+  RentalReservation,
+  PickupMethod,
+  ReservationStatus,
+} from "@/types/rental";
 import { STATUS_MAP, PICKUP_METHOD_LABELS } from "@/types/rental";
 import type { Device, DeviceStatus } from "@/types/device";
 import { cn } from "@/lib/utils";
@@ -35,14 +39,16 @@ export default function RentalOutPage() {
   );
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("list");
-  const [selectedStatus, setSelectedStatus] = useState("pending");
+  const [selectedStatus, setSelectedStatus] = useState<
+    ReservationStatus | "all"
+  >("all");
   const [selectedPickupMethod, setSelectedPickupMethod] = useState<
     PickupMethod | "all"
   >("all");
 
-  // 검색 상태
+  // 검색 상태 - 오늘 날짜를 기본값으로 설정
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(new Date());
 
   const loadData = async () => {
     setLoading(true);
@@ -282,11 +288,9 @@ export default function RentalOutPage() {
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateFilter ? (
-                  format(dateFilter, "yyyy-MM-dd", { locale: ko })
-                ) : (
-                  <span>수령일 선택</span>
-                )}
+                {dateFilter
+                  ? format(dateFilter, "yyyy-MM-dd", { locale: ko })
+                  : "수령 날짜 선택"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -410,16 +414,11 @@ export default function RentalOutPage() {
               <span className="font-medium text-blue-600">전체 기간</span>
             )}
             <span className="ml-2">총 {filteredRentals.length}개의 예약</span>
-            {filteredRentals.length !== rentals.length && (
-              <span className="text-gray-400 ml-2">
-                (전체 {rentals.length}건 중)
-              </span>
-            )}
-            {getFilterDescription() && (
+            {/* {getFilterDescription() && (
               <span className="block text-xs text-blue-600 font-medium mt-1">
                 필터 조건: {getFilterDescription()}
               </span>
-            )}
+            )} */}
           </div>
         </div>
       </div>

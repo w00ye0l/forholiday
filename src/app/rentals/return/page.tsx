@@ -263,7 +263,7 @@ export default function RentalReturnPage() {
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {dateFilter
-                  ? format(dateFilter, "yyyy년 MM월 dd일", { locale: ko })
+                  ? format(dateFilter, "yyyy-MM-dd", { locale: ko })
                   : "반납 날짜 선택"}
               </Button>
             </PopoverTrigger>
@@ -285,31 +285,6 @@ export default function RentalReturnPage() {
             <RefreshCwIcon className="w-4 h-4" />
             초기화
           </Button>
-        </div>
-
-        {/* 필터링된 결과 및 상태별 개수 */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
-          <div>
-            {dateFilter ? (
-              <span className="font-medium text-blue-600">
-                {format(dateFilter, "yyyy년 MM월 dd일", { locale: ko })} 기준
-              </span>
-            ) : (
-              <span className="font-medium text-blue-600">전체 기간</span>
-            )}
-            <span className="ml-2">총 {filteredRentals.length}개의 예약</span>
-            {activeStatusFilter !== "all" && (
-              <span className="ml-2 text-sm font-medium text-purple-600">
-                (
-                {activeStatusFilter === "picked_up"
-                  ? "수령완료"
-                  : activeStatusFilter === "not_picked_up"
-                  ? "미수령"
-                  : "반납완료"}{" "}
-                항목만 표시)
-              </span>
-            )}
-          </div>
         </div>
 
         {/* 상태별 개수 표시 (클릭 가능) */}
@@ -378,6 +353,31 @@ export default function RentalReturnPage() {
           >
             반납완료: {getStatusCounts().returned}건
           </Button>
+        </div>
+
+        {/* 필터링된 결과 및 상태별 개수 */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
+          <div>
+            {dateFilter ? (
+              <span className="font-medium text-blue-600">
+                {format(dateFilter, "yyyy년 MM월 dd일", { locale: ko })} 기준
+              </span>
+            ) : (
+              <span className="font-medium text-blue-600">전체 기간</span>
+            )}
+            <span className="ml-2">총 {filteredRentals.length}개의 예약</span>
+            {activeStatusFilter !== "all" && (
+              <span className="ml-2 text-sm font-medium text-purple-600">
+                (
+                {activeStatusFilter === "picked_up"
+                  ? "수령완료"
+                  : activeStatusFilter === "not_picked_up"
+                  ? "미수령"
+                  : "반납완료"}{" "}
+                항목만 표시)
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
