@@ -154,3 +154,29 @@ export interface CreateRentalReservationDto {
   renter_address: string;
   description?: string;
 }
+
+export type DataTransferStatus =
+  | "PENDING_UPLOAD"
+  | "UPLOADED"
+  | "EMAIL_SENT"
+  | "ISSUE";
+
+export interface DataTransfer {
+  id: string;
+  rentalId: string;
+  status: DataTransferStatus;
+  uploadedAt?: string;
+  emailSentAt?: string;
+  issue?: string;
+  createdAt: string;
+  updatedAt: string;
+  rental?: {
+    renter_name: string;
+    renter_phone: string;
+    renter_email?: string;
+    device_category: string;
+    device_tag_name?: string;
+    return_date: string;
+    description?: string;
+  };
+}
