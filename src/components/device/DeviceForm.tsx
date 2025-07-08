@@ -48,9 +48,10 @@ export default function DeviceForm({
   useEffect(() => {
     if (device) {
       setForm({
-        tag_name: device.tag_name,
-        category: device.category,
-        status: device.status,
+        tag_name: device.tag_name ?? "",
+        category:
+          (device.category as DeviceCategory) ?? DEFAULT_DEVICE_CATEGORY,
+        status: (device.status as DeviceStatus) ?? DEFAULT_DEVICE_STATUS,
       });
     } else {
       setForm({
@@ -168,8 +169,8 @@ export default function DeviceForm({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Select
                 key={`category-${device?.id || "new"}-${form.category}`}
-                value={form.category}
-                defaultValue={form.category}
+                value={form.category as DeviceCategory}
+                defaultValue={form.category as DeviceCategory}
                 onValueChange={handleCategoryChange}
               >
                 <SelectTrigger>
@@ -196,8 +197,8 @@ export default function DeviceForm({
 
               <Select
                 key={`status-${device?.id || "new"}-${form.status}`}
-                value={form.status}
-                defaultValue={form.status}
+                value={form.status as DeviceStatus}
+                defaultValue={form.status as DeviceStatus}
                 onValueChange={handleStatusChange}
               >
                 <SelectTrigger>
