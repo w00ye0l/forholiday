@@ -88,9 +88,7 @@ const InventoryDashboard = React.memo(() => {
       {/* 헤더 섹션 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            기기 인벤토리 관리
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">재고 관리</h1>
         </div>
 
         {/* 상태 인디케이터 */}
