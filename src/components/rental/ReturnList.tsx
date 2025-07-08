@@ -34,11 +34,13 @@ import {
 interface ReturnListProps {
   rentals: RentalReservation[];
   onStatusUpdate?: () => void;
+  getDisplayStatus: (rental: RentalReservation) => ReservationStatus;
 }
 
 export function ReturnList({
   rentals: initialRentals,
   onStatusUpdate,
+  getDisplayStatus,
 }: ReturnListProps) {
   const [rentals, setRentals] = useState(initialRentals);
   const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
@@ -46,6 +48,35 @@ export function ReturnList({
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
 
   const supabase = createClient();
+
+  // 상태별 카드 스타일 반환
+  const getCardStyle = (status: ReservationStatus) => {
+    const baseClasses = "p-3 shadow-sm border-l-4";
+
+    switch (status) {
+      case "pending":
+        // 수령전 - 하얀색/무색
+        return `${baseClasses} bg-white border-l-gray-400`;
+      case "picked_up":
+        // 수령완료 - 파란색
+        return `${baseClasses} bg-blue-50 border-l-blue-500`;
+      case "not_picked_up":
+        // 미수령 - 취소선, 배경색 무색
+        return `${baseClasses} bg-white border-l-red-500 line-through opacity-70`;
+      case "returned":
+        // 반납완료 - 초록색
+        return `${baseClasses} bg-green-50 border-l-green-500`;
+      case "overdue":
+        // 미반납 - 노란색 (향후 구현)
+        return `${baseClasses} bg-yellow-50 border-l-yellow-500`;
+      case "problem":
+        // 문제있음 - 빨간색 (향후 구현)
+        return `${baseClasses} bg-red-50 border-l-red-500`;
+      default:
+        // 알 수 없는 상태는 기본 스타일
+        return `${baseClasses} bg-white border-l-gray-400`;
+    }
+  };
 
   // props가 변경될 때 내부 상태 업데이트
   useEffect(() => {
@@ -165,9 +196,7 @@ export function ReturnList({
       {rentals.map((rental) => (
         <Card
           key={rental.id}
-          className={`!border-2 shadow-sm ${
-            CARD_BORDER_COLORS[rental.status]
-          } ${STATUS_MAP[rental.status].color} p-3`}
+          className={getCardStyle(getDisplayStatus(rental))}
         >
           <div className="flex flex-col gap-2 text-sm">
             <div className="flex gap-2 justify-between">
@@ -177,6 +206,42 @@ export function ReturnList({
                   <span className="font-bold text-base">
                     {rental.renter_name}
                   </span>
+                  <Badge
+                    variant="outline"
+                    className={`
+                      ${
+                        getDisplayStatus(rental) === "picked_up"
+                          ? "bg-blue-100 text-blue-800 border-blue-300"
+                          : ""
+                      }
+                      ${
+                        getDisplayStatus(rental) === "not_picked_up"
+                          ? "bg-red-100 text-red-800 border-red-300"
+                          : ""
+                      }
+                      ${
+                        getDisplayStatus(rental) === "returned"
+                          ? "bg-green-100 text-green-800 border-green-300"
+                          : ""
+                      }
+                      ${
+                        getDisplayStatus(rental) === "overdue"
+                          ? "bg-yellow-100 text-yellow-800 border-yellow-300"
+                          : ""
+                      }
+                      ${
+                        getDisplayStatus(rental) === "problem"
+                          ? "bg-red-100 text-red-800 border-red-300"
+                          : ""
+                      }
+                    `}
+                  >
+                    {getDisplayStatus(rental) === "picked_up" && "수령완료"}
+                    {getDisplayStatus(rental) === "not_picked_up" && "미수령"}
+                    {getDisplayStatus(rental) === "returned" && "반납완료"}
+                    {getDisplayStatus(rental) === "overdue" && "지연 반납"}
+                    {getDisplayStatus(rental) === "problem" && "문제있음"}
+                  </Badge>
                 </div>
                 <div className="flex items-center gap-2">
                   <PhoneIcon className="w-3 h-3" />
@@ -208,32 +273,10 @@ export function ReturnList({
                   </div>
                 </div>
 
-                {/* 반납 완료 버튼 (picked_up 상태인 경우에만 표시) */}
-                {rental.status === "picked_up" && (
-                  <Button
-                    size="sm"
-                    onClick={() => handleCompleteReturn(rental.id)}
-                    disabled={isUpdating[rental.id]}
-                    className="h-7 w-36 text-xs bg-green-600 hover:bg-green-700"
-                  >
-                    {isUpdating[rental.id] ? "처리중..." : "반납 완료"}
-                  </Button>
-                )}
-
-                {/* 반납 완료 표시 */}
-                {rental.status === "returned" && (
-                  <div className="w-36">
-                    <Badge className="w-full justify-center text-xs bg-green-100 text-green-800 border-green-200">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      반납완료
-                    </Badge>
-                  </div>
-                )}
-
                 {/* 상태 수동 변경 (개발자/관리자용) */}
                 <div className="w-24">
                   <Select
-                    value={rental.status}
+                    value={getDisplayStatus(rental)}
                     onValueChange={(value: ReservationStatus) =>
                       handleStatusChange(rental.id, value)
                     }

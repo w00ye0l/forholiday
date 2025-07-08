@@ -14,6 +14,7 @@ import {
   SettingsIcon,
   UserIcon,
   PlaneIcon,
+  DatabaseIcon,
 } from "lucide-react";
 
 import { NavStorage } from "@/components/nav-storage";
@@ -51,6 +52,11 @@ const data = {
       title: "반납 관리",
       url: "/rentals/return",
       icon: RotateCcwIcon,
+    },
+    {
+      title: "데이터 관리",
+      url: "/rentals/data-transfer",
+      icon: DatabaseIcon,
     },
   ],
   storageMenu: [

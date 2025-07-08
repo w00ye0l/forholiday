@@ -42,28 +42,66 @@ export default function RentalReturnPage() {
     setLoading(true);
     const supabase = createClient();
 
-    // 반납 예정 및 완료된 예약 목록 조회 (반납완료 포함)
-    const { data: rentalsData } = await supabase
-      .from("rental_reservations")
-      .select("*")
-      .in("status", ["picked_up", "not_picked_up", "returned"])
-      .order("return_date", { ascending: true })
-      .order("return_time", { ascending: true });
+    try {
+      // 반납 예정 및 완료된 예약 목록 조회 (기존 상태만)
+      const { data: rentalsData, error } = await supabase
+        .from("rental_reservations")
+        .select("*")
+        .in("status", ["picked_up", "not_picked_up", "returned"])
+        .order("return_date", { ascending: true })
+        .order("return_time", { ascending: true });
 
-    setRentals(rentalsData || []);
-    setLoading(false);
+      if (error) {
+        console.error("반납 관리 데이터 로딩 에러:", error);
+        setRentals([]);
+      } else {
+        console.log("반납 관리 데이터 로드됨:", rentalsData?.length, "건");
+        setRentals(rentalsData || []);
+      }
+    } catch (error) {
+      console.error("반납 관리 데이터 로딩 실패:", error);
+      setRentals([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 예약의 실제 상태와 표시 상태를 구분
+  const getDisplayStatus = (rental: RentalReservation) => {
+    const now = new Date();
+    const returnDateTime = new Date(
+      `${rental.return_date} ${rental.return_time}`
+    );
+
+    // 이미 반납 완료된 경우는 그대로 표시
+    if (rental.status === "returned") {
+      return "returned";
+    }
+
+    // 반납 시간이 지났는데 반납 완료가 아닌 경우 지연 반납으로 표시
+    if (returnDateTime < now && rental.status === "picked_up") {
+      return "overdue";
+    }
+
+    // 그 외의 경우는 실제 상태 그대로 표시
+    return rental.status;
   };
 
   // 검색 필터링 로직
   useEffect(() => {
     let filtered = rentals;
 
-    // 날짜 필터 (반납일 기준)
+    // 날짜 필터 (반납일 기준) - 지연 반납은 제외
     if (dateFilter) {
       const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      filtered = filtered.filter((rental) =>
-        rental.return_date.includes(filterDateString)
-      );
+      filtered = filtered.filter((rental) => {
+        const displayStatus = getDisplayStatus(rental);
+        // 지연 반납은 날짜 필터에서 제외
+        if (displayStatus === "overdue") {
+          return true;
+        }
+        return rental.return_date.includes(filterDateString);
+      });
     }
 
     // 장소별 필터 (반납 방법 기준)
@@ -76,7 +114,7 @@ export default function RentalReturnPage() {
     // 상태별 필터
     if (activeStatusFilter !== "all") {
       filtered = filtered.filter(
-        (rental) => rental.status === activeStatusFilter
+        (rental) => getDisplayStatus(rental) === activeStatusFilter
       );
     }
 
@@ -99,8 +137,16 @@ export default function RentalReturnPage() {
       const bReturnDate = new Date(`${b.return_date} ${b.return_time}`);
 
       // 1. 반납 완료 항목은 맨 아래
-      if (a.status === "returned" && b.status !== "returned") return 1;
-      if (a.status !== "returned" && b.status === "returned") return -1;
+      if (
+        getDisplayStatus(a) === "returned" &&
+        getDisplayStatus(b) !== "returned"
+      )
+        return 1;
+      if (
+        getDisplayStatus(a) !== "returned" &&
+        getDisplayStatus(b) === "returned"
+      )
+        return -1;
 
       // 2. 같은 카테고리 내에서는 시간순 정렬
       return aReturnDate.getTime() - bReturnDate.getTime();
@@ -129,12 +175,17 @@ export default function RentalReturnPage() {
   const getBaseFilteredRentals = () => {
     let baseFiltered = rentals;
 
-    // 날짜 필터 적용
+    // 날짜 필터 적용 - 지연 반납은 제외
     if (dateFilter) {
       const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      baseFiltered = baseFiltered.filter((rental) =>
-        rental.return_date.includes(filterDateString)
-      );
+      baseFiltered = baseFiltered.filter((rental) => {
+        const displayStatus = getDisplayStatus(rental);
+        // 지연 반납은 날짜 필터에서 제외
+        if (displayStatus === "overdue") {
+          return true;
+        }
+        return rental.return_date.includes(filterDateString);
+      });
     }
 
     // 검색 필터 적용
@@ -177,13 +228,15 @@ export default function RentalReturnPage() {
 
     return {
       all: baseFiltered.length,
-      picked_up: baseFiltered.filter((rental) => rental.status === "picked_up")
-        .length,
-      not_picked_up: baseFiltered.filter(
-        (rental) => rental.status === "not_picked_up"
+      picked_up: baseFiltered.filter(
+        (rental) => getDisplayStatus(rental) === "picked_up"
       ).length,
-      returned: baseFiltered.filter((rental) => rental.status === "returned")
-        .length,
+      overdue: baseFiltered.filter(
+        (rental) => getDisplayStatus(rental) === "overdue"
+      ).length,
+      returned: baseFiltered.filter(
+        (rental) => getDisplayStatus(rental) === "returned"
+      ).length,
     };
   };
 
@@ -246,7 +299,7 @@ export default function RentalReturnPage() {
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {dateFilter
-                  ? format(dateFilter, "yyyy년 MM월 dd일", { locale: ko })
+                  ? format(dateFilter, "yyyy-MM-dd", { locale: ko })
                   : "반납 날짜 선택"}
               </Button>
             </PopoverTrigger>
@@ -270,6 +323,58 @@ export default function RentalReturnPage() {
           </Button>
         </div>
 
+        {/* 상태별 필터 버튼 그룹 */}
+        <div className="flex flex-wrap gap-2 text-xs">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setActiveStatusFilter("all")}
+            className={`h-6 px-2 py-1 text-xs ${
+              activeStatusFilter === "all"
+                ? "bg-gray-200 border-2 border-gray-400"
+                : "bg-gray-100 hover:bg-gray-200"
+            }`}
+          >
+            전체: {getStatusCounts().all}건
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setActiveStatusFilter("picked_up")}
+            className={`h-6 px-2 py-1 text-xs ${
+              activeStatusFilter === "picked_up"
+                ? "bg-blue-200 border-2 border-blue-400 text-blue-800"
+                : "bg-blue-100 hover:bg-blue-200 text-blue-800"
+            }`}
+          >
+            수령완료: {getStatusCounts().picked_up}건
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setActiveStatusFilter("overdue")}
+            className={`h-6 px-2 py-1 text-xs ${
+              activeStatusFilter === "overdue"
+                ? "bg-yellow-200 border-2 border-yellow-400 text-yellow-800"
+                : "bg-yellow-100 hover:bg-yellow-200 text-yellow-800"
+            }`}
+          >
+            지연 반납: {getStatusCounts().overdue}건
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setActiveStatusFilter("returned")}
+            className={`h-6 px-2 py-1 text-xs ${
+              activeStatusFilter === "returned"
+                ? "bg-green-200 border-2 border-green-400 text-green-800"
+                : "bg-green-100 hover:bg-green-200 text-green-800"
+            }`}
+          >
+            반납완료: {getStatusCounts().returned}건
+          </Button>
+        </div>
+
         {/* 필터링된 결과 및 상태별 개수 */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
           <div>
@@ -286,81 +391,13 @@ export default function RentalReturnPage() {
                 (
                 {activeStatusFilter === "picked_up"
                   ? "수령완료"
-                  : activeStatusFilter === "not_picked_up"
-                  ? "미수령"
+                  : activeStatusFilter === "overdue"
+                  ? "지연 반납"
                   : "반납완료"}{" "}
                 항목만 표시)
               </span>
             )}
           </div>
-        </div>
-
-        {/* 상태별 개수 표시 (클릭 가능) */}
-        <div className="flex flex-wrap gap-2 text-xs">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              setActiveStatusFilter(
-                activeStatusFilter === "all" ? "all" : "all"
-              )
-            }
-            className={`h-6 px-2 py-1 text-xs ${
-              activeStatusFilter === "all"
-                ? "bg-gray-200 text-gray-900 border-2 border-gray-400"
-                : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-            }`}
-          >
-            전체: {getStatusCounts().all}건
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              setActiveStatusFilter(
-                activeStatusFilter === "picked_up" ? "all" : "picked_up"
-              )
-            }
-            className={`h-6 px-2 py-1 text-xs ${
-              activeStatusFilter === "picked_up"
-                ? "bg-blue-200 text-blue-900 border-2 border-blue-400"
-                : "bg-blue-100 text-blue-800 hover:bg-blue-200"
-            }`}
-          >
-            수령완료: {getStatusCounts().picked_up}건
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              setActiveStatusFilter(
-                activeStatusFilter === "not_picked_up" ? "all" : "not_picked_up"
-              )
-            }
-            className={`h-6 px-2 py-1 text-xs ${
-              activeStatusFilter === "not_picked_up"
-                ? "bg-red-200 text-red-900 border-2 border-red-400"
-                : "bg-red-100 text-red-800 hover:bg-red-200"
-            }`}
-          >
-            미수령: {getStatusCounts().not_picked_up}건
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              setActiveStatusFilter(
-                activeStatusFilter === "returned" ? "all" : "returned"
-              )
-            }
-            className={`h-6 px-2 py-1 text-xs ${
-              activeStatusFilter === "returned"
-                ? "bg-green-200 text-green-900 border-2 border-green-400"
-                : "bg-green-100 text-green-800 hover:bg-green-200"
-            }`}
-          >
-            반납완료: {getStatusCounts().returned}건
-          </Button>
         </div>
       </div>
 
@@ -394,6 +431,7 @@ export default function RentalReturnPage() {
         <ReturnList
           rentals={filteredRentals}
           onStatusUpdate={handleStatusUpdate}
+          getDisplayStatus={getDisplayStatus}
         />
       )}
     </div>

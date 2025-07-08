@@ -65,6 +65,8 @@ const translations = {
       picked_up: "수령 완료",
       not_picked_up: "미수령",
       returned: "반납 완료",
+      overdue: "미반납",
+      problem: "문제있음",
     },
 
     // 수령/반납 방법 라벨
@@ -118,6 +120,8 @@ const translations = {
       picked_up: "Picked Up",
       not_picked_up: "Not Picked Up",
       returned: "Returned",
+      overdue: "Overdue",
+      problem: "Problem",
     },
 
     // Pickup/return method labels

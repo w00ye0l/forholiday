@@ -4,7 +4,11 @@ export type DeviceStatus =
   | "in_use"
   | "maintenance"
   | "damaged"
-  | "lost";
+  | "lost"
+  | "rented"
+  | "pending_return"
+  | "under_inspection"
+  | "under_repair";
 
 export type DeviceCategory =
   | "GP13"
@@ -75,6 +79,10 @@ export const DEVICE_STATUS_LABELS: Record<DeviceStatus, string> = {
   maintenance: "점검중",
   damaged: "손상됨",
   lost: "분실",
+  rented: "대여중",
+  pending_return: "반납대기",
+  under_inspection: "점검중",
+  under_repair: "수리중",
 };
 
 // 상태별 색상 및 스타일 매핑
@@ -121,6 +129,34 @@ export const DEVICE_STATUS_MAP = {
     bgColor: "bg-red-50",
     borderColor: "border-red-200",
   },
+  rented: {
+    label: "대여중",
+    variant: "destructive" as const,
+    color: "bg-blue-100 text-blue-800",
+    bgColor: "bg-blue-50",
+    borderColor: "border-blue-200",
+  },
+  pending_return: {
+    label: "반납대기",
+    variant: "secondary" as const,
+    color: "bg-orange-100 text-orange-800",
+    bgColor: "bg-orange-50",
+    borderColor: "border-orange-200",
+  },
+  under_inspection: {
+    label: "점검중",
+    variant: "outline" as const,
+    color: "bg-gray-100 text-gray-800",
+    bgColor: "bg-gray-50",
+    borderColor: "border-gray-200",
+  },
+  under_repair: {
+    label: "수리중",
+    variant: "destructive" as const,
+    color: "bg-red-100 text-red-800",
+    bgColor: "bg-red-50",
+    borderColor: "border-red-200",
+  },
 } as const;
 
 // 기기 카테고리별 특성 정의
@@ -141,10 +177,14 @@ export const DEVICE_FEATURES = {
 export const DEVICE_STATUS_PRIORITY: Record<DeviceStatus, number> = {
   available: 1,
   reserved: 2,
-  in_use: 3,
-  maintenance: 4,
-  damaged: 5,
-  lost: 6,
+  rented: 3,
+  in_use: 4,
+  pending_return: 5,
+  maintenance: 6,
+  under_inspection: 7,
+  under_repair: 8,
+  damaged: 9,
+  lost: 10,
 } as const;
 
 export interface Device {
@@ -152,6 +192,52 @@ export interface Device {
   category: DeviceCategory;
   tag_name: string;
   status: DeviceStatus;
+  // 갤럭시 기기 추가 정보
+  imei?: string;
+  imei2?: string;
+  serial_number?: string;
+  mac_address?: string;
+  eid?: string;
+  // 기타 기기 정보
+  warranty_expiry?: string;
+  // 재고 관리 관련
+  priority?: number;
+  assigned_reservation_id?: string;
   created_at: string;
   updated_at: string;
+}
+
+// 재고 가용성 확인을 위한 인터페이스
+export interface DeviceAvailability {
+  device_id: string;
+  available_from: string;
+  available_until: string;
+  is_available: boolean;
+  conflicting_reservations: string[];
+}
+
+// 재고 현황 대시보드용 인터페이스
+export interface InventoryStatus {
+  category: DeviceCategory;
+  total_devices: number;
+  available_devices: number;
+  rented_devices: number;
+  maintenance_devices: number;
+  utilization_rate: number;
+}
+
+// 예약 가능 여부 확인 파라미터
+export interface AvailabilityCheckParams {
+  category: DeviceCategory;
+  pickup_date: string;
+  return_date: string;
+  exclude_reservation_id?: string;
+}
+
+// 재고 할당 결과
+export interface DeviceAllocation {
+  success: boolean;
+  device_id?: string;
+  device_tag_name?: string;
+  error_message?: string;
 }
