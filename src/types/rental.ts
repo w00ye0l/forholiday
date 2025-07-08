@@ -135,7 +135,7 @@ export interface RentalReservation {
   reservation_id: string; // 고객용 예약 번호 (RT20241220ABCD)
   user_id: string;
   device_category: DeviceCategory; // 예약 생성 시 입력
-  device_tag_name?: string; // 수령완료 시 입력 (nullable)
+  device_tag_name: string | null; // 수령완료 시 입력 (nullable)
   status: ReservationStatus;
   pickup_date: string;
   pickup_time: string;
