@@ -155,7 +155,7 @@ export function OutgoingList({
             rental.id === id
               ? {
                   ...rental,
-                  device_tag_name: undefined,
+                  device_tag_name: null,
                 }
               : rental
           )
@@ -251,184 +251,179 @@ export function OutgoingList({
   };
 
   return (
-    <div className="grid gap-2 md:gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="flex flex-col gap-2 md:gap-4">
       {rentals.map((rental) => (
         <Card key={rental.id} className={getCardStyle(rental.status)}>
-          <div className="flex flex-col gap-2 text-sm">
-            <div className="flex gap-2 justify-between">
-              {/* 메인 정보 (이름, 연락처, 시간) */}
-              <div className="flex flex-col justify-between gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-base">
-                    {rental.renter_name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <PhoneIcon className="w-3 h-3" />
-                  <span className="text-xs text-gray-600">
-                    {rental.renter_phone}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-600 flex gap-2 items-center">
-                  <MapPinIcon className="w-3 h-3" />
-                  <span>{PICKUP_METHOD_LABELS[rental.pickup_method]}</span>
-                </div>
-                <div className="text-xs text-gray-600 flex gap-2 items-center">
-                  <CalendarIcon className="w-3 h-3" />
-                  <span>
-                    {format(new Date(rental.pickup_date), "yyyy.MM.dd", {
-                      locale: ko,
-                    })}{" "}
-                    {rental.pickup_time.slice(0, 5)}
-                  </span>
-                </div>
+          <div className="flex flex-col md:flex-row md:items-start md:gap-6 gap-2 text-sm">
+            {/* 좌측: 주요 정보 */}
+            <div className="flex-1 flex flex-col gap-1 md:gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-base">
+                  {rental.renter_name}
+                </span>
               </div>
+              <div className="flex items-center gap-2">
+                <PhoneIcon className="w-3 h-3" />
+                <span className="text-xs text-gray-600">
+                  {rental.renter_phone}
+                </span>
+              </div>
+              <div className="text-xs text-gray-600 flex gap-2 items-center">
+                <MapPinIcon className="w-3 h-3" />
+                <span>{PICKUP_METHOD_LABELS[rental.pickup_method]}</span>
+              </div>
+              <div className="text-xs text-gray-600 flex gap-2 items-center">
+                <CalendarIcon className="w-3 h-3" />
+                <span>
+                  {format(new Date(rental.pickup_date), "yyyy.MM.dd", {
+                    locale: ko,
+                  })}{" "}
+                  {rental.pickup_time.slice(0, 5)}
+                </span>
+              </div>
+              {/* SD카드/데이터 전송 옵션 */}
+              <div className="flex gap-1 flex-wrap mt-1">
+                {rental.sd_option && (
+                  <Badge variant="secondary" className="border-gray-400">
+                    SD카드 {rental.sd_option}
+                  </Badge>
+                )}
+                {rental.data_transmission && (
+                  <Badge variant="secondary" className="border-gray-400">
+                    데이터 전송
+                  </Badge>
+                )}
+              </div>
+            </div>
 
-              <div className="flex flex-col items-end gap-2 text-sm">
-                {/* 기기 선택/표시 */}
-                <div className="w-36">
-                  {rental.status === "pending" ? (
-                    <Select
-                      value={
-                        rental.device_tag_name ||
-                        selectedDevices[rental.id] ||
-                        "placeholder"
-                      }
-                      onValueChange={(value) => {
-                        setSelectedDevices((prev) => ({
-                          ...prev,
-                          [rental.id]: value,
-                        }));
-                        handleDeviceSelect(rental.id, value);
-                      }}
-                      disabled={isUpdating[rental.id]}
-                    >
-                      <SelectTrigger className="h-7 text-sm bg-white border-gray-400">
-                        <SelectValue>
-                          {rental.device_tag_name ||
-                            (selectedDevices[rental.id] &&
-                            selectedDevices[rental.id] !== "placeholder"
-                              ? selectedDevices[rental.id]
-                              : `${
-                                  DEVICE_CATEGORY_LABELS[rental.device_category]
-                                } 선택`)}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="placeholder">
-                          {`${
-                            DEVICE_CATEGORY_LABELS[rental.device_category]
-                          } 선택`}
-                        </SelectItem>
-                        {devices
-                          .filter(
-                            (device) =>
-                              device.category === rental.device_category
-                          )
-                          .map((device) => (
-                            <SelectItem
-                              key={device.tag_name}
-                              value={device.tag_name}
-                            >
-                              {device.tag_name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="text-sm font-mono bg-white px-2 py-1 rounded border text-center">
-                      {rental.device_tag_name || rental.device_category}
-                    </div>
-                  )}
-                </div>
-
-                {/* 상태 수동 변경 (개발자/관리자용) */}
-                <div className="w-24">
+            {/* 우측: 기기/상태/비고 등 관리 기능 */}
+            <div className="flex flex-col gap-2 md:items-end md:w-56 w-full">
+              {/* 기기 선택/표시 */}
+              <div className="w-full md:w-48">
+                {rental.status === "pending" ? (
                   <Select
-                    value={rental.status}
-                    onValueChange={(value: ReservationStatus) =>
-                      handleStatusChange(rental.id, value)
+                    value={
+                      rental.device_tag_name ||
+                      selectedDevices[rental.id] ||
+                      "placeholder"
                     }
+                    onValueChange={(value) => {
+                      setSelectedDevices((prev) => ({
+                        ...prev,
+                        [rental.id]: value,
+                      }));
+                      handleDeviceSelect(rental.id, value);
+                    }}
                     disabled={isUpdating[rental.id]}
                   >
-                    <SelectTrigger className="h-6 text-xs bg-white border-gray-300">
-                      <SelectValue />
+                    <SelectTrigger className="h-7 text-sm bg-white border-gray-400">
+                      <SelectValue>
+                        {rental.device_tag_name ||
+                          (selectedDevices[rental.id] &&
+                          selectedDevices[rental.id] !== "placeholder"
+                            ? selectedDevices[rental.id]
+                            : `${
+                                DEVICE_CATEGORY_LABELS[rental.device_category]
+                              } 선택`)}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(STATUS_MAP).map(
-                        ([status, statusInfo]) => (
-                          <SelectItem key={status} value={status}>
-                            {statusInfo.label}
-                          </SelectItem>
+                      <SelectItem value="placeholder">
+                        {`${
+                          DEVICE_CATEGORY_LABELS[rental.device_category]
+                        } 선택`}
+                      </SelectItem>
+                      {devices
+                        .filter(
+                          (device) => device.category === rental.device_category
                         )
-                      )}
+                        .map((device) => (
+                          <SelectItem
+                            key={device.tag_name}
+                            value={device.tag_name}
+                          >
+                            {device.tag_name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
-                </div>
+                ) : (
+                  <div className="text-sm font-mono bg-white px-2 py-1 rounded border text-center">
+                    {rental.device_tag_name || rental.device_category}
+                  </div>
+                )}
               </div>
-            </div>
 
-            {/* SD 카드, 데이터 전송 옵션 */}
-            <div>
-              {rental.sd_option && (
-                <Badge variant="secondary" className="border-gray-400">
-                  SD카드 {rental.sd_option}
-                </Badge>
-              )}
-              {rental.data_transmission && (
-                <Badge variant="secondary" className="border-gray-400">
-                  데이터 전송
-                </Badge>
-              )}
-            </div>
+              {/* 상태 수동 변경 (개발자/관리자용) */}
+              <div className="w-full md:w-32">
+                <Select
+                  value={rental.status}
+                  onValueChange={(value: ReservationStatus) =>
+                    handleStatusChange(rental.id, value)
+                  }
+                  disabled={isUpdating[rental.id]}
+                >
+                  <SelectTrigger className="h-6 text-xs bg-white border-gray-300">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(STATUS_MAP).map(([status, statusInfo]) => (
+                      <SelectItem key={status} value={status}>
+                        {statusInfo.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* 비고 및 로딩 */}
-            <div className="flex items-center gap-1">
-              {editingNotes[rental.id] ? (
-                <>
-                  <Input
-                    value={notes[rental.id] || ""}
-                    onChange={(e) =>
-                      setNotes((prev) => ({
-                        ...prev,
-                        [rental.id]: e.target.value,
-                      }))
-                    }
-                    placeholder="비고"
-                    className="h-7 text-sm flex-1 min-w-0 bg-white border-gray-400"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => handleNotesUpdate(rental.id)}
-                    className="h-7 w-7 p-0 text-xs flex-shrink-0"
-                  >
-                    ✓
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <p
-                    className="text-sm text-gray-600 break-all min-w-0"
-                    title={rental.description || "비고 없음"}
-                  >
-                    비고: {rental.description || "비고 없음"}
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      startEditingNotes(rental.id, rental.description)
-                    }
-                    className="h-7 w-7 p-0 text-xs flex-shrink-0"
-                  >
-                    <PencilIcon className="w-3 h-3" />
-                  </Button>
-                </>
-              )}
+              {/* 비고 및 로딩 */}
+              <div className="flex items-center gap-1 w-full">
+                {editingNotes[rental.id] ? (
+                  <>
+                    <Input
+                      value={notes[rental.id] || ""}
+                      onChange={(e) =>
+                        setNotes((prev) => ({
+                          ...prev,
+                          [rental.id]: e.target.value,
+                        }))
+                      }
+                      placeholder="비고"
+                      className="h-7 text-sm flex-1 min-w-0 bg-white border-gray-400"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => handleNotesUpdate(rental.id)}
+                      className="h-7 w-7 p-0 text-xs flex-shrink-0"
+                    >
+                      ✓
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p
+                      className="text-sm text-gray-600 break-all min-w-0"
+                      title={rental.description || "비고 없음"}
+                    >
+                      비고: {rental.description || "비고 없음"}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        startEditingNotes(rental.id, rental.description)
+                      }
+                      className="h-7 w-7 p-0 text-xs flex-shrink-0"
+                    >
+                      <PencilIcon className="w-3 h-3" />
+                    </Button>
+                  </>
+                )}
 
-              {isUpdating[rental.id] && (
-                <div className="animate-spin h-3 w-3 border border-blue-500 border-t-transparent rounded-full ml-1 flex-shrink-0"></div>
-              )}
+                {isUpdating[rental.id] && (
+                  <div className="animate-spin h-3 w-3 border border-blue-500 border-t-transparent rounded-full ml-1 flex-shrink-0"></div>
+                )}
+              </div>
             </div>
           </div>
         </Card>
