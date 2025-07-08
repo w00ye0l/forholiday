@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   SearchIcon,
@@ -22,7 +23,6 @@ import { ko } from "date-fns/locale";
 import type { StorageReservation } from "@/types/storage";
 import StorageLogisticsList from "@/components/storage/StorageLogisticsList";
 import { cn } from "@/lib/utils";
-import { Checkbox } from "@/components/ui/checkbox";
 
 export default function StorageIncomingPage() {
   const [allStorages, setAllStorages] = useState<StorageReservation[]>([]);
@@ -35,7 +35,11 @@ export default function StorageIncomingPage() {
 
   // 검색 상태
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState<Date | undefined>(new Date()); // 기본값: 오늘 날짜
+  const today = new Date();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: today,
+    to: today,
+  });
   const [showAllDates, setShowAllDates] = useState(false); // 전체 날짜 보기 여부
 
   const loadData = async () => {
@@ -105,9 +109,12 @@ export default function StorageIncomingPage() {
   const getStatusTabCount = (status: string) => {
     let base = getActiveStorages();
     // 날짜 필터 적용
-    if (!showAllDates && dateFilter) {
-      const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      base = base.filter((s) => s.drop_off_date.includes(filterDateString));
+    if (!showAllDates && dateRange) {
+      const fromStr = format(dateRange.from!, "yyyy-MM-dd");
+      const toStr = format(dateRange.to!, "yyyy-MM-dd");
+      base = base.filter(
+        (s) => s.drop_off_date >= fromStr && s.drop_off_date <= toStr
+      );
     }
     if (status === "all") return base.length;
     if (status === "pending")
@@ -128,9 +135,12 @@ export default function StorageIncomingPage() {
       });
     }
     // 날짜 필터
-    if (!showAllDates && dateFilter) {
-      const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      base = base.filter((s) => s.drop_off_date.includes(filterDateString));
+    if (!showAllDates && dateRange) {
+      const fromStr = format(dateRange.from!, "yyyy-MM-dd");
+      const toStr = format(dateRange.to!, "yyyy-MM-dd");
+      base = base.filter(
+        (s) => s.drop_off_date >= fromStr && s.drop_off_date <= toStr
+      );
     }
     if (location === "all") return base.length;
     return base.filter((s) => getLocationFromReservation(s) === location)
@@ -155,11 +165,13 @@ export default function StorageIncomingPage() {
         return location === locationTab;
       });
     }
-    // 날짜 필터 (전체 날짜 보기가 아닌 경우)
-    if (!showAllDates && dateFilter) {
-      const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      filtered = filtered.filter((storage) =>
-        storage.drop_off_date.includes(filterDateString)
+    // 기간(범위) 필터 (전체 날짜 보기가 아닌 경우)
+    if (!showAllDates && dateRange?.from && dateRange?.to) {
+      const fromStr = format(dateRange.from, "yyyy-MM-dd");
+      const toStr = format(dateRange.to, "yyyy-MM-dd");
+      filtered = filtered.filter(
+        (storage) =>
+          storage.drop_off_date >= fromStr && storage.drop_off_date <= toStr
       );
     }
     // 검색 필터
@@ -181,7 +193,7 @@ export default function StorageIncomingPage() {
   }, [
     allStorages,
     searchTerm,
-    dateFilter,
+    dateRange,
     locationTab,
     statusTab,
     showAllDates,
@@ -193,114 +205,138 @@ export default function StorageIncomingPage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    setDateFilter(new Date()); // 오늘 날짜로 리셋
+    setDateRange(undefined);
     setShowAllDates(false);
   };
 
-  // 전체 날짜 보기 토글
-  const handleShowAllDatesChange = (checked: boolean) => {
-    setShowAllDates(checked);
-    if (checked) {
-      setDateFilter(undefined); // 전체 보기 시 날짜 필터 제거
-    } else {
-      setDateFilter(new Date()); // 오늘 날짜로 설정
-    }
-  };
-
   return (
-    <div className="container mx-auto px-2 py-8">
+    <div className="container mx-auto py-8">
       <div className="mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <ArrowDownIcon className="w-6 h-6 text-blue-600" />
-          <h1 className="text-2xl font-bold text-blue-800">입고 관리</h1>
-        </div>
+        <h1 className="text-2xl font-bold mb-2">입고 관리</h1>
       </div>
 
-      {/* 상태 구분 탭 */}
-      <Tabs value={statusTab} onValueChange={setStatusTab} className="mb-4">
-        <TabsList className="w-full bg-blue-100">
-          <TabsTrigger value="all" className="flex-1">
-            전체{" "}
-            <span className="ml-1 text-xs text-blue-700">
-              ({getStatusTabCount("all")})
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value="pending" className="flex-1">
-            보관 전{" "}
-            <span className="ml-1 text-xs text-blue-700">
-              ({getStatusTabCount("pending")})
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value="stored" className="flex-1">
-            보관 완료{" "}
-            <span className="ml-1 text-xs text-blue-700">
-              ({getStatusTabCount("stored")})
-            </span>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* 검색/날짜/필터 바 */}
-      <div className="flex flex-wrap gap-2 items-center mb-2 rounded-lg py-2">
-        <div className="relative flex-1 min-w-[180px]">
-          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            placeholder="고객명, 예약번호, 물품명, 태그번호 검색"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 text-sm"
-          />
+      {/* 검색 및 필터 */}
+      <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {/* 이름/기기명 검색 */}
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
+            <Input
+              placeholder="고객명, 예약번호, 물품명, 태그번호 검색"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setDateRange(undefined);
+              }}
+              className="text-sm pl-9"
+            />
+          </div>
+          {/* 날짜 필터 */}
+          {!showAllDates && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "justify-start text-left font-normal",
+                    !dateRange && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange?.from && dateRange?.to
+                    ? `${format(dateRange.from, "yyyy-MM-dd", {
+                        locale: ko,
+                      })} ~ ${format(dateRange.to, "yyyy-MM-dd", {
+                        locale: ko,
+                      })}`
+                    : "입고 기간 선택"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  locale={ko}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          )}
+          {/* 초기화 버튼 */}
+          <Button
+            variant="outline"
+            onClick={handleReset}
+            className="flex items-center gap-2"
+          >
+            <RefreshCwIcon className="w-4 h-4" />
+            초기화
+          </Button>
         </div>
-        {!showAllDates && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "justify-start text-left font-normal min-w-[160px]",
-                  !dateFilter && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateFilter
-                  ? format(dateFilter, "yyyy-MM-dd", { locale: ko })
-                  : "날짜 선택"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={dateFilter}
-                onSelect={(date) => setDateFilter(date)}
-                locale={ko}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        )}
-        <div className="flex items-center gap-1">
-          <Checkbox
-            id="showAllDates"
-            checked={showAllDates}
-            onCheckedChange={handleShowAllDatesChange}
-          />
-          <label htmlFor="showAllDates" className="text-sm cursor-pointer">
-            전체 날짜
-          </label>
+        {/* 상태별 필터 버튼 그룹 */}
+        <div className="flex flex-wrap gap-2 text-xs">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatusTab("all")}
+            className={`h-6 px-2 py-1 text-xs ${
+              statusTab === "all"
+                ? "bg-gray-200 text-gray-900 border-2 border-gray-400"
+                : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+            }`}
+          >
+            전체: {getStatusTabCount("all")}건
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatusTab("pending")}
+            className={`h-6 px-2 py-1 text-xs ${
+              statusTab === "pending"
+                ? "bg-yellow-200 text-yellow-900 border-2 border-yellow-400"
+                : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+            }`}
+          >
+            보관 전: {getStatusTabCount("pending")}건
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatusTab("stored")}
+            className={`h-6 px-2 py-1 text-xs ${
+              statusTab === "stored"
+                ? "bg-gray-200 text-gray-900 border-2 border-gray-400"
+                : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+            }`}
+          >
+            보관 완료: {getStatusTabCount("stored")}건
+          </Button>
         </div>
-        <Button
-          onClick={handleReset}
-          variant="outline"
-          className="flex items-center gap-2 text-sm px-4 h-9"
-        >
-          <RefreshCwIcon className="w-4 h-4" />
-          초기화
-        </Button>
+        {/* 필터 결과 표시 */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
+          <div>
+            {dateRange?.from && dateRange?.to ? (
+              <span className="font-medium text-gray-800">
+                {format(dateRange.from, "yyyy년 MM월 dd일", { locale: ko })} ~{" "}
+                {format(dateRange.to, "yyyy년 MM월 dd일", { locale: ko })} 기간
+              </span>
+            ) : (
+              <span className="font-medium text-gray-800">전체 기간</span>
+            )}
+            <span className="ml-2">총 {filteredStorages.length}건</span>
+            {statusTab !== "all" && (
+              <span className="ml-2 text-sm font-medium text-purple-600">
+                ({statusTab === "pending" ? "보관 전" : "보관 완료"} 항목만
+                표시)
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* 위치 구분 탭 (밑줄 스타일) */}
       <Tabs value={locationTab} onValueChange={setLocationTab} className="mb-6">
-        <TabsList className="p-0 border-b border-blue-200 bg-transparent rounded-none w-full md:w-fit">
+        <TabsList className="p-0 border-b border-gray-200 bg-transparent rounded-none w-full">
           <TabsTrigger
             value="all"
             className="px-10 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent h-full data-[state=active]:shadow-none"
