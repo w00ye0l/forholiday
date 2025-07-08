@@ -15,6 +15,7 @@ import {
   UserIcon,
   PlaneIcon,
   DatabaseIcon,
+  TableIcon,
 } from "lucide-react";
 
 import { NavStorage } from "@/components/nav-storage";
@@ -86,6 +87,11 @@ const data = {
       title: "기기 관리",
       url: "/devices",
       icon: BoxIcon,
+    },
+    {
+      title: "재고 관리",
+      url: "/inventory",
+      icon: TableIcon,
     },
     {
       title: "고객 조회 페이지",

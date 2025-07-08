@@ -10,6 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
 import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
@@ -30,7 +31,11 @@ export default function RentalReturnPage() {
 
   // 검색 상태 - 오늘 날짜를 기본값으로 설정
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState<Date | undefined>(new Date());
+  const today = new Date();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: today,
+    to: today,
+  });
   const [activeLocationTab, setActiveLocationTab] = useState<
     ReturnMethod | "all"
   >("all");
@@ -91,16 +96,16 @@ export default function RentalReturnPage() {
   useEffect(() => {
     let filtered = rentals;
 
-    // 날짜 필터 (반납일 기준) - 지연 반납은 제외
-    if (dateFilter) {
-      const filterDateString = format(dateFilter, "yyyy-MM-dd");
+    // 기간(범위) 필터 (반납일 기준) - 지연 반납은 제외
+    if (dateRange?.from && dateRange?.to) {
+      const fromStr = format(dateRange.from, "yyyy-MM-dd");
+      const toStr = format(dateRange.to, "yyyy-MM-dd");
       filtered = filtered.filter((rental) => {
         const displayStatus = getDisplayStatus(rental);
-        // 지연 반납은 날짜 필터에서 제외
         if (displayStatus === "overdue") {
           return true;
         }
-        return rental.return_date.includes(filterDateString);
+        return rental.return_date >= fromStr && rental.return_date <= toStr;
       });
     }
 
@@ -153,7 +158,7 @@ export default function RentalReturnPage() {
     });
 
     setFilteredRentals(filtered);
-  }, [rentals, searchTerm, dateFilter, activeLocationTab, activeStatusFilter]);
+  }, [rentals, searchTerm, dateRange, activeLocationTab, activeStatusFilter]);
 
   useEffect(() => {
     loadData();
@@ -161,7 +166,7 @@ export default function RentalReturnPage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    setDateFilter(undefined);
+    setDateRange(undefined);
     setActiveLocationTab("all");
     setActiveStatusFilter("all");
   };
@@ -176,15 +181,16 @@ export default function RentalReturnPage() {
     let baseFiltered = rentals;
 
     // 날짜 필터 적용 - 지연 반납은 제외
-    if (dateFilter) {
-      const filterDateString = format(dateFilter, "yyyy-MM-dd");
+    if (dateRange?.from && dateRange?.to) {
+      const fromStr = format(dateRange.from, "yyyy-MM-dd");
+      const toStr = format(dateRange.to, "yyyy-MM-dd");
       baseFiltered = baseFiltered.filter((rental) => {
         const displayStatus = getDisplayStatus(rental);
         // 지연 반납은 날짜 필터에서 제외
         if (displayStatus === "overdue") {
           return true;
         }
-        return rental.return_date.includes(filterDateString);
+        return rental.return_date >= fromStr && rental.return_date <= toStr;
       });
     }
 
@@ -253,25 +259,7 @@ export default function RentalReturnPage() {
   return (
     <div className="container mx-auto py-8">
       <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">
-            반납 관리
-            {activeLocationTab !== "all" && (
-              <span className="text-lg text-blue-600 ml-2">
-                - {LOCATION_LABELS[activeLocationTab]}
-              </span>
-            )}
-          </h1>
-        </div>
-
-        <p className="text-sm text-gray-500 mt-2">
-          기기 반납 및 상태 관리
-          {activeLocationTab !== "all" && (
-            <span className="ml-2 text-blue-500">
-              ({LOCATION_LABELS[activeLocationTab]} 전용)
-            </span>
-          )}
-        </p>
+        <h1 className="text-2xl font-bold mb-2">반납 관리</h1>
       </div>
 
       {/* 검색 필터 */}
@@ -283,7 +271,10 @@ export default function RentalReturnPage() {
             <Input
               placeholder="이름, 기기명 또는 예약번호 검색"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setDateRange(undefined);
+              }}
               className="text-sm pl-9"
             />
           </div>
@@ -294,20 +285,24 @@ export default function RentalReturnPage() {
               <Button
                 variant="outline"
                 className={`justify-start text-left font-normal ${
-                  !dateFilter && "text-muted-foreground"
+                  !dateRange && "text-muted-foreground"
                 }`}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateFilter
-                  ? format(dateFilter, "yyyy-MM-dd", { locale: ko })
-                  : "반납 날짜 선택"}
+                {dateRange?.from && dateRange?.to
+                  ? `${format(dateRange.from, "yyyy-MM-dd", {
+                      locale: ko,
+                    })} ~ ${format(dateRange.to, "yyyy-MM-dd", { locale: ko })}`
+                  : "반납 기간 선택"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
-                mode="single"
-                selected={dateFilter}
-                onSelect={setDateFilter}
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                locale={ko}
+                initialFocus
               />
             </PopoverContent>
           </Popover>
@@ -378,9 +373,10 @@ export default function RentalReturnPage() {
         {/* 필터링된 결과 및 상태별 개수 */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
           <div>
-            {dateFilter ? (
+            {dateRange?.from && dateRange?.to ? (
               <span className="font-medium text-blue-600">
-                {format(dateFilter, "yyyy년 MM월 dd일", { locale: ko })} 기준
+                {format(dateRange.from, "yyyy년 MM월 dd일", { locale: ko })} ~{" "}
+                {format(dateRange.to, "yyyy년 MM월 dd일", { locale: ko })} 기간
               </span>
             ) : (
               <span className="font-medium text-blue-600">전체 기간</span>

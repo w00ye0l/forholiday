@@ -1,3 +1,5 @@
+import { Database } from "@/lib/supabase/database.types";
+
 export type DeviceStatus =
   | "available"
   | "reserved"
@@ -187,11 +189,7 @@ export const DEVICE_STATUS_PRIORITY: Record<DeviceStatus, number> = {
   lost: 10,
 } as const;
 
-export interface Device {
-  id: string;
-  category: DeviceCategory;
-  tag_name: string;
-  status: DeviceStatus;
+export type Device = Database["public"]["Tables"]["devices"]["Row"] & {
   // 갤럭시 기기 추가 정보
   imei?: string;
   imei2?: string;
@@ -203,9 +201,7 @@ export interface Device {
   // 재고 관리 관련
   priority?: number;
   assigned_reservation_id?: string;
-  created_at: string;
-  updated_at: string;
-}
+};
 
 // 재고 가용성 확인을 위한 인터페이스
 export interface DeviceAvailability {

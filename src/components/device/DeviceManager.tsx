@@ -5,6 +5,8 @@ import {
   DEVICE_CATEGORY_LABELS,
   DEVICE_STATUS_MAP,
   Device,
+  DeviceCategory,
+  DeviceStatus,
 } from "@/types/device";
 import {
   Table,
@@ -76,10 +78,17 @@ export default function DeviceManager({
         {devices.map((device) => (
           <TableRow key={device.id}>
             <TableCell className="font-medium">{device.tag_name}</TableCell>
-            <TableCell>{DEVICE_CATEGORY_LABELS[device.category]}</TableCell>
             <TableCell>
-              <Badge variant={DEVICE_STATUS_MAP[device.status].variant as any}>
-                {DEVICE_STATUS_MAP[device.status].label}
+              {DEVICE_CATEGORY_LABELS[device.category as DeviceCategory] ?? "-"}
+            </TableCell>
+            <TableCell>
+              <Badge
+                variant={
+                  DEVICE_STATUS_MAP[device.status as DeviceStatus]
+                    ?.variant as any
+                }
+              >
+                {DEVICE_STATUS_MAP[device.status as DeviceStatus]?.label ?? "-"}
               </Badge>
             </TableCell>
             <TableCell>{device.created_at.slice(0, 10)}</TableCell>

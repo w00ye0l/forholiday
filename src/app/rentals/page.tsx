@@ -84,19 +84,21 @@ export default function RentalsPage() {
   // 출고 관리 정렬 로직
   const sortRentalsForOutgoing = (rentals: RentalWithDevice[]) => {
     return rentals.sort((a, b) => {
-      // 1차 정렬: 수령 방법별 우선순위 (터미널1 → 터미널2 → 택배 → 사무실 → 호텔)
-      const priorityA = PICKUP_METHOD_PRIORITY[a.pickup_method];
-      const priorityB = PICKUP_METHOD_PRIORITY[b.pickup_method];
-
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
-
-      // 2차 정렬: 시간순 (픽업 날짜 + 시간)
+      // 1차 정렬: 시간 내림차순 (최근 예약이 먼저)
       const dateTimeA = new Date(`${a.pickup_date} ${a.pickup_time}`);
       const dateTimeB = new Date(`${b.pickup_date} ${b.pickup_time}`);
 
-      return dateTimeA.getTime() - dateTimeB.getTime();
+      const timeDiff = dateTimeB.getTime() - dateTimeA.getTime();
+
+      if (timeDiff !== 0) {
+        return timeDiff;
+      }
+
+      // 2차 정렬: 수령 방법별 우선순위 (터미널1 → 터미널2 → 택배 → 사무실 → 호텔)
+      const priorityA = PICKUP_METHOD_PRIORITY[a.pickup_method];
+      const priorityB = PICKUP_METHOD_PRIORITY[b.pickup_method];
+
+      return priorityA - priorityB;
     });
   };
 

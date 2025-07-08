@@ -17,6 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -48,7 +49,11 @@ export default function RentalOutPage() {
 
   // 검색 상태 - 오늘 날짜를 기본값으로 설정
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState<Date | undefined>(new Date());
+  const today = new Date();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: today,
+    to: today,
+  });
 
   const loadData = async () => {
     setLoading(true);
@@ -97,11 +102,12 @@ export default function RentalOutPage() {
       });
     }
 
-    // 날짜 필터링
-    if (dateFilter) {
-      const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      filtered = filtered.filter((rental) =>
-        rental.pickup_date.includes(filterDateString)
+    // 기간(범위) 필터링
+    if (dateRange?.from && dateRange?.to) {
+      const fromStr = format(dateRange.from, "yyyy-MM-dd");
+      const toStr = format(dateRange.to, "yyyy-MM-dd");
+      filtered = filtered.filter(
+        (rental) => rental.pickup_date >= fromStr && rental.pickup_date <= toStr
       );
     }
 
@@ -118,7 +124,7 @@ export default function RentalOutPage() {
     }
 
     setFilteredRentals(filtered);
-  }, [rentals, searchTerm, dateFilter, selectedPickupMethod, selectedStatus]);
+  }, [rentals, searchTerm, dateRange, selectedPickupMethod, selectedStatus]);
 
   useEffect(() => {
     loadData();
@@ -126,7 +132,7 @@ export default function RentalOutPage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    setDateFilter(undefined);
+    setDateRange(undefined);
     setSelectedPickupMethod("all");
     setSelectedStatus("all");
   };
@@ -150,11 +156,12 @@ export default function RentalOutPage() {
       });
     }
 
-    // 날짜 필터링
-    if (dateFilter) {
-      const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      filtered = filtered.filter((rental) =>
-        rental.pickup_date.includes(filterDateString)
+    // 기간(범위) 필터링
+    if (dateRange?.from && dateRange?.to) {
+      const fromStr = format(dateRange.from, "yyyy-MM-dd");
+      const toStr = format(dateRange.to, "yyyy-MM-dd");
+      filtered = filtered.filter(
+        (rental) => rental.pickup_date >= fromStr && rental.pickup_date <= toStr
       );
     }
 
@@ -200,11 +207,12 @@ export default function RentalOutPage() {
       });
     }
 
-    // 날짜 필터링
-    if (dateFilter) {
-      const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      filtered = filtered.filter((rental) =>
-        rental.pickup_date.includes(filterDateString)
+    // 기간(범위) 필터링
+    if (dateRange?.from && dateRange?.to) {
+      const fromStr = format(dateRange.from, "yyyy-MM-dd");
+      const toStr = format(dateRange.to, "yyyy-MM-dd");
+      filtered = filtered.filter(
+        (rental) => rental.pickup_date >= fromStr && rental.pickup_date <= toStr
       );
     }
 
@@ -235,8 +243,14 @@ export default function RentalOutPage() {
       conditions.push(`검색: "${searchTerm}"`);
     }
 
-    if (dateFilter) {
-      conditions.push(`${format(dateFilter, "yyyy-MM-dd", { locale: ko })}`);
+    if (dateRange?.from && dateRange?.to) {
+      conditions.push(
+        `${format(dateRange.from, "yyyy-MM-dd", { locale: ko })} ~ ${format(
+          dateRange.to,
+          "yyyy-MM-dd",
+          { locale: ko }
+        )}`
+      );
     }
 
     if (selectedPickupMethod !== "all") {
@@ -269,7 +283,10 @@ export default function RentalOutPage() {
             <Input
               placeholder="고객명, 전화번호, 예약번호, 기기명으로 검색..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setDateRange(undefined);
+              }}
               className="text-sm pl-9"
             />
           </div>
@@ -281,20 +298,22 @@ export default function RentalOutPage() {
                 variant="outline"
                 className={cn(
                   "justify-start text-left font-normal",
-                  !dateFilter && "text-muted-foreground"
+                  !dateRange && "text-muted-foreground"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateFilter
-                  ? format(dateFilter, "yyyy-MM-dd", { locale: ko })
-                  : "수령 날짜 선택"}
+                {dateRange?.from && dateRange?.to
+                  ? `${format(dateRange.from, "yyyy-MM-dd", {
+                      locale: ko,
+                    })} ~ ${format(dateRange.to, "yyyy-MM-dd", { locale: ko })}`
+                  : "수령 기간 선택"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
-                mode="single"
-                selected={dateFilter}
-                onSelect={setDateFilter}
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
                 locale={ko}
                 initialFocus
               />
@@ -403,9 +422,10 @@ export default function RentalOutPage() {
         {/* 필터 결과 표시 */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
           <div>
-            {dateFilter ? (
+            {dateRange?.from && dateRange?.to ? (
               <span className="font-medium text-blue-600">
-                {format(dateFilter, "yyyy년 MM월 dd일", { locale: ko })} 기준
+                {format(dateRange.from, "yyyy년 MM월 dd일", { locale: ko })} ~{" "}
+                {format(dateRange.to, "yyyy년 MM월 dd일", { locale: ko })} 기간
               </span>
             ) : (
               <span className="font-medium text-blue-600">전체 기간</span>
