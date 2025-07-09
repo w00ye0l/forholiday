@@ -16,6 +16,7 @@ import {
   PlaneIcon,
   DatabaseIcon,
   TableIcon,
+  ClockIcon,
 } from "lucide-react";
 
 import { NavStorage } from "@/components/nav-storage";
@@ -34,6 +35,11 @@ import Image from "next/image";
 
 const data = {
   rentalMenu: [
+    {
+      title: "예약 대기",
+      url: "/rentals/pending",
+      icon: ClockIcon,
+    },
     {
       title: "예약 목록",
       url: "/rentals",
