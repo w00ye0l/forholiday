@@ -407,6 +407,9 @@ export default function DataTransferPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8">
+                <input type="checkbox" className="accent-primary" disabled />
+              </TableHead>
               <TableHead>대여자</TableHead>
               <TableHead>연락처</TableHead>
               <TableHead>이메일</TableHead>
@@ -422,13 +425,16 @@ export default function DataTransferPage() {
           <TableBody>
             {filteredTransfers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-4">
+                <TableCell colSpan={11} className="text-center py-4">
                   데이터가 없습니다.
                 </TableCell>
               </TableRow>
             ) : (
               filteredTransfers.map((transfer) => (
                 <TableRow key={transfer.id}>
+                  <TableCell className="w-8">
+                    <input type="checkbox" className="accent-primary" />
+                  </TableCell>
                   <TableCell>{transfer.rental?.renter_name || "-"}</TableCell>
                   <TableCell>{transfer.rental?.renter_phone || "-"}</TableCell>
                   <TableCell>{transfer.rental?.renter_email || "-"}</TableCell>
