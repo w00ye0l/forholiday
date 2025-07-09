@@ -164,9 +164,12 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ data, total });
   } catch (e) {
-    // 상세 에러 메시지 반환
+    console.error("Google Sheets API Error:", e);
     return NextResponse.json(
-      { error: "구글 시트 데이터 불러오기 실패", detail: String(e) },
+      {
+        error: "구글 시트 데이터 불러오기 실패",
+        detail: String(e),
+      },
       { status: 500 }
     );
   }
