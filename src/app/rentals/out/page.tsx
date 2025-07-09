@@ -23,11 +23,7 @@ import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import type {
-  RentalReservation,
-  PickupMethod,
-  ReservationStatus,
-} from "@/types/rental";
+import type { RentalReservation, PickupMethod } from "@/types/rental";
 import { STATUS_MAP, PICKUP_METHOD_LABELS } from "@/types/rental";
 import type { Device, DeviceStatus } from "@/types/device";
 import { cn } from "@/lib/utils";
@@ -41,7 +37,7 @@ export default function RentalOutPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("list");
   const [selectedStatus, setSelectedStatus] = useState<
-    ReservationStatus | "all"
+    "pending" | "picked_up" | "not_picked_up" | "all"
   >("all");
   const [selectedPickupMethod, setSelectedPickupMethod] = useState<
     PickupMethod | "all"
@@ -132,7 +128,10 @@ export default function RentalOutPage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    setDateRange(undefined);
+    setDateRange({
+      from: today,
+      to: today,
+    });
     setSelectedPickupMethod("all");
     setSelectedStatus("all");
   };
@@ -179,9 +178,6 @@ export default function RentalOutPage() {
       picked_up: filtered.filter((r) => r.status === "picked_up").length,
       not_picked_up: filtered.filter((r) => r.status === "not_picked_up")
         .length,
-      returned: filtered.filter((r) => r.status === "returned").length,
-      overdue: filtered.filter((r) => r.status === "overdue").length,
-      problem: filtered.filter((r) => r.status === "problem").length,
     };
 
     return counts;
@@ -276,7 +272,7 @@ export default function RentalOutPage() {
 
       {/* 검색 및 필터 */}
       <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           {/* 이름/기기명 검색 */}
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
@@ -381,42 +377,6 @@ export default function RentalOutPage() {
           >
             {STATUS_MAP.not_picked_up.label}: {statusCounts.not_picked_up}건
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedStatus("returned")}
-            className={`h-6 px-2 py-1 text-xs ${
-              selectedStatus === "returned"
-                ? STATUS_MAP.returned.button
-                : STATUS_MAP.returned.badge
-            }`}
-          >
-            {STATUS_MAP.returned.label}: {statusCounts.returned}건
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedStatus("overdue")}
-            className={`h-6 px-2 py-1 text-xs ${
-              selectedStatus === "overdue"
-                ? STATUS_MAP.overdue.button
-                : STATUS_MAP.overdue.badge
-            }`}
-          >
-            {STATUS_MAP.overdue.label}: {statusCounts.overdue}건
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedStatus("problem")}
-            className={`h-6 px-2 py-1 text-xs ${
-              selectedStatus === "problem"
-                ? STATUS_MAP.problem.button
-                : STATUS_MAP.problem.badge
-            }`}
-          >
-            {STATUS_MAP.problem.label}: {statusCounts.problem}건
-          </Button>
         </div>
 
         {/* 필터 결과 표시 */}
@@ -438,13 +398,7 @@ export default function RentalOutPage() {
                   ? "수령전"
                   : selectedStatus === "picked_up"
                   ? "수령완료"
-                  : selectedStatus === "not_picked_up"
-                  ? "미수령"
-                  : selectedStatus === "returned"
-                  ? "반납완료"
-                  : selectedStatus === "overdue"
-                  ? "지연 반납"
-                  : "문제있음"}{" "}
+                  : "미수령"}{" "}
                 항목만 표시)
               </span>
             )}

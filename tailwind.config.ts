@@ -22,6 +22,10 @@ const config: Config = {
     "text-blue-800",
     "text-red-800",
     "text-green-800",
+    // 기기 할당 색상
+    "bg-device-assigned",
+    "text-device-assigned",
+    "border-device-assigned",
   ],
   theme: {
     extend: {
@@ -65,6 +69,9 @@ const config: Config = {
           "3": "hsl(var(--chart-3))",
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
+        },
+        device: {
+          assigned: "#00AE9E",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
