@@ -185,8 +185,7 @@ export type DataTransferStatus =
   | "PENDING_UPLOAD"
   | "UPLOADED"
   | "EMAIL_SENT"
-  | "ISSUE"
-  | "CANCELLED";
+  | "ISSUE";
 
 export interface DataTransfer {
   id: string;
