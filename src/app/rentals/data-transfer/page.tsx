@@ -27,6 +27,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -40,6 +50,7 @@ const statusOptions: { value: DataTransferStatus; label: string }[] = [
   { value: "UPLOADED", label: "업로드 완료" },
   { value: "EMAIL_SENT", label: "메일발송완료" },
   { value: "ISSUE", label: "문제있음" },
+  { value: "CANCELLED", label: "구매취소" },
 ];
 
 export default function DataTransferPage() {
@@ -54,6 +65,15 @@ export default function DataTransferPage() {
   // 검색 및 필터 상태
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
+  const [endDateFilter, setEndDateFilter] = useState<Date | undefined>(
+    undefined
+  );
+
+  // 취소 확인 모달 상태
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [selectedTransferId, setSelectedTransferId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     checkUser();
@@ -79,10 +99,8 @@ export default function DataTransferPage() {
 
   const fetchTransfers = async () => {
     try {
-      const { data, error } = await supabase
-        .from("data_transfers")
-        .select(
-          `
+      let query = supabase.from("data_transfers").select(
+        `
           *,
           rental:rental_reservations (
             renter_name,
@@ -94,8 +112,13 @@ export default function DataTransferPage() {
             description
           )
         `
-        )
-        .order("created_at", { ascending: false });
+      );
+
+      // 날짜 필터는 클라이언트 사이드에서 처리
+
+      const { data, error } = await query.order("created_at", {
+        ascending: false,
+      });
 
       if (error) throw error;
       setTransfers(data || []);
@@ -111,6 +134,13 @@ export default function DataTransferPage() {
     transferId: string,
     newStatus: DataTransferStatus
   ) => {
+    // 구매 취소 시 확인 모달 표시
+    if (newStatus === "CANCELLED") {
+      setSelectedTransferId(transferId);
+      setShowCancelDialog(true);
+      return;
+    }
+
     try {
       const updateData: any = {
         status: newStatus,
@@ -155,6 +185,53 @@ export default function DataTransferPage() {
     }
   };
 
+  const handleCancelConfirm = async () => {
+    if (!selectedTransferId) return;
+
+    try {
+      // 먼저 data_transfer 레코드를 조회하여 rental_id 가져오기
+      const { data: transferData, error: transferError } = await supabase
+        .from("data_transfers")
+        .select("rental_id")
+        .eq("id", selectedTransferId)
+        .single();
+
+      if (transferError) throw transferError;
+
+      // 1. 예약 테이블의 data_transmission을 false로 변경
+      const { error: rentalUpdateError } = await supabase
+        .from("rental_reservations")
+        .update({
+          data_transmission: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", transferData.rental_id);
+
+      if (rentalUpdateError) throw rentalUpdateError;
+
+      // 2. data_transfers 테이블에서 해당 레코드 삭제
+      const { error: deleteError } = await supabase
+        .from("data_transfers")
+        .delete()
+        .eq("id", selectedTransferId);
+
+      if (deleteError) throw deleteError;
+
+      // 3. 로컬 상태에서 해당 데이터 제거
+      setTransfers((prev) =>
+        prev.filter((transfer) => transfer.id !== selectedTransferId)
+      );
+
+      toast.success("구매가 취소되었습니다.");
+    } catch (error) {
+      console.error("Error cancelling purchase:", error);
+      toast.error("구매 취소에 실패했습니다.");
+    } finally {
+      setShowCancelDialog(false);
+      setSelectedTransferId(null);
+    }
+  };
+
   const getStatusBadgeVariant = (
     status: DataTransferStatus
   ): "default" | "secondary" | "destructive" | "outline" => {
@@ -166,6 +243,8 @@ export default function DataTransferPage() {
       case "EMAIL_SENT":
         return "outline";
       case "ISSUE":
+        return "destructive";
+      case "CANCELLED":
         return "destructive";
       default:
         return "default";
@@ -192,10 +271,17 @@ export default function DataTransferPage() {
       if (!matchesSearch) return false;
     }
 
-    // 날짜 필터링
-    if (dateFilter && transfer.rental?.return_date) {
-      const filterDateString = format(dateFilter, "yyyy-MM-dd");
-      if (!transfer.rental.return_date.includes(filterDateString)) {
+    // 날짜 필터링 (기간 설정)
+    if ((dateFilter || endDateFilter) && transfer.rental?.return_date) {
+      const returnDate = new Date(transfer.rental.return_date);
+
+      // 시작 날짜 체크
+      if (dateFilter && returnDate < dateFilter) {
+        return false;
+      }
+
+      // 종료 날짜 체크
+      if (endDateFilter && returnDate > endDateFilter) {
         return false;
       }
     }
@@ -206,7 +292,14 @@ export default function DataTransferPage() {
   const handleReset = () => {
     setSearchTerm("");
     setDateFilter(undefined);
+    setEndDateFilter(undefined);
     setSelectedStatus("ALL");
+    fetchTransfers();
+  };
+
+  const handleDateFilterChange = (startDate?: Date, endDate?: Date) => {
+    setDateFilter(startDate);
+    setEndDateFilter(endDate);
   };
 
   // 상태별 개수 계산
@@ -226,10 +319,17 @@ export default function DataTransferPage() {
         if (!matchesSearch) return false;
       }
 
-      // 날짜 필터링
-      if (dateFilter && transfer.rental?.return_date) {
-        const filterDateString = format(dateFilter, "yyyy-MM-dd");
-        if (!transfer.rental.return_date.includes(filterDateString)) {
+      // 날짜 필터링 (기간 설정)
+      if ((dateFilter || endDateFilter) && transfer.rental?.return_date) {
+        const returnDate = new Date(transfer.rental.return_date);
+
+        // 시작 날짜 체크
+        if (dateFilter && returnDate < dateFilter) {
+          return false;
+        }
+
+        // 종료 날짜 체크
+        if (endDateFilter && returnDate > endDateFilter) {
           return false;
         }
       }
@@ -244,6 +344,7 @@ export default function DataTransferPage() {
       UPLOADED: baseFiltered.filter((t) => t.status === "UPLOADED").length,
       EMAIL_SENT: baseFiltered.filter((t) => t.status === "EMAIL_SENT").length,
       ISSUE: baseFiltered.filter((t) => t.status === "ISSUE").length,
+      CANCELLED: baseFiltered.filter((t) => t.status === "CANCELLED").length,
     };
   };
 
@@ -267,7 +368,7 @@ export default function DataTransferPage() {
 
       {/* 검색 및 필터 */}
       <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
           {/* 이름/기기명 검색 */}
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
@@ -279,7 +380,7 @@ export default function DataTransferPage() {
             />
           </div>
 
-          {/* 날짜 필터 */}
+          {/* 시작 날짜 필터 */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -292,16 +393,41 @@ export default function DataTransferPage() {
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {dateFilter
                   ? format(dateFilter, "yyyy-MM-dd", { locale: ko })
-                  : "반납 날짜 선택"}
+                  : "시작 날짜"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 mode="single"
                 selected={dateFilter}
-                onSelect={setDateFilter}
+                onSelect={(date) => handleDateFilterChange(date, endDateFilter)}
                 locale={ko}
-                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+
+          {/* 종료 날짜 필터 */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "justify-start text-left font-normal",
+                  !endDateFilter && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {endDateFilter
+                  ? format(endDateFilter, "yyyy-MM-dd", { locale: ko })
+                  : "종료 날짜"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={endDateFilter}
+                onSelect={(date) => handleDateFilterChange(dateFilter, date)}
+                locale={ko}
               />
             </PopoverContent>
           </Popover>
@@ -379,14 +505,38 @@ export default function DataTransferPage() {
           >
             문제있음: {statusCounts.ISSUE}건
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedStatus("CANCELLED")}
+            className={`h-6 px-2 py-1 text-xs ${
+              selectedStatus === "CANCELLED"
+                ? "bg-gray-200 text-gray-900 border-2 border-gray-400"
+                : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+            }`}
+          >
+            구매취소: {statusCounts.CANCELLED}건
+          </Button>
         </div>
 
         {/* 필터 결과 표시 */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
           <div>
-            {dateFilter ? (
+            {dateFilter || endDateFilter ? (
               <span className="font-medium text-blue-600">
-                {format(dateFilter, "yyyy년 MM월 dd일", { locale: ko })} 기준
+                {dateFilter && endDateFilter
+                  ? `${format(dateFilter, "yyyy년 MM월 dd일", {
+                      locale: ko,
+                    })} ~ ${format(endDateFilter, "yyyy년 MM월 dd일", {
+                      locale: ko,
+                    })} 기간`
+                  : dateFilter
+                  ? `${format(dateFilter, "yyyy년 MM월 dd일", {
+                      locale: ko,
+                    })} 이후`
+                  : `${format(endDateFilter!, "yyyy년 MM월 dd일", {
+                      locale: ko,
+                    })} 이전`}
               </span>
             ) : (
               <span className="font-medium text-blue-600">전체 기간</span>
@@ -461,8 +611,24 @@ export default function DataTransferPage() {
                       }
                     </Badge>
                   </TableCell>
-                  <TableCell>{transfer.uploadedAt || "-"}</TableCell>
-                  <TableCell>{transfer.emailSentAt || "-"}</TableCell>
+                  <TableCell>
+                    {transfer.uploaded_at
+                      ? format(
+                          new Date(transfer.uploaded_at),
+                          "yyyy-MM-dd HH:mm",
+                          { locale: ko }
+                        )
+                      : "-"}
+                  </TableCell>
+                  <TableCell>
+                    {transfer.email_sent_at
+                      ? format(
+                          new Date(transfer.email_sent_at),
+                          "yyyy-MM-dd HH:mm",
+                          { locale: ko }
+                        )
+                      : "-"}
+                  </TableCell>
                   <TableCell>
                     {transfer.rental?.description || transfer.issue || "-"}
                   </TableCell>
@@ -494,6 +660,27 @@ export default function DataTransferPage() {
           </TableBody>
         </Table>
       </Card>
+
+      {/* 구매 취소 확인 모달 */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>구매 취소 확인</AlertDialogTitle>
+            <AlertDialogDescription>
+              정말로 데이터 구매를 취소하시겠습니까?
+              <br />이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowCancelDialog(false)}>
+              취소
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelConfirm}>
+              구매 취소
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

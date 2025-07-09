@@ -185,16 +185,19 @@ export type DataTransferStatus =
   | "PENDING_UPLOAD"
   | "UPLOADED"
   | "EMAIL_SENT"
-  | "ISSUE";
+  | "ISSUE"
+  | "CANCELLED";
 
 export interface DataTransfer {
   id: string;
-  rentalId: string;
+  rental_id: string;
   status: DataTransferStatus;
-  uploadedAt?: string;
-  emailSentAt?: string;
+  uploaded_at?: string;
+  email_sent_at?: string;
   issue?: string;
-  createdAt: string;
-  updatedAt: string;
+  cancelled_at?: string;
+  cancel_reason?: string;
+  created_at: string;
+  updated_at: string;
   rental?: RentalReservation;
 }
