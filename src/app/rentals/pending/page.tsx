@@ -71,7 +71,7 @@ const COLUMN_WIDTHS: Record<string, string> = {
   예약번호: "w-36",
   "(0)": "w-4",
   대여품목: "w-32",
-  이메일: "w-46",
+  이메일: "w-48",
   없음: "w-4",
   "(1)": "w-4",
   특별요청: "w-12",
@@ -157,7 +157,12 @@ export default function RentalsPendingPage() {
     <div className="w-full mx-auto py-8 overflow-auto">
       <h1 className="text-2xl font-bold mb-4">예약 대기 목록</h1>
       {loading ? (
-        <div>로딩 중...</div>
+        <div className="flex flex-col items-center justify-center h-64 gap-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
+          <span className="text-blue-600 font-semibold text-sm animate-pulse">
+            로딩 중...
+          </span>
+        </div>
       ) : (
         <div className="rounded-lg border bg-background max-w-[calc(100vw-20rem)] max-h-[calc(100vh-12rem)] overflow-auto mx-auto">
           <Table className="text-xs w-full table-fixed">
