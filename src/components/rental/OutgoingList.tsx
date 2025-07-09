@@ -648,6 +648,10 @@ export function OutgoingList({
                             <Button
                               onClick={async () => {
                                 try {
+                                  const originalRental = rentals.find(r => r.id === editingRental.id);
+                                  const dataTransmissionChanged = originalRental?.data_transmission !== editingRental.data_transmission;
+                                  
+                                  // 예약 정보 업데이트
                                   const { error } = await supabase
                                     .from("rental_reservations")
                                     .update({
@@ -666,6 +670,43 @@ export function OutgoingList({
                                     .eq("id", editingRental.id);
 
                                   if (error) throw error;
+
+                                  // 데이터 전송 옵션이 변경된 경우 data_transfers 테이블 처리
+                                  if (dataTransmissionChanged) {
+                                    if (editingRental.data_transmission) {
+                                      // 데이터 전송이 활성화된 경우 - 기존 레코드 확인 후 생성
+                                      const { data: existingTransfer } = await supabase
+                                        .from("data_transfers")
+                                        .select("id")
+                                        .eq("rental_id", editingRental.id)
+                                        .single();
+                                      
+                                      if (!existingTransfer) {
+                                        const { error: insertError } = await supabase
+                                          .from("data_transfers")
+                                          .insert({
+                                            rental_id: editingRental.id,
+                                            status: 'PENDING_UPLOAD'
+                                          });
+                                        
+                                        if (insertError) {
+                                          console.error("데이터 전송 레코드 생성 실패:", insertError);
+                                          throw insertError;
+                                        }
+                                      }
+                                    } else {
+                                      // 데이터 전송이 비활성화된 경우 - data_transfers 레코드 삭제
+                                      const { error: deleteError } = await supabase
+                                        .from("data_transfers")
+                                        .delete()
+                                        .eq("rental_id", editingRental.id);
+                                      
+                                      if (deleteError) {
+                                        console.error("데이터 전송 레코드 삭제 실패:", deleteError);
+                                        // 삭제 실패 시 경고만 출력하고 계속 진행
+                                      }
+                                    }
+                                  }
 
                                   toast.success("예약 정보가 수정되었습니다.");
                                   setEditingRental(null);
