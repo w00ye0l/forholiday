@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
 import { GoogleAuth } from "google-auth-library";
+import fs from "fs";
+import path from "path";
 
 // 22개 한국어 헤더 예시 (실제 번역에 맞게 수정)
 const KOREAN_HEADERS = [
@@ -36,8 +38,24 @@ export async function GET(req: Request) {
     const startRow = (page - 1) * pageSize + 2;
     const endRow = startRow + pageSize - 1;
 
+    // 1. 환경변수에서 서비스 계정 JSON 읽어 임시 파일로 저장
+    const keyJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    if (!keyJson) {
+      return NextResponse.json(
+        { error: "서비스 계정 키 환경변수가 없습니다." },
+        { status: 500 }
+      );
+    }
+    const keyPath = path.join("/tmp", "google-service-account.json");
+    // JSON 파싱 후 private_key의 \n을 실제 줄바꿈으로 변환
+    const parsed = JSON.parse(keyJson);
+    if (parsed.private_key) {
+      parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+    }
+    fs.writeFileSync(keyPath, JSON.stringify(parsed, null, 2));
+
     const auth = new GoogleAuth({
-      keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
+      keyFile: keyPath,
       scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
     });
     const sheets = google.sheets({ version: "v4", auth });
