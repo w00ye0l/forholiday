@@ -165,7 +165,7 @@ export default function RentalsPendingPage() {
           </span>
         </div>
       ) : (
-        <div className="rounded-lg border bg-background max-w-[calc(100vw-20rem)] max-h-[calc(100vh-12rem)] overflow-auto mx-auto">
+        <div className="rounded-lg border bg-background max-w-[calc(100vw-20rem)] max-h-[calc(100vh-13rem)] overflow-auto mx-auto">
           <Table className="text-xs w-full table-fixed">
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
