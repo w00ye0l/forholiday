@@ -1,4 +1,5 @@
 "use client";
+
 import * as React from "react";
 import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
@@ -92,6 +93,9 @@ export default function RentalsPendingPage() {
     pageIndex: 0,
     pageSize: 20,
   });
+  const keyJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "";
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID || "";
+  const sheetName = process.env.GOOGLE_SHEET_NAME || "";
 
   const columns = React.useMemo(() => {
     return [
@@ -155,6 +159,13 @@ export default function RentalsPendingPage() {
 
   return (
     <div className="w-full mx-auto py-8 overflow-auto">
+      <p>
+        {keyJson}
+        <br />
+        {spreadsheetId}
+        <br />
+        {sheetName}
+      </p>
       <h1 className="text-2xl font-bold mb-4">예약 대기 목록</h1>
       {loading ? (
         <div className="flex flex-col items-center justify-center h-64 gap-2">
