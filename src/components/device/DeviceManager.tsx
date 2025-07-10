@@ -17,9 +17,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { Badge } from "../ui/badge";
+import { toast } from "sonner";
 
 interface DeviceManagerProps {
   devices?: Device[];
@@ -33,7 +34,32 @@ export default function DeviceManager({
   onEditDevice,
 }: DeviceManagerProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const supabase = createClient();
+
+  // 상태 업데이트 함수
+  const handleStatusUpdate = async (device: Device, newStatus: DeviceStatus) => {
+    if (device.status === newStatus) return;
+
+    setUpdatingStatusId(device.id);
+    try {
+      const { error } = await supabase
+        .from("devices")
+        .update({ status: newStatus })
+        .eq("id", device.id);
+
+      if (error) {
+        toast.error("상태 변경 실패: " + error.message);
+      } else {
+        toast.success(`${device.tag_name} 상태가 '${DEVICE_STATUS_MAP[newStatus].label}'로 변경되었습니다.`);
+        onDeviceUpdated?.();
+      }
+    } catch (error) {
+      toast.error("상태 변경 중 오류가 발생했습니다.");
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
 
   const handleDelete = async (device: Device) => {
     if (!confirm(`"${device.tag_name}" 기기를 정말 삭제하시겠습니까?`)) {
@@ -82,14 +108,20 @@ export default function DeviceManager({
               {DEVICE_CATEGORY_LABELS[device.category as DeviceCategory] ?? "-"}
             </TableCell>
             <TableCell>
-              <Badge
-                variant={
-                  DEVICE_STATUS_MAP[device.status as DeviceStatus]
-                    ?.variant as any
-                }
+              <Select
+                value={device.status}
+                onValueChange={(newStatus: DeviceStatus) => handleStatusUpdate(device, newStatus)}
+                disabled={updatingStatusId === device.id}
               >
-                {DEVICE_STATUS_MAP[device.status as DeviceStatus]?.label ?? "-"}
-              </Badge>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="available">사용가능</SelectItem>
+                  <SelectItem value="maintenance">점검중</SelectItem>
+                  <SelectItem value="lost">분실</SelectItem>
+                </SelectContent>
+              </Select>
             </TableCell>
             <TableCell>{device.created_at.slice(0, 10)}</TableCell>
             <TableCell className="text-right">
