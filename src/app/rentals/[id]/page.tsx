@@ -2,10 +2,26 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Edit, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   RentalReservation,
   STATUS_MAP,
@@ -13,6 +29,9 @@ import {
   RETURN_METHOD_LABELS,
   RESERVATION_SITE_LABELS,
 } from "@/types/rental";
+import { DEVICE_CATEGORY_LABELS } from "@/types/device";
+import { RentalEditForm } from "@/components/rental/RentalEditForm";
+import { toast } from "sonner";
 
 interface RentalDetail extends RentalReservation {
   devices: {
@@ -31,6 +50,9 @@ export default function RentalDetailPage() {
   const [rental, setRental] = useState<RentalDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     async function fetchRentalDetail() {
@@ -89,6 +111,61 @@ export default function RentalDetailPage() {
     }
   }, [params.id]);
 
+  const handleEdit = () => {
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async (data: Partial<RentalReservation>) => {
+    if (!rental) return;
+
+    setIsSubmitting(true);
+    try {
+      const supabase = createClient();
+
+      const { error } = await supabase
+        .from("rental_reservations")
+        .update(data)
+        .eq("id", rental.id);
+
+      if (error) throw error;
+
+      setRental({ ...rental, ...data } as RentalDetail);
+      setIsEditModalOpen(false);
+      toast.success("예약 정보가 성공적으로 수정되었습니다.");
+    } catch (err) {
+      console.error("예약 수정 실패:", err);
+      toast.error("예약 정보 수정에 실패했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!rental) return;
+
+    setIsSubmitting(true);
+    try {
+      const supabase = createClient();
+
+      const { error } = await supabase
+        .from("rental_reservations")
+        .delete()
+        .eq("id", rental.id);
+
+      if (error) throw error;
+
+      toast.success("예약이 성공적으로 삭제되었습니다.");
+
+      router.back();
+    } catch (err) {
+      console.error("예약 삭제 실패:", err);
+      toast.error("예약 삭제에 실패했습니다.");
+    } finally {
+      setIsSubmitting(false);
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-8">
@@ -139,9 +216,21 @@ export default function RentalDetailPage() {
                   대여기기
                 </td>
                 <td className="px-4 py-3 text-gray-700">
-                  {rental.devices.category}
+                  {DEVICE_CATEGORY_LABELS[
+                    rental.device_category as keyof typeof DEVICE_CATEGORY_LABELS
+                  ] || rental.device_category}
                 </td>
               </tr>
+              {rental.order_number && (
+                <tr className="border-b">
+                  <td className="bg-gray-100 px-4 py-3 font-medium text-gray-900">
+                    주문번호
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">
+                    {rental.order_number}
+                  </td>
+                </tr>
+              )}
               <tr className="border-b">
                 <td className="bg-gray-100 px-4 py-3 font-medium text-gray-900">
                   데이터 전송
@@ -163,9 +252,30 @@ export default function RentalDetailPage() {
                   연락처
                 </td>
                 <td className="px-4 py-3 text-gray-700">
-                  {rental.renter_phone}
+                  {rental.contact_image_url ? (
+                    <div className="flex items-center gap-2">
+                      <span>QR코드</span>
+                      <img
+                        src={rental.contact_image_url}
+                        alt="연락처 QR코드"
+                        className="w-16 h-16 object-contain"
+                      />
+                    </div>
+                  ) : (
+                    rental.renter_phone || "-"
+                  )}
                 </td>
               </tr>
+              {rental.renter_email && (
+                <tr className="border-b">
+                  <td className="bg-gray-100 px-4 py-3 font-medium text-gray-900">
+                    이메일
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">
+                    {rental.renter_email}
+                  </td>
+                </tr>
+              )}
               <tr className="border-b">
                 <td className="bg-gray-100 px-4 py-3 font-medium text-gray-900">
                   비고
@@ -257,17 +367,67 @@ export default function RentalDetailPage() {
         </div>
 
         <div className="p-6 border-t border-gray-200 rounded-b-lg bg-gray-50">
-          <div className="flex gap-4">
+          <div className="flex justify-end gap-4">
             <Button
+              onClick={handleEdit}
               variant="default"
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-green-600 hover:bg-green-700 flex items-center gap-2"
             >
+              <Edit className="h-4 w-4" />
               수정
             </Button>
-            <Button variant="outline">삭제</Button>
+            <Button
+              onClick={() => setIsDeleteDialogOpen(true)}
+              variant="outline"
+              className="flex items-center gap-2 text-red-600 border-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              삭제
+            </Button>
           </div>
         </div>
       </div>
+
+      {/* 수정 모달 */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>예약 정보 수정</DialogTitle>
+          </DialogHeader>
+
+          <RentalEditForm
+            rental={rental}
+            onSubmit={handleSaveEdit}
+            onCancel={() => setIsEditModalOpen(false)}
+            isSubmitting={isSubmitting}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>예약 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              정말로 이 예약을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isSubmitting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isSubmitting ? "삭제 중..." : "삭제"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
