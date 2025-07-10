@@ -378,8 +378,8 @@ export default function RentalReturnPage() {
           <div>
             {dateRange?.from && dateRange?.to ? (
               <span className="font-medium text-blue-600">
-                {format(dateRange.from, "yyyy년 MM월 dd일", { locale: ko })} ~{" "}
-                {format(dateRange.to, "yyyy년 MM월 dd일", { locale: ko })} 기간
+                {format(dateRange.from, "yyyy.MM.dd", { locale: ko })} ~{" "}
+                {format(dateRange.to, "yyyy.MM.dd", { locale: ko })}
               </span>
             ) : (
               <span className="font-medium text-blue-600">전체 기간</span>

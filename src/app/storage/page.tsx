@@ -282,7 +282,7 @@ export default function StoragePage() {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="container mx-auto py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-2">짐 보관 관리</h1>
         <p className="text-sm text-gray-500 mb-4">

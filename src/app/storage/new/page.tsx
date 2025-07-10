@@ -15,7 +15,7 @@ export default function StorageNewPage() {
   };
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-4xl">
+    <main className="container mx-auto py-8 max-w-4xl">
       <div className="mb-8">
         <h1 className="text-2xl font-bold">새 보관 예약</h1>
         <p className="text-gray-600 mt-2">
