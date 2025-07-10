@@ -23,7 +23,7 @@ const DeviceFilter = lazy(() =>
   }))
 );
 
-const DAYS_TO_SHOW = 7; // 과거/미래로 보여줄 날짜 수
+const DAYS_TO_SHOW = 14; // 과거/미래로 보여줄 날짜 수
 
 // 인벤토리 대시보드 컴포넌트
 const InventoryDashboard = React.memo(() => {
@@ -80,7 +80,7 @@ const InventoryDashboard = React.memo(() => {
 
   return (
     <main
-      className="container mx-auto px-4 py-8"
+      className="flex flex-1 flex-col gap-2 px-4 py-8 overflow-hidden"
       role="main"
       aria-label="인벤토리 관리 대시보드"
       tabIndex={-1}
@@ -108,34 +108,24 @@ const InventoryDashboard = React.memo(() => {
       </div>
 
       {/* 메인 컨텐츠 */}
-      <div className="flex gap-4">
+      <div className="flex gap-4 min-h-0 flex-1">
         {/* 타임라인 뷰 */}
-        <div className="flex-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="w-5 h-5" />
-                기기 예약 현황
-              </CardTitle>
-            </CardHeader>
-            <CardContent id="main-timeline">
-              <Suspense fallback={<InventoryLoadingSkeleton />}>
-                <TimelineView
-                  devices={devices}
-                  timeSlots={timeSlots}
-                  startDate={startDate}
-                  endDate={endDate}
-                  loading={loading}
-                  onLoadMore={handleLoadMore}
-                  daysToShow={DAYS_TO_SHOW}
-                />
-              </Suspense>
-            </CardContent>
-          </Card>
+        <div className="flex-1 min-w-0 w-[calc(100vw-42rem)] overflow-hidden">
+          <Suspense fallback={<InventoryLoadingSkeleton />}>
+            <TimelineView
+              devices={devices}
+              timeSlots={timeSlots}
+              startDate={startDate}
+              endDate={endDate}
+              loading={loading}
+              onLoadMore={handleLoadMore}
+              daysToShow={DAYS_TO_SHOW}
+            />
+          </Suspense>
         </div>
 
         {/* 필터 사이드바 */}
-        <div className="w-80" id="device-filter">
+        <div className="w-80 flex-shrink-0" id="device-filter">
           <Suspense fallback={<InventoryLoadingSkeleton />}>
             <DeviceFilter />
           </Suspense>

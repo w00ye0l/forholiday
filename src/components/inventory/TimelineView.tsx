@@ -163,14 +163,14 @@ export const TimelineView = function TimelineView({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-lg border border-gray-200 w-full h-full overflow-x-auto">
       {/* 고정 헤더 */}
       <div
         ref={headerRef}
         className="sticky top-0 z-10 flex overflow-hidden bg-gray-50"
       >
         {/* 날짜 레이블 헤더 */}
-        <div className="w-32 shrink-0 border-r border-gray-200">
+        <div className="w-24 shrink-0 border-r border-gray-200">
           <div className="h-8 border-b border-gray-200 flex items-center justify-center font-medium">
             날짜
           </div>
@@ -181,7 +181,7 @@ export const TimelineView = function TimelineView({
           {devices.map((deviceTag, deviceIdx) => (
             <div
               key={deviceTag}
-              className="w-40 min-w-[10rem] border-r border-gray-200"
+              className="w-32 min-w-[8rem] border-r border-gray-200"
             >
               <div className="h-8 border-b border-gray-200 p-2">
                 <div className="text-sm font-medium">{deviceTag}</div>
@@ -194,7 +194,7 @@ export const TimelineView = function TimelineView({
       {/* 스크롤 가능한 타임라인 */}
       <div
         ref={timelineRef}
-        className="flex overflow-auto max-h-[calc(100vh-20rem)]"
+        className="flex overflow-auto max-h-[calc(100vh-16rem)]"
         onScroll={(e) => {
           if (headerRef.current) {
             headerRef.current.scrollLeft = e.currentTarget.scrollLeft;
@@ -202,11 +202,11 @@ export const TimelineView = function TimelineView({
         }}
       >
         {/* 날짜 레이블 열 */}
-        <div className="w-32 shrink-0 border-r border-gray-200">
+        <div className="w-24 shrink-0 border-r border-gray-200">
           {/* 이전 데이터 로드 버튼 */}
           <Button
             variant="ghost"
-            className="w-full h-12 border-b border-gray-200 flex items-center justify-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+            className="w-full h-8 bg-green-200 border-b border-gray-200 flex items-center justify-center gap-1 text-sm text-gray-600 hover:text-gray-900 hover:bg-green-300"
             onClick={handleLoadPrevious}
             disabled={loading}
           >
@@ -218,7 +218,7 @@ export const TimelineView = function TimelineView({
           {timeSlots.map((slot) => (
             <div
               key={slot.date}
-              className="h-12 border-b border-gray-200 flex items-center justify-center text-sm font-medium bg-gray-50"
+              className="h-8 border-b border-gray-200 flex items-center justify-center text-xs font-medium bg-gray-50"
             >
               {format(new Date(slot.date), "MM/dd (eee)", { locale: ko })}
             </div>
@@ -227,7 +227,7 @@ export const TimelineView = function TimelineView({
           {/* 다음 데이터 로드 버튼 */}
           <Button
             variant="ghost"
-            className="w-full h-12 border-b border-gray-200 flex items-center justify-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+            className="w-full h-8 bg-green-200 border-b border-gray-200 flex items-center justify-center gap-1 text-sm text-gray-600 hover:text-gray-900 hover:bg-green-300"
             onClick={handleLoadNext}
             disabled={loading}
           >
@@ -237,14 +237,14 @@ export const TimelineView = function TimelineView({
         </div>
 
         {/* 기기별 열 */}
-        <div className="flex">
-          {devices.map((deviceTag, deviceIdx) => (
+        <div className="flex border-r border-gray-200">
+          {devices.map((deviceTag) => (
             <div
               key={deviceTag}
-              className="w-40 min-w-[10rem] border-r border-gray-200 last:border-r-0 relative"
+              className="w-32 min-w-[8rem] border-r border-gray-200 relative"
             >
               {/* 이전 데이터 로드 버튼 공간 */}
-              <div className="h-12 border-b border-gray-200" />
+              <div className="h-8 border-b border-gray-200" />
 
               {/* 날짜별 예약 상태 */}
               {timeSlots.map((slot, slotIndex) => {
@@ -259,7 +259,7 @@ export const TimelineView = function TimelineView({
                   return (
                     <div
                       key={`${slot.date}-${deviceTag}`}
-                      className="h-12 border-b border-gray-200"
+                      className="h-8 border-b border-gray-200"
                     />
                   );
                 }
@@ -267,7 +267,7 @@ export const TimelineView = function TimelineView({
                 // 블록의 시작 부분
                 if (reservationBlock) {
                   const { reservation, duration } = reservationBlock;
-                  const blockHeight = duration * 48; // 16 * 4 = 64px per slot + border
+                  const blockHeight = duration * 32; // 16 * 4 = 64px per slot + border
 
                   return (
                     <div
@@ -277,7 +277,7 @@ export const TimelineView = function TimelineView({
                       }`}
                       style={{
                         height: `${blockHeight}px`,
-                        top: `${48 + slotIndex * 48}px`, // 로드 버튼 높이(64px) + 슬롯 위치(각 슬롯 64px + 보더 1px)
+                        top: `${32 + slotIndex * 32}px`, // 로드 버튼 높이(64px) + 슬롯 위치(각 슬롯 64px + 보더 1px)
                       }}
                       title={`${reservation.renter_name}\n상태: ${
                         STATUS_MAP[reservation.status]?.label ||
@@ -320,17 +320,13 @@ export const TimelineView = function TimelineView({
                 return (
                   <div
                     key={`${slot.date}-${deviceTag}`}
-                    className={`h-12 border-b border-gray-200${
-                      deviceIdx === devices.length - 1
-                        ? " border-r border-gray-200"
-                        : ""
-                    } bg-white`}
+                    className="h-8 border-b border-gray-200 bg-white"
                   />
                 );
               })}
 
               {/* 다음 데이터 로드 버튼 공간 */}
-              <div className="h-12 border-b border-gray-200" />
+              <div className="h-8 border-b border-gray-200" />
             </div>
           ))}
         </div>
