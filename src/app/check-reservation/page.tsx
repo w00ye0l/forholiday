@@ -34,14 +34,12 @@ const translations = {
   ko: {
     // 페이지 제목 및 설명
     pageTitle: "예약 조회",
-    pageDescription: "예약 번호와 전화번호를 입력하여 예약 내역을 확인하세요.",
+    pageDescription: "예약 번호를 입력하여 예약 내역을 확인하세요.",
 
     // 검색 폼
     searchFormTitle: "예약 정보 입력",
     reservationIdLabel: "예약 번호",
     reservationIdPlaceholder: "예약 번호를 입력하세요",
-    phoneLabel: "전화번호",
-    phonePlaceholder: "예약 시 입력한 전화번호를 입력하세요",
     searchButton: "예약 조회",
     searchingButton: "조회 중...",
     resetButton: "초기화",
@@ -89,14 +87,12 @@ const translations = {
     // Page title and description
     pageTitle: "Check Reservation",
     pageDescription:
-      "Enter your reservation number and phone number to check your reservation details.",
+      "Enter your reservation number to check your reservation details.",
 
     // Search form
     searchFormTitle: "Enter Reservation Information",
     reservationIdLabel: "Reservation Number",
     reservationIdPlaceholder: "Enter your reservation number",
-    phoneLabel: "Phone Number",
-    phonePlaceholder: "Enter the phone number used for reservation",
     searchButton: "Search Reservation",
     searchingButton: "Searching...",
     resetButton: "Reset",
@@ -146,7 +142,6 @@ const translations = {
 
 export default function CheckReservationPage() {
   const [reservationId, setReservationId] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [reservation, setReservation] = useState<RentalReservation | null>(
     null
   );
@@ -163,7 +158,7 @@ export default function CheckReservationPage() {
     setReservation(null);
 
     try {
-      const result = await checkReservation(reservationId, phoneNumber);
+      const result = await checkReservation(reservationId);
 
       if (result.success && result.data) {
         setReservation(result.data);
@@ -180,7 +175,6 @@ export default function CheckReservationPage() {
 
   const handleReset = () => {
     setReservationId("");
-    setPhoneNumber("");
     setReservation(null);
     setError("");
   };
@@ -234,19 +228,6 @@ export default function CheckReservationPage() {
                 placeholder={t.reservationIdPlaceholder}
                 value={reservationId}
                 onChange={(e) => setReservationId(e.target.value)}
-                className="w-full text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t.phoneLabel}
-              </label>
-              <Input
-                type="tel"
-                placeholder={t.phonePlaceholder}
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
                 className="w-full text-sm"
               />
             </div>
@@ -417,21 +398,6 @@ export default function CheckReservationPage() {
                   )}
                 </div>
               </div>
-
-              {/* 비고 */}
-              {reservation.description && (
-                <>
-                  <Separator />
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
-                      {t.notes}
-                    </label>
-                    <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
-                      {reservation.description}
-                    </p>
-                  </div>
-                </>
-              )}
 
               {/* 예약 일시 */}
               <Separator />
