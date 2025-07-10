@@ -207,7 +207,10 @@ export default function StorageOutgoingPage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    setDateRange(undefined);
+    setDateRange({
+      from: today,
+      to: today,
+    });
     setShowAllDates(false);
   };
 

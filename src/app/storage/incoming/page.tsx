@@ -205,7 +205,10 @@ export default function StorageIncomingPage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    setDateRange(undefined);
+    setDateRange({
+      from: today,
+      to: today,
+    });
     setShowAllDates(false);
   };
 
