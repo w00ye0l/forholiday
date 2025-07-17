@@ -16,11 +16,13 @@ export type DeviceCategory =
   | "GP13"
   | "GP12"
   | "GP11"
+  | "GP10"
   | "GP8"
   | "POCKET3"
   | "ACTION5"
   | "S23"
   | "S24"
+  | "S25"
   | "PS5"
   | "GLAMPAM"
   | "AIRWRAP"
@@ -36,11 +38,13 @@ export const DEVICE_CATEGORY_LABELS: Record<DeviceCategory, string> = {
   GP13: "GP13",
   GP12: "GP12",
   GP11: "GP11",
+  GP10: "GP10",
   GP8: "GP8",
   POCKET3: "포켓3",
   ACTION5: "액션5",
   S23: "S23",
   S24: "S24",
+  S25: "S25",
   PS5: "PS5",
   GLAMPAM: "글램팜",
   AIRWRAP: "에어랩",
@@ -57,11 +61,13 @@ export const DEVICE_CATEGORY_LABELS_EN: Record<DeviceCategory, string> = {
   GP13: "GP13",
   GP12: "GP12",
   GP11: "GP11",
+  GP10: "GP10",
   GP8: "GP8",
   POCKET3: "Pocket3",
   ACTION5: "Action5",
   S23: "S23",
   S24: "S24",
+  S25: "S25",
   PS5: "PS5",
   GLAMPAM: "Glampam",
   AIRWRAP: "Airwrap",

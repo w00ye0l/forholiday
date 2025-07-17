@@ -25,6 +25,11 @@ export default function DevicesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  
   const supabase = createClient();
 
   // 기기 목록 fetch 함수
@@ -62,6 +67,7 @@ export default function DevicesPage() {
     }
 
     setFilteredDevices(filtered);
+    setCurrentPage(1); // 필터 변경 시 첫 페이지로 이동
   }, [devices, searchTerm, selectedCategory, selectedStatus]);
 
   useEffect(() => {
@@ -85,6 +91,7 @@ export default function DevicesPage() {
     setSearchTerm("");
     setSelectedCategory("all");
     setSelectedStatus("all");
+    setCurrentPage(1);
   };
 
   // 상태별 개수 계산
@@ -128,19 +135,32 @@ export default function DevicesPage() {
     return categories;
   };
 
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(filteredDevices.length / pageSize);
+  const paginatedDevices = filteredDevices.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // 페이지네이션 핸들러
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
   return (
     <main className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">기기 관리</h1>
 
-      <Tabs defaultValue="inventory" className="space-y-6">
+      <Tabs defaultValue="devices" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="inventory">재고 현황</TabsTrigger>
           <TabsTrigger value="devices">기기 관리</TabsTrigger>
+          <TabsTrigger value="inventory">재고 현황</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="inventory" className="space-y-6">
-          <InventoryDashboard />
-        </TabsContent>
 
         <TabsContent value="devices" className="space-y-6">
           {/* 수정 모드일 때만 표시되는 수정 폼 */}
@@ -293,11 +313,145 @@ export default function DevicesPage() {
               </span>
             </div>
             <DeviceManager
-              devices={filteredDevices}
+              devices={paginatedDevices}
               onDeviceUpdated={fetchDevices}
               onEditDevice={handleEditDevice}
             />
+            
+            {/* 페이지네이션 */}
+            {filteredDevices.length > 0 && (
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>페이지 크기:</span>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => handlePageSizeChange(parseInt(value))}
+                  >
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="ml-4">
+                    {filteredDevices.length > 0 
+                      ? `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, filteredDevices.length)} / ${filteredDevices.length}개`
+                      : '0개'
+                    }
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    {"<<"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    {"<"}
+                  </Button>
+                  
+                  {/* 페이지 번호 */}
+                  <div className="flex items-center gap-1">
+                    {(() => {
+                      const startPage = Math.max(1, currentPage - 2);
+                      const endPage = Math.min(totalPages, currentPage + 2);
+                      const pages = [];
+                      
+                      if (startPage > 1) {
+                        pages.push(
+                          <Button
+                            key={1}
+                            variant={currentPage === 1 ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(1)}
+                            className="w-8 h-8"
+                          >
+                            1
+                          </Button>
+                        );
+                        if (startPage > 2) {
+                          pages.push(<span key="ellipsis1" className="px-2">...</span>);
+                        }
+                      }
+                      
+                      for (let i = startPage; i <= endPage; i++) {
+                        pages.push(
+                          <Button
+                            key={i}
+                            variant={currentPage === i ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(i)}
+                            className="w-8 h-8"
+                          >
+                            {i}
+                          </Button>
+                        );
+                      }
+                      
+                      if (endPage < totalPages) {
+                        if (endPage < totalPages - 1) {
+                          pages.push(<span key="ellipsis2" className="px-2">...</span>);
+                        }
+                        pages.push(
+                          <Button
+                            key={totalPages}
+                            variant={currentPage === totalPages ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(totalPages)}
+                            className="w-8 h-8"
+                          >
+                            {totalPages}
+                          </Button>
+                        );
+                      }
+                      
+                      return pages;
+                    })()}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    {">"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    {">>"}
+                  </Button>
+                </div>
+                
+                {totalPages <= 1 && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <span>페이지 {currentPage} / {totalPages}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="inventory" className="space-y-6">
+          <InventoryDashboard />
         </TabsContent>
       </Tabs>
     </main>
