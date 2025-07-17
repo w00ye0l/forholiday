@@ -38,6 +38,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1", 10);
     const pageSize = parseInt(searchParams.get("pageSize") || "20", 10);
+    const getAllData = searchParams.get("all") === "true";
 
     // 환경 변수 체크
     const keyJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -95,11 +96,19 @@ export async function GET(req: Request) {
       );
     }
 
-    // 역순으로 페이지네이션을 위한 범위 계산
-    const startFromBottom = (page - 1) * pageSize;
-    const endFromBottom = startFromBottom + pageSize - 1;
-    const startRow = Math.max(2, totalRows - endFromBottom);
-    const endRow = totalRows - startFromBottom;
+    // 전체 데이터 또는 페이지네이션 범위 계산
+    let startRow, endRow;
+    if (getAllData) {
+      // 전체 데이터 가져오기 (헤더 제외)
+      startRow = 2;
+      endRow = totalRows;
+    } else {
+      // 역순으로 페이지네이션을 위한 범위 계산
+      const startFromBottom = (page - 1) * pageSize;
+      const endFromBottom = startFromBottom + pageSize - 1;
+      startRow = Math.max(2, totalRows - endFromBottom);
+      endRow = totalRows - startFromBottom;
+    }
 
     // 날짜/시간 열만 FORMATTED_VALUE로 fetch
     let aCol, cCol, dCol, fCol, gCol;
@@ -199,7 +208,13 @@ export async function GET(req: Request) {
     });
 
     // 데이터를 역순으로 정렬 (최신 데이터가 먼저 오도록)
-    data.reverse();
+    if (getAllData) {
+      // 전체 데이터인 경우 역순으로 정렬
+      data.reverse();
+    } else {
+      // 페이지네이션인 경우 이미 역순으로 가져왔으므로 그대로 유지
+      data.reverse();
+    }
 
     return NextResponse.json({ data, total });
   } catch (e) {

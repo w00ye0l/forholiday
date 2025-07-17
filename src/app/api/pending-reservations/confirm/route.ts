@@ -7,8 +7,11 @@ export async function POST(req: Request) {
   try {
     // 인증 체크
     const authSupabase = await createServerClient();
-    const { data: { user }, error: userError } = await authSupabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: userError,
+    } = await authSupabase.auth.getUser();
+
     if (userError || !user) {
       return NextResponse.json(
         { error: "인증이 필요합니다." },
@@ -29,9 +32,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-
-    // 서비스 역할 키 사용 시 사용자 정보 없음 (인증은 위에서 완료)
-    const serviceUser: { id: string } | null = null;
 
     // 예약 ID 생성 함수
     const generateReservationId = () => {
