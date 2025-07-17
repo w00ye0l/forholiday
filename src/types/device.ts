@@ -169,11 +169,12 @@ export const DEVICE_STATUS_MAP = {
 
 // 기기 카테고리별 특성 정의
 export const DEVICE_FEATURES = {
-  PHONE_CATEGORIES: ["S23", "S24"] as DeviceCategory[],
+  PHONE_CATEGORIES: ["S23", "S24", "S25"] as DeviceCategory[],
   CAMERA_CATEGORIES: [
     "GP13",
     "GP12",
     "GP11",
+    "GP10",
     "GP8",
     "POCKET3",
     "ACTION5",

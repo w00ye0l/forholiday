@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Device, DEVICE_CATEGORY_LABELS, DeviceCategory } from "@/types/device";
 import DeviceManager from "@/components/device/DeviceManager";
-import DeviceForm from "@/components/device/DeviceForm";
+import DeviceCreateForm from "@/components/device/DeviceCreateForm";
+import DeviceEditModal from "@/components/device/DeviceEditModal";
 import { InventoryDashboard } from "@/components/device/InventoryDashboard";
 import { createClient } from "@/lib/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +23,7 @@ export default function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [filteredDevices, setFilteredDevices] = useState<Device[]>([]);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -76,14 +78,17 @@ export default function DevicesPage() {
 
   const handleEditDevice = (device: Device) => {
     setEditingDevice(device);
+    setShowEditModal(true);
   };
 
-  const handleCancelEdit = () => {
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
     setEditingDevice(null);
   };
 
   const handleDeviceUpdated = () => {
     fetchDevices();
+    setShowEditModal(false);
     setEditingDevice(null);
   };
 
@@ -163,23 +168,8 @@ export default function DevicesPage() {
         </TabsList>
 
         <TabsContent value="devices" className="space-y-6">
-          {/* 수정 모드일 때만 표시되는 수정 폼 */}
-          {editingDevice && (
-            <DeviceForm
-              device={editingDevice}
-              onCreated={handleDeviceUpdated}
-              onCancel={handleCancelEdit}
-            />
-          )}
-
-          {/* 기기 추가 폼 - 수정 모드가 아닐 때만 표시 */}
-          {!editingDevice && (
-            <DeviceForm
-              onCreated={fetchDevices}
-              device={null}
-              onCancel={undefined}
-            />
-          )}
+          {/* 기기 추가 폼 */}
+          <DeviceCreateForm onCreated={fetchDevices} />
 
           {/* 검색 및 필터 */}
           <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
@@ -454,6 +444,14 @@ export default function DevicesPage() {
           <InventoryDashboard />
         </TabsContent>
       </Tabs>
+
+      {/* 기기 수정 모달 */}
+      <DeviceEditModal
+        device={editingDevice}
+        open={showEditModal}
+        onOpenChange={handleCloseEditModal}
+        onUpdated={handleDeviceUpdated}
+      />
     </main>
   );
 }
