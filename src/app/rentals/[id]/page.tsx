@@ -116,25 +116,51 @@ export default function RentalDetailPage() {
   };
 
   const handleSaveEdit = async (data: Partial<RentalReservation>) => {
-    if (!rental) return;
+    if (!rental) {
+      toast.error("예약 정보를 찾을 수 없습니다.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const supabase = createClient();
 
-      const { error } = await supabase
+      // updated_at 필드 추가
+      const updateData = {
+        ...data,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log("Updating rental with data:", updateData);
+
+      const { data: updatedData, error } = await supabase
         .from("rental_reservations")
-        .update(data)
-        .eq("id", rental.id);
+        .update(updateData)
+        .eq("id", rental.id)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase update error:", error);
+        throw error;
+      }
 
-      setRental({ ...rental, ...data } as RentalDetail);
+      console.log("Update successful:", updatedData);
+
+      // 성공적으로 업데이트된 데이터로 로컬 상태 업데이트
+      const updatedRental = {
+        ...rental,
+        ...updatedData,
+        devices: rental.devices // 기기 정보는 유지
+      } as RentalDetail;
+
+      setRental(updatedRental);
       setIsEditModalOpen(false);
       toast.success("예약 정보가 성공적으로 수정되었습니다.");
     } catch (err) {
       console.error("예약 수정 실패:", err);
-      toast.error("예약 정보 수정에 실패했습니다.");
+      const errorMessage = err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.";
+      toast.error(`예약 정보 수정에 실패했습니다: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
