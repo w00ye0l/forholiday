@@ -11,7 +11,9 @@ export async function POST(request: NextRequest) {
     
     // 첨부파일 처리
     const attachments: { filename: string; content: Buffer }[] = [];
-    for (const [key, value] of formData.entries()) {
+    const entries = Array.from(formData.entries());
+    
+    for (const [key, value] of entries) {
       if (key.startsWith('attachment_') && value instanceof File) {
         const buffer = Buffer.from(await value.arrayBuffer());
         attachments.push({
