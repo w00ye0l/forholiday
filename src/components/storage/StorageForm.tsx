@@ -35,27 +35,29 @@ import { cn } from "@/lib/utils";
 import {
   RESERVATION_SITES,
   RESERVATION_SITE_LABELS,
+  STORAGE_LOCATION_LABELS,
   type ReservationSite,
   type StorageReservation,
+  type StorageLocation,
 } from "@/types/storage";
 import { Textarea } from "../ui/textarea";
 
+const STORAGE_LOCATIONS: StorageLocation[] = ["T1", "T2", "delivery", "office", "hotel"];
+
 const formSchema = z.object({
-  items_description: z.string().min(1, "물품 내용을 입력해주세요"),
-  quantity: z.number().min(1, "수량을 입력해주세요"),
-  customer_name: z.string().min(1, "고객 이름을 입력해주세요"),
-  phone_number: z.string().min(1, "연락처를 입력해주세요"),
+  items_description: z.string().optional(),
+  quantity: z.number().optional(),
+  customer_name: z.string().optional(),
+  phone_number: z.string().optional(),
   tag_number: z.string().optional(),
-  drop_off_date: z.date({
-    required_error: "맡기는 날짜를 선택해주세요",
-  }),
-  drop_off_time: z.string().min(1, "맡기는 시간을 선택해주세요"),
-  pickup_date: z.date({
-    required_error: "찾아가는 날짜를 선택해주세요",
-  }),
-  pickup_time: z.string().min(1, "찾아가는 시간을 선택해주세요"),
+  drop_off_date: z.date().optional(),
+  drop_off_time: z.string().optional(),
+  drop_off_location: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const).optional(),
+  pickup_date: z.date().optional(),
+  pickup_time: z.string().optional(),
+  pickup_location: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const).optional(),
   notes: z.string().optional(),
-  reservation_site: z.enum(RESERVATION_SITES),
+  reservation_site: z.enum(RESERVATION_SITES).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -99,7 +101,9 @@ export default function StorageForm({
       phone_number: "",
       tag_number: "",
       drop_off_time: "",
+      drop_off_location: "T1",
       pickup_time: "",
+      pickup_location: "T1",
       notes: "",
       reservation_site: "현금",
     },
@@ -116,8 +120,10 @@ export default function StorageForm({
         tag_number: storage.tag_number || "",
         drop_off_date: new Date(storage.drop_off_date),
         drop_off_time: storage.drop_off_time,
+        drop_off_location: storage.drop_off_location || "T1",
         pickup_date: new Date(storage.pickup_date),
         pickup_time: storage.pickup_time,
+        pickup_location: storage.pickup_location || "T1",
         notes: storage.notes || "",
         reservation_site: storage.reservation_site as ReservationSite,
       });
@@ -136,17 +142,19 @@ export default function StorageForm({
 
     try {
       const formattedData = {
-        items_description: data.items_description,
-        quantity: data.quantity,
-        customer_name: data.customer_name,
-        phone_number: data.phone_number,
+        items_description: data.items_description || "",
+        quantity: data.quantity || 1,
+        customer_name: data.customer_name || "",
+        phone_number: data.phone_number || "",
         tag_number: data.tag_number || null,
-        drop_off_date: format(data.drop_off_date, "yyyy-MM-dd"),
-        drop_off_time: data.drop_off_time,
-        pickup_date: format(data.pickup_date, "yyyy-MM-dd"),
-        pickup_time: data.pickup_time,
+        drop_off_date: data.drop_off_date ? format(data.drop_off_date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
+        drop_off_time: data.drop_off_time || "00:00",
+        drop_off_location: data.drop_off_location || "T1",
+        pickup_date: data.pickup_date ? format(data.pickup_date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
+        pickup_time: data.pickup_time || "00:00",
+        pickup_location: data.pickup_location || "T1",
         notes: data.notes || null,
-        reservation_site: data.reservation_site,
+        reservation_site: data.reservation_site || "현금",
       };
 
       if (storage) {
@@ -206,7 +214,7 @@ export default function StorageForm({
               name="items_description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>물품 내용 *</FormLabel>
+                  <FormLabel>물품 내용</FormLabel>
                   <FormControl>
                     <Textarea
                       {...field}
@@ -225,7 +233,7 @@ export default function StorageForm({
                 name="quantity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>보관 개수 *</FormLabel>
+                    <FormLabel>보관 개수</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -265,7 +273,7 @@ export default function StorageForm({
               name="customer_name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>고객 이름 *</FormLabel>
+                  <FormLabel>고객 이름</FormLabel>
                   <FormControl>
                     <Input {...field} placeholder="고객 이름" />
                   </FormControl>
@@ -279,7 +287,7 @@ export default function StorageForm({
               name="phone_number"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>연락처 *</FormLabel>
+                  <FormLabel>연락처</FormLabel>
                   <FormControl>
                     <Input {...field} placeholder="연락처" />
                   </FormControl>
@@ -289,14 +297,14 @@ export default function StorageForm({
             />
           </div>
 
-          {/* 맡기는 날짜 및 시간 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 맡기는 날짜, 시간 및 장소 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField
               control={form.control}
               name="drop_off_date"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>맡기는 날짜 *</FormLabel>
+                  <FormLabel>맡기는 날짜</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -335,7 +343,7 @@ export default function StorageForm({
               name="drop_off_time"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>맡기는 시간 *</FormLabel>
+                  <FormLabel>맡기는 시간</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
@@ -357,16 +365,44 @@ export default function StorageForm({
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="drop_off_location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>맡기는 곳</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="맡기는 곳을 선택해주세요" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {STORAGE_LOCATIONS.map((location) => (
+                        <SelectItem key={`drop-${location}`} value={location}>
+                          {STORAGE_LOCATION_LABELS[location]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
 
-          {/* 찾아가는 날짜 및 시간 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 찾아가는 날짜, 시간 및 장소 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField
               control={form.control}
               name="pickup_date"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>찾아가는 날짜 *</FormLabel>
+                  <FormLabel>찾아가는 날짜</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -405,7 +441,7 @@ export default function StorageForm({
               name="pickup_time"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>찾아가는 시간 *</FormLabel>
+                  <FormLabel>찾아가는 시간</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
@@ -419,6 +455,34 @@ export default function StorageForm({
                       {timeOptions.map((time) => (
                         <SelectItem key={`pickup-${time}`} value={time}>
                           {time}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="pickup_location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>찾아가는 곳</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="찾아가는 곳을 선택해주세요" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {STORAGE_LOCATIONS.map((location) => (
+                        <SelectItem key={`pickup-${location}`} value={location}>
+                          {STORAGE_LOCATION_LABELS[location]}
                         </SelectItem>
                       ))}
                     </SelectContent>

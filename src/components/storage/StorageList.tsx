@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { StorageReservation, STORAGE_STATUS_LABELS } from "@/types/storage";
+import { StorageReservation, STORAGE_STATUS_LABELS, STORAGE_LOCATION_LABELS } from "@/types/storage";
 import React from "react";
 
 interface StorageListProps {
@@ -101,7 +101,9 @@ export default function StorageList({
             <TableHead>개수</TableHead>
             <TableHead>태그번호</TableHead>
             <TableHead>맡기는 날짜</TableHead>
+            <TableHead>맡기는 곳</TableHead>
             <TableHead>찾아가는 날짜</TableHead>
+            <TableHead>찾아가는 곳</TableHead>
             <TableHead>상태</TableHead>
             <TableHead className="text-right">작업</TableHead>
           </TableRow>
@@ -130,7 +132,13 @@ export default function StorageList({
                   {storage.drop_off_date} {storage.drop_off_time.slice(0, 5)}
                 </TableCell>
                 <TableCell>
+                  {storage.drop_off_location ? STORAGE_LOCATION_LABELS[storage.drop_off_location] : "-"}
+                </TableCell>
+                <TableCell>
                   {storage.pickup_date} {storage.pickup_time.slice(0, 5)}
+                </TableCell>
+                <TableCell>
+                  {storage.pickup_location ? STORAGE_LOCATION_LABELS[storage.pickup_location] : "-"}
                 </TableCell>
                 <TableCell>
                   <Badge variant={getStatusBadgeVariant(storage.status)}>
@@ -157,7 +165,7 @@ export default function StorageList({
               {/* 확장된 상세 정보 */}
               {expandedId === storage.id && (
                 <TableRow>
-                  <TableCell colSpan={9} className="bg-gray-50">
+                  <TableCell colSpan={11} className="bg-gray-50">
                     <div className="p-4 space-y-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -215,7 +223,7 @@ export default function StorageList({
           ))}
           {storages.length === 0 && (
             <TableRow>
-              <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+              <TableCell colSpan={11} className="text-center py-8 text-gray-500">
                 {searchTerm
                   ? "검색 결과가 없습니다."
                   : "등록된 보관 예약이 없습니다."}

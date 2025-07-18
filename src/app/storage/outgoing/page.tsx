@@ -59,6 +59,12 @@ export default function StorageOutgoingPage() {
 
   // 장소별 필터링 함수
   const getLocationFromReservation = (storage: StorageReservation): string => {
+    // pickup_location 필드가 있으면 사용
+    if (storage.pickup_location) {
+      return storage.pickup_location;
+    }
+    
+    // 없으면 notes에서 찾기 (하위 호환성)
     const notes = storage.notes?.toLowerCase() || "";
 
     if (
@@ -338,38 +344,47 @@ export default function StorageOutgoingPage() {
         </div>
       </div>
 
-      {/* 위치 구분 탭 (밑줄 스타일) */}
+      {/* 위치 구분 탭 */}
       <Tabs
         value={locationTab}
         onValueChange={setLocationTab}
         className="mb-6 w-full"
       >
-        <TabsList className="p-0 border-b border-gray-200 bg-transparent rounded-none w-full">
-          <TabsTrigger
-            value="all"
-            className="flex-1 max-w-40 data-[state=active]:border-b-2 data-[state=active]:border-green-600 rounded-none bg-transparent h-full data-[state=active]:shadow-none"
-          >
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="all">
             전체{" "}
-            <span className="ml-1 text-xs text-green-700">
+            <span className="ml-1 text-xs">
               ({getLocationTabCount("all")})
             </span>
           </TabsTrigger>
-          <TabsTrigger
-            value="T1"
-            className="flex-1 max-w-40 data-[state=active]:border-b-2 data-[state=active]:border-green-600 rounded-none bg-transparent h-full data-[state=active]:shadow-none"
-          >
+          <TabsTrigger value="T1">
             터미널1{" "}
-            <span className="ml-1 text-xs text-green-700">
+            <span className="ml-1 text-xs">
               ({getLocationTabCount("T1")})
             </span>
           </TabsTrigger>
-          <TabsTrigger
-            value="T2"
-            className="flex-1 max-w-40 data-[state=active]:border-b-2 data-[state=active]:border-green-600 rounded-none bg-transparent h-full data-[state=active]:shadow-none"
-          >
+          <TabsTrigger value="T2">
             터미널2{" "}
-            <span className="ml-1 text-xs text-green-700">
+            <span className="ml-1 text-xs">
               ({getLocationTabCount("T2")})
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="delivery">
+            택배{" "}
+            <span className="ml-1 text-xs">
+              ({getLocationTabCount("delivery")})
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="office">
+            사무실{" "}
+            <span className="ml-1 text-xs">
+              ({getLocationTabCount("office")})
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="hotel">
+            호텔{" "}
+            <span className="ml-1 text-xs">
+              ({getLocationTabCount("hotel")})
             </span>
           </TabsTrigger>
         </TabsList>
