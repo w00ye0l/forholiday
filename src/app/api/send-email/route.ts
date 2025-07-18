@@ -3,7 +3,23 @@ import nodemailer from 'nodemailer';
 
 export async function POST(request: NextRequest) {
   try {
-    const { to, subject, content, transferId } = await request.json();
+    const formData = await request.formData();
+    const to = formData.get('to') as string;
+    const subject = formData.get('subject') as string;
+    const content = formData.get('content') as string;
+    const transferId = formData.get('transferId') as string;
+    
+    // 첨부파일 처리
+    const attachments: { filename: string; content: Buffer }[] = [];
+    for (const [key, value] of formData.entries()) {
+      if (key.startsWith('attachment_') && value instanceof File) {
+        const buffer = Buffer.from(await value.arrayBuffer());
+        attachments.push({
+          filename: value.name,
+          content: buffer
+        });
+      }
+    }
 
     // 환경 변수 검증
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
@@ -32,6 +48,10 @@ export async function POST(request: NextRequest) {
       subject: subject,
       text: content,
       html: content.replace(/\n/g, '<br>'), // 간단한 HTML 변환
+      attachments: attachments.map(attachment => ({
+        filename: attachment.filename,
+        content: attachment.content
+      }))
     };
 
     // 이메일 전송

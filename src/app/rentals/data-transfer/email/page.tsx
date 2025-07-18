@@ -9,20 +9,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, X } from "lucide-react";
 import { toast } from "sonner";
 
 export default function EmailSendPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
-  
+
   const [transfers, setTransfers] = useState<DataTransfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  
+  const [attachments, setAttachments] = useState<File[]>([]);
+
   // 이메일 폼 상태
-  const [emailSubject, setEmailSubject] = useState("포할리데이 - 데이터 전송 완료 안내");
+  const [emailSubject, setEmailSubject] = useState(
+    "포할리데이 - 데이터 전송 완료 안내"
+  );
   const [emailContent, setEmailContent] = useState(`안녕하세요,
 
 포할리데이를 이용해주셔서 감사합니다.
@@ -40,21 +43,42 @@ export default function EmailSendPage() {
 포할리데이 팀`);
 
   useEffect(() => {
-    const transferIds = searchParams.get('transfers');
+    const transferIds = searchParams.get("transfers");
     if (!transferIds) {
       toast.error("선택된 항목이 없습니다.");
-      router.push('/rentals/data-transfer');
+      router.push("/rentals/data-transfer");
       return;
     }
-    
-    fetchTransfers(transferIds.split(','));
+
+    fetchTransfers(transferIds.split(","));
   }, [searchParams]);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const newFiles = Array.from(files);
+      setAttachments(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   const fetchTransfers = async (transferIds: string[]) => {
     try {
       const { data, error } = await supabase
         .from("data_transfers")
-        .select(`
+        .select(
+          `
           *,
           rental:rental_reservations (
             renter_name,
@@ -65,9 +89,10 @@ export default function EmailSendPage() {
             return_date,
             description
           )
-        `)
-        .in('id', transferIds)
-        .eq('status', 'UPLOADED');
+        `
+        )
+        .in("id", transferIds)
+        .eq("status", "UPLOADED");
 
       if (error) throw error;
       setTransfers(data || []);
@@ -91,28 +116,35 @@ export default function EmailSendPage() {
       const emailPromises = transfers.map(async (transfer) => {
         if (!transfer.rental?.renter_email) {
           console.warn(`Transfer ${transfer.id} has no email address`);
-          return { success: false, transferId: transfer.id, error: "이메일 주소 없음" };
+          return {
+            success: false,
+            transferId: transfer.id,
+            error: "이메일 주소 없음",
+          };
         }
 
         try {
-          // 실제 이메일 발송 API 호출
-          const emailResponse = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              to: transfer.rental.renter_email,
-              subject: emailSubject,
-              content: emailContent,
-              transferId: transfer.id,
-            }),
+          // FormData를 사용해서 파일과 함께 전송
+          const formData = new FormData();
+          formData.append("to", transfer.rental.renter_email);
+          formData.append("subject", emailSubject);
+          formData.append("content", emailContent);
+          formData.append("transferId", transfer.id);
+          
+          // 첨부파일 추가
+          attachments.forEach((file, index) => {
+            formData.append(`attachment_${index}`, file);
+          });
+
+          const emailResponse = await fetch("/api/send-email", {
+            method: "POST",
+            body: formData,
           });
 
           const emailResult = await emailResponse.json();
 
           if (!emailResult.success) {
-            throw new Error(emailResult.error || 'Email sending failed');
+            throw new Error(emailResult.error || "Email sending failed");
           }
 
           // 이메일 발송 성공 시 데이터베이스 상태 업데이트
@@ -127,21 +159,34 @@ export default function EmailSendPage() {
 
           if (updateError) throw updateError;
 
-          return { success: true, transferId: transfer.id, messageId: emailResult.messageId };
+          return {
+            success: true,
+            transferId: transfer.id,
+            messageId: emailResult.messageId,
+          };
         } catch (error) {
-          console.error(`Error sending email for transfer ${transfer.id}:`, error);
-          return { success: false, transferId: transfer.id, error: error instanceof Error ? error.message : String(error) };
+          console.error(
+            `Error sending email for transfer ${transfer.id}:`,
+            error
+          );
+          return {
+            success: false,
+            transferId: transfer.id,
+            error: error instanceof Error ? error.message : String(error),
+          };
         }
       });
 
       const results = await Promise.all(emailPromises);
-      const successCount = results.filter(r => r.success).length;
-      const failCount = results.filter(r => !r.success).length;
+      const successCount = results.filter((r) => r.success).length;
+      const failCount = results.filter((r) => !r.success).length;
 
       if (successCount > 0) {
-        toast.success(`${successCount}개의 이메일이 성공적으로 발송되었습니다.`);
+        toast.success(
+          `${successCount}개의 이메일이 성공적으로 발송되었습니다.`
+        );
       }
-      
+
       if (failCount > 0) {
         toast.error(`${failCount}개의 이메일 발송에 실패했습니다.`);
       }
@@ -149,7 +194,7 @@ export default function EmailSendPage() {
       // 성공한 경우 이전 페이지로 돌아가기
       if (successCount > 0) {
         setTimeout(() => {
-          router.push('/rentals/data-transfer');
+          router.push("/rentals/data-transfer");
         }, 2000);
       }
     } catch (error) {
@@ -171,13 +216,9 @@ export default function EmailSendPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 max-w-4xl">
+    <div className="container mx-auto py-8 max-w-6xl">
       <div className="mb-6">
-        <Button
-          variant="ghost"
-          onClick={() => router.back()}
-          className="mb-4"
-        >
+        <Button variant="ghost" onClick={() => router.back()} className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />
           돌아가기
         </Button>
@@ -203,7 +244,7 @@ export default function EmailSendPage() {
                 placeholder="이메일 제목을 입력하세요"
               />
             </div>
-            
+
             <div>
               <Label htmlFor="content">내용</Label>
               <Textarea
@@ -211,9 +252,48 @@ export default function EmailSendPage() {
                 value={emailContent}
                 onChange={(e) => setEmailContent(e.target.value)}
                 placeholder="이메일 내용을 입력하세요"
-                rows={15}
+                rows={12}
                 className="resize-none"
               />
+            </div>
+
+            <div>
+              <Label htmlFor="attachments">첨부파일</Label>
+              <div className="mt-2">
+                <Input
+                  id="attachments"
+                  type="file"
+                  multiple
+                  onChange={handleFileUpload}
+                  className="mb-2"
+                />
+                {attachments.length > 0 && (
+                  <div className="space-y-2">
+                    {attachments.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded border"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Paperclip className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm font-medium">{file.name}</span>
+                          <span className="text-xs text-gray-500">
+                            ({formatFileSize(file.size)})
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeAttachment(index)}
+                          className="text-red-500 hover:text-red-700 p-1"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <Button
@@ -223,6 +303,11 @@ export default function EmailSendPage() {
             >
               <Send className="w-4 h-4 mr-2" />
               {sending ? "발송 중..." : `${transfers.length}명에게 이메일 발송`}
+              {attachments.length > 0 && (
+                <span className="ml-2 text-xs">
+                  (첨부파일 {attachments.length}개)
+                </span>
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -246,12 +331,15 @@ export default function EmailSendPage() {
                     {transfer.rental?.renter_email || "이메일 없음"}
                   </div>
                   <div className="text-xs text-gray-500">
-                    기기: {transfer.rental?.device_tag_name || transfer.rental?.device_category || "-"}
+                    기기:{" "}
+                    {transfer.rental?.device_tag_name ||
+                      transfer.rental?.device_category ||
+                      "-"}
                   </div>
                 </div>
               ))}
             </div>
-            
+
             {transfers.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 발송할 이메일이 없습니다.
