@@ -59,6 +59,12 @@ export default function StorageIncomingPage() {
 
   // 장소별 필터링 함수
   const getLocationFromReservation = (storage: StorageReservation): string => {
+    // drop_off_location 필드가 있으면 사용
+    if (storage.drop_off_location) {
+      return storage.drop_off_location;
+    }
+    
+    // 없으면 notes에서 찾기 (하위 호환성)
     const notes = storage.notes?.toLowerCase() || "";
 
     if (
@@ -205,7 +211,10 @@ export default function StorageIncomingPage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    setDateRange(undefined);
+    setDateRange({
+      from: today,
+      to: today,
+    });
     setShowAllDates(false);
   };
 
@@ -217,7 +226,7 @@ export default function StorageIncomingPage() {
 
       {/* 검색 및 필터 */}
       <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           {/* 이름/기기명 검색 */}
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
@@ -316,12 +325,12 @@ export default function StorageIncomingPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
           <div>
             {dateRange?.from && dateRange?.to ? (
-              <span className="font-medium text-gray-800">
-                {format(dateRange.from, "yyyy년 MM월 dd일", { locale: ko })} ~{" "}
-                {format(dateRange.to, "yyyy년 MM월 dd일", { locale: ko })} 기간
+              <span className="font-medium text-blue-600">
+                {format(dateRange.from, "yyyy.MM.dd", { locale: ko })} ~{" "}
+                {format(dateRange.to, "yyyy.MM.dd", { locale: ko })}
               </span>
             ) : (
-              <span className="font-medium text-gray-800">전체 기간</span>
+              <span className="font-medium text-blue-600">전체 기간</span>
             )}
             <span className="ml-2">총 {filteredStorages.length}건</span>
             {statusTab !== "all" && (
@@ -334,34 +343,47 @@ export default function StorageIncomingPage() {
         </div>
       </div>
 
-      {/* 위치 구분 탭 (밑줄 스타일) */}
-      <Tabs value={locationTab} onValueChange={setLocationTab} className="mb-6">
-        <TabsList className="p-0 border-b border-gray-200 bg-transparent rounded-none w-full">
-          <TabsTrigger
-            value="all"
-            className="px-10 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent h-full data-[state=active]:shadow-none"
-          >
+      {/* 위치 구분 탭 */}
+      <Tabs
+        value={locationTab}
+        onValueChange={setLocationTab}
+        className="mb-6 w-full"
+      >
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="all">
             전체{" "}
-            <span className="ml-1 text-xs text-blue-700">
+            <span className="ml-1 text-xs">
               ({getLocationTabCount("all")})
             </span>
           </TabsTrigger>
-          <TabsTrigger
-            value="T1"
-            className="px-10 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent h-full data-[state=active]:shadow-none"
-          >
+          <TabsTrigger value="T1">
             터미널1{" "}
-            <span className="ml-1 text-xs text-blue-700">
+            <span className="ml-1 text-xs">
               ({getLocationTabCount("T1")})
             </span>
           </TabsTrigger>
-          <TabsTrigger
-            value="T2"
-            className="px-10 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent h-full data-[state=active]:shadow-none"
-          >
+          <TabsTrigger value="T2">
             터미널2{" "}
-            <span className="ml-1 text-xs text-blue-700">
+            <span className="ml-1 text-xs">
               ({getLocationTabCount("T2")})
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="delivery">
+            택배{" "}
+            <span className="ml-1 text-xs">
+              ({getLocationTabCount("delivery")})
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="office">
+            사무실{" "}
+            <span className="ml-1 text-xs">
+              ({getLocationTabCount("office")})
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="hotel">
+            호텔{" "}
+            <span className="ml-1 text-xs">
+              ({getLocationTabCount("hotel")})
             </span>
           </TabsTrigger>
         </TabsList>

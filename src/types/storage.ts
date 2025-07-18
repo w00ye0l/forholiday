@@ -1,5 +1,7 @@
 export type StorageStatus = "pending" | "stored" | "retrieved";
 
+export type StorageLocation = "T1" | "T2" | "delivery" | "office" | "hotel";
+
 export interface StorageReservation {
   id: string;
   reservation_id: string;
@@ -10,8 +12,10 @@ export interface StorageReservation {
   tag_number?: string;
   drop_off_date: string;
   drop_off_time: string;
+  drop_off_location: StorageLocation;
   pickup_date: string;
   pickup_time: string;
+  pickup_location: StorageLocation;
   notes?: string;
   reservation_site: string;
   status: StorageStatus;
@@ -24,6 +28,15 @@ export const STORAGE_STATUS_LABELS: Record<StorageStatus, string> = {
   pending: "대기중",
   stored: "보관중",
   retrieved: "찾아감",
+};
+
+// 보관 장소 한글 라벨
+export const STORAGE_LOCATION_LABELS: Record<StorageLocation, string> = {
+  T1: "터미널1",
+  T2: "터미널2",
+  delivery: "택배",
+  office: "사무실",
+  hotel: "호텔",
 };
 
 // 예약 사이트 옵션

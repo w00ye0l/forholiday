@@ -5,6 +5,7 @@ import {
   RentalReservation,
   STATUS_MAP,
   PICKUP_METHOD_LABELS,
+  RETURN_METHOD_LABELS,
 } from "@/types/rental";
 import { DEVICE_CATEGORY_LABELS } from "@/types/device";
 import {
@@ -131,10 +132,12 @@ export function RentalList({
             <TableHead>예약번호</TableHead>
             <TableHead>고객명</TableHead>
             <TableHead>연락처</TableHead>
+            <TableHead>이메일</TableHead>
             <TableHead>대여기기</TableHead>
             <TableHead>수령일</TableHead>
             <TableHead>반납일</TableHead>
             <TableHead>수령방법</TableHead>
+            <TableHead>반납방법</TableHead>
             <TableHead className="text-center">상태</TableHead>
           </TableRow>
         </TableHeader>
@@ -153,6 +156,9 @@ export function RentalList({
               </TableCell>
               <TableCell>
                 {highlightText(rental.renter_phone, searchTerm)}
+              </TableCell>
+              <TableCell>
+                {rental.renter_email ? highlightText(rental.renter_email, searchTerm) : "-"}
               </TableCell>
               <TableCell>
                 <div>
@@ -186,6 +192,11 @@ export function RentalList({
               <TableCell>
                 <div className="text-sm">
                   {PICKUP_METHOD_LABELS[rental.pickup_method]}
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="text-sm">
+                  {RETURN_METHOD_LABELS[rental.return_method]}
                 </div>
               </TableCell>
               <TableCell className="text-center">

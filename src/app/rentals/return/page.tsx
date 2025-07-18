@@ -166,7 +166,10 @@ export default function RentalReturnPage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    setDateRange(undefined);
+    setDateRange({
+      from: today,
+      to: today,
+    });
     setActiveLocationTab("all");
     setActiveStatusFilter("all");
   };
@@ -264,7 +267,7 @@ export default function RentalReturnPage() {
 
       {/* 검색 필터 */}
       <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           {/* 이름/기기명/예약번호 검색 */}
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
@@ -375,8 +378,8 @@ export default function RentalReturnPage() {
           <div>
             {dateRange?.from && dateRange?.to ? (
               <span className="font-medium text-blue-600">
-                {format(dateRange.from, "yyyy년 MM월 dd일", { locale: ko })} ~{" "}
-                {format(dateRange.to, "yyyy년 MM월 dd일", { locale: ko })} 기간
+                {format(dateRange.from, "yyyy.MM.dd", { locale: ko })} ~{" "}
+                {format(dateRange.to, "yyyy.MM.dd", { locale: ko })}
               </span>
             ) : (
               <span className="font-medium text-blue-600">전체 기간</span>

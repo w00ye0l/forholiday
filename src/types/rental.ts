@@ -144,7 +144,7 @@ export interface RentalReservation {
   pickup_method: PickupMethod;
   return_method: ReturnMethod;
   data_transmission: boolean;
-  sd_option?: "대여" | "구매" | "구매+대여";
+  sd_option?: "대여" | "구매" | "구매+대여" | null;
   reservation_site: ReservationSite;
   renter_name: string;
   renter_phone: string;
@@ -169,7 +169,7 @@ export interface CreateRentalReservationDto {
   pickup_method: PickupMethod;
   return_method: ReturnMethod;
   data_transmission: boolean;
-  sd_option?: "대여" | "구매" | "구매+대여";
+  sd_option?: "대여" | "구매" | "구매+대여" | null;
   reservation_site: ReservationSite;
   renter_name: string;
   renter_phone?: string;
@@ -189,12 +189,14 @@ export type DataTransferStatus =
 
 export interface DataTransfer {
   id: string;
-  rentalId: string;
+  rental_id: string;
   status: DataTransferStatus;
-  uploadedAt?: string;
-  emailSentAt?: string;
+  uploaded_at?: string;
+  email_sent_at?: string;
   issue?: string;
-  createdAt: string;
-  updatedAt: string;
+  cancelled_at?: string;
+  cancel_reason?: string;
+  created_at: string;
+  updated_at: string;
   rental?: RentalReservation;
 }

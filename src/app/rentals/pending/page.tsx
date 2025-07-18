@@ -1,7 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getPaginationRowModel,
+} from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
 import {
   Table,
@@ -12,27 +16,37 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { SearchIcon, CalendarIcon, RefreshCwIcon } from "lucide-react";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
+import { useSidebar } from "@/components/ui/sidebar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
-
-function normalizeHeader(header: string, idx: number, allHeaders: string[]) {
-  let id = (header || "")
-    .replace(/\n/g, " ")
-    .replace(/\r/g, " ")
-    .replace(/\t/g, " ")
-    .replace(/\s+/g, " ")
-    .replace(/[^a-zA-Z0-9가-힣_ ]/g, "")
-    .trim()
-    .replace(/ /g, "_")
-    .toLowerCase();
-  if (!id) id = `col_${idx + 1}`;
-  let count = 1;
-  let baseId = id;
-  while (allHeaders.indexOf(id) < idx) {
-    id = `${baseId}_${count++}`;
-  }
-  return id;
-}
 
 // 22개 한국어 헤더 예시 (실제 번역에 맞게 수정)
 const KOREAN_HEADERS = [
@@ -45,19 +59,13 @@ const KOREAN_HEADERS = [
   "반납시간", // G
   "예약사이트", // H
   "예약번호", // I
-  "(0)", // J
-  "대여품목", // K
-  "이메일", // L
-  "없음", // M
-  "(1)", // N
-  "특별요청", // O
-  "메신저", // P
-  "메신저ID(1)", // Q
-  "메신저ID(2)", // R
-  "메신저ID(3)", // S
-  "동의", // T
-  "픽업터미널", // U
-  "반납터미널", // V
+  "대여품목", // J
+  "이메일", // K
+  "메신저", // M
+  "메신저ID", // N
+  "동의", // O
+  "픽업터미널", // P
+  "반납터미널", // Q
 ];
 
 const COLUMN_WIDTHS: Record<string, string> = {
@@ -70,93 +78,785 @@ const COLUMN_WIDTHS: Record<string, string> = {
   반납시간: "w-24",
   예약사이트: "w-32",
   예약번호: "w-36",
-  "(0)": "w-4",
   대여품목: "w-32",
   이메일: "w-48",
-  없음: "w-4",
-  "(1)": "w-4",
-  특별요청: "w-12",
   메신저: "w-24",
-  "메신저ID(1)": "w-24",
-  "메신저ID(2)": "w-24",
-  "메신저ID(3)": "w-24",
-  동의: "w-14",
+  메신저ID: "w-24",
+  동의: "w-20",
   픽업터미널: "w-32",
   반납터미널: "w-32",
 };
 
 export default function RentalsPendingPage() {
+  const { state } = useSidebar();
   const [data, setData] = React.useState<any[]>([]);
-  const [total, setTotal] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 20,
   });
+  const [selectedRows, setSelectedRows] = React.useState<Set<number>>(
+    new Set()
+  );
+  const [isConfirming, setIsConfirming] = React.useState(false);
+  const [confirmedReservationIds, setConfirmedReservationIds] = React.useState<
+    Set<string>
+  >(new Set());
+  const [showConfirmDialog, setShowConfirmDialog] = React.useState(false);
+  const [isCanceling, setIsCanceling] = React.useState(false);
+  const [showCancelDialog, setShowCancelDialog] = React.useState(false);
+  const [canceledReservationIds, setCanceledReservationIds] = React.useState<
+    Set<string>
+  >(new Set());
+
+  // 검색 및 필터 상태
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>();
+  const [selectedSite, setSelectedSite] = React.useState("all");
+  const [selectedCategory, setSelectedCategory] = React.useState("all");
+
+  // 고유 식별자 생성 함수
+  const generateReservationId = React.useCallback((reservation: any) => {
+    const timestamp = reservation["타임스탬프"];
+    const bookingNumber = String(reservation["예약번호"]);
+    return `${timestamp}|${bookingNumber}`;
+  }, []);
+
+  const handleSelectAll = React.useCallback(
+    (checked: boolean, currentData: any[]) => {
+      if (checked) {
+        setSelectedRows(new Set(currentData.map((_, index) => index)));
+      } else {
+        setSelectedRows(new Set());
+      }
+    },
+    []
+  );
+
+  const handleRowSelect = React.useCallback(
+    (index: number, checked: boolean) => {
+      setSelectedRows((prev) => {
+        const newSet = new Set(prev);
+        if (checked) {
+          newSet.add(index);
+        } else {
+          newSet.delete(index);
+        }
+        return newSet;
+      });
+    },
+    []
+  );
+
+  const handleConfirmClick = React.useCallback(() => {
+    if (selectedRows.size === 0) return;
+    setShowConfirmDialog(true);
+  }, [selectedRows.size]);
+
+  const handleCancelClick = React.useCallback(() => {
+    if (selectedRows.size === 0) return;
+    setShowCancelDialog(true);
+  }, [selectedRows.size]);
+
+  // 필터링된 데이터
+  const filteredData = React.useMemo(() => {
+    return data.filter((item) => {
+      // 검색어 필터 (이름, 예약번호, 이메일)
+      const matchesSearch =
+        !searchTerm ||
+        item["이름"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item["예약번호"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item["이메일"]?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // 예약 사이트 필터
+      const matchesSite =
+        selectedSite === "all" || item["예약사이트"] === selectedSite;
+
+      // 대여품목 필터
+      const matchesCategory =
+        selectedCategory === "all" || item["대여품목"] === selectedCategory;
+
+      // 날짜 필터 (픽업일 기준)
+      const matchesDateRange =
+        !dateRange?.from ||
+        !dateRange?.to ||
+        (() => {
+          const pickupDate = item["픽업일"];
+          if (!pickupDate) return false;
+
+          try {
+            // 한국어 날짜 형식을 표준 날짜 형식으로 변환
+            const normalizedDate = pickupDate
+              .replace(/\./g, "")
+              .trim()
+              .split(" ");
+            if (normalizedDate.length < 3) return false;
+
+            const year = normalizedDate[0];
+            const month = normalizedDate[1];
+            const day = normalizedDate[2];
+
+            if (!year || !month || !day) return false;
+
+            const dateStr = `${year}-${month.padStart(2, "0")}-${day.padStart(
+              2,
+              "0"
+            )}`;
+
+            const fromStr = format(dateRange.from, "yyyy-MM-dd");
+            const toStr = format(dateRange.to, "yyyy-MM-dd");
+
+            return dateStr >= fromStr && dateStr <= toStr;
+          } catch (error) {
+            console.warn("날짜 파싱 오류:", pickupDate, error);
+            return false;
+          }
+        })();
+
+      return (
+        matchesSearch && matchesSite && matchesCategory && matchesDateRange
+      );
+    });
+  }, [data, searchTerm, selectedSite, selectedCategory, dateRange]);
+
+  const getSelectedConfirmedCount = React.useCallback(() => {
+    return Array.from(selectedRows).filter((index) =>
+      confirmedReservationIds.has(generateReservationId(filteredData[index]))
+    ).length;
+  }, [
+    selectedRows,
+    confirmedReservationIds,
+    filteredData,
+    generateReservationId,
+  ]);
+
+  // 고유 값들 추출 (필터 옵션용)
+  const uniqueSites = React.useMemo(() => {
+    const sites = Array.from(
+      new Set(data.map((item) => item["예약사이트"]))
+    ).filter(Boolean);
+    return sites.sort();
+  }, [data]);
+
+  const uniqueCategories = React.useMemo(() => {
+    const categories = Array.from(
+      new Set(data.map((item) => item["대여품목"]))
+    ).filter(Boolean);
+    return categories.sort();
+  }, [data]);
+
+  // 필터 초기화
+  const handleResetFilters = React.useCallback(() => {
+    setSearchTerm("");
+    setDateRange(undefined);
+    setSelectedSite("all");
+    setSelectedCategory("all");
+    setSelectedRows(new Set());
+  }, []);
+
+  // 필터 변경 시 선택 초기화
+  React.useEffect(() => {
+    setSelectedRows(new Set());
+  }, [searchTerm, dateRange, selectedSite, selectedCategory]);
+
+  const handleConfirmReservations = React.useCallback(async () => {
+    if (selectedRows.size === 0) return;
+
+    setIsConfirming(true);
+    setShowConfirmDialog(false);
+
+    try {
+      const selectedData = Array.from(selectedRows).map(
+        (index) => filteredData[index]
+      );
+
+      // 새로운 API 엔드포인트로 예약 확정 요청
+      const response = await fetch("/api/pending-reservations/confirm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reservations: selectedData }),
+      });
+
+      if (!response.ok) {
+        throw new Error("예약 확정 요청 실패");
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(result.message);
+
+        // 확정된 예약들을 상태에 추가 (고유 식별자 사용)
+        const newConfirmedReservationIds = selectedData.map((item) =>
+          generateReservationId(item)
+        );
+        setConfirmedReservationIds(
+          (prev) =>
+            new Set([...Array.from(prev), ...newConfirmedReservationIds])
+        );
+        setSelectedRows(new Set());
+
+        // 데이터 새로고침
+        const refreshResponse = await fetch(`/api/rentals/pending?all=true`);
+        const refreshData = await refreshResponse.json();
+        setData(refreshData.data || []);
+
+        // 상태 정보 새로고침
+        try {
+          const statusResponse = await fetch(
+            `/api/pending-reservations/status`
+          );
+          const statusResult = await statusResponse.json();
+
+          if (statusResult.success) {
+            const confirmedIds = new Set<string>(
+              statusResult.confirmed_reservation_keys || []
+            );
+            const canceledIds = new Set<string>(
+              statusResult.canceled_reservation_keys || []
+            );
+
+            setConfirmedReservationIds(confirmedIds);
+            setCanceledReservationIds(canceledIds);
+          }
+        } catch (error) {
+          console.error("상태 새로고침 오류:", error);
+          console.error(
+            "에러 상세:",
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+      } else {
+        alert("예약 확정에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("예약 확정 오류:", error);
+      alert("예약 확정 중 오류가 발생했습니다.");
+    } finally {
+      setIsConfirming(false);
+    }
+  }, [selectedRows, filteredData, generateReservationId]);
+
+  const handleCancelReservations = React.useCallback(async () => {
+    if (selectedRows.size === 0) return;
+
+    setIsCanceling(true);
+    setShowCancelDialog(false);
+
+    try {
+      const selectedData = Array.from(selectedRows).map(
+        (index) => filteredData[index]
+      );
+      const reservationKeys = selectedData.map((item) =>
+        generateReservationId(item)
+      );
+
+      const response = await fetch("/api/pending-reservations/cancel", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reservationKeys,
+          reservationData: selectedData,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("예약 취소 요청 실패");
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(result.message);
+
+        // 취소된 예약들을 확정 상태에서 제거하고 취소 상태에 추가
+        const canceledReservationIds = selectedData
+          .filter((_, index) => result.results[index]?.success)
+          .map((item) => generateReservationId(item));
+
+        setConfirmedReservationIds((prev) => {
+          const newSet = new Set(prev);
+          canceledReservationIds.forEach((id: string) => newSet.delete(id));
+          return newSet;
+        });
+
+        setCanceledReservationIds((prev) => {
+          const newSet = new Set(prev);
+          canceledReservationIds.forEach((id: string) => newSet.add(id));
+          return newSet;
+        });
+        setSelectedRows(new Set());
+
+        // 데이터 새로고침 없이 현재 페이지 유지
+      } else {
+        alert("예약 취소에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("예약 취소 오류:", error);
+      alert("예약 취소 중 오류가 발생했습니다.");
+    } finally {
+      setIsCanceling(false);
+    }
+  }, [selectedRows, filteredData, generateReservationId]);
 
   const columns = React.useMemo(() => {
     return [
       {
         id: "select",
         header: () => (
-          <input type="checkbox" className="accent-primary" disabled />
+          <input
+            type="checkbox"
+            className="accent-primary"
+            checked={
+              selectedRows.size > 0 && selectedRows.size === filteredData.length
+            }
+            onChange={(e) => handleSelectAll(e.target.checked, filteredData)}
+          />
         ),
-        cell: () => <input type="checkbox" className="accent-primary" />,
+        cell: (info: any) => {
+          const rowIndex = info.row.index;
+          return (
+            <input
+              type="checkbox"
+              className="accent-primary"
+              checked={selectedRows.has(rowIndex)}
+              onChange={(e) => handleRowSelect(rowIndex, e.target.checked)}
+            />
+          );
+        },
         customWidth: "w-8",
       },
-      ...KOREAN_HEADERS.map((header) => ({
+      ...KOREAN_HEADERS.filter((header) => header !== "동의").map((header) => ({
         id: header,
         accessorKey: header,
         header,
         customWidth: COLUMN_WIDTHS[header] || "w-24",
         cell: (info: any) => {
           const value = info.getValue();
+          const rowData = info.row.original;
+          const reservationId = generateReservationId(rowData);
+          const isConfirmed = confirmedReservationIds.has(reservationId);
+          const isCanceled = canceledReservationIds.has(reservationId);
+
+          // 디버깅용 로그 (개발 환경에서만)
+          // if (process.env.NODE_ENV === 'development' && header === "예약번호") {
+          //   console.log(`예약 ${reservationId}: 확정=${isConfirmed}, 취소=${isCanceled}`);
+          // }
+
           if (typeof value === "string" && value.startsWith("https://")) {
             return (
               <a
                 href={value}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 underline text-ellipsis overflow-hidden"
+                className={`text-blue-600 underline text-ellipsis overflow-hidden ${
+                  isConfirmed ? "opacity-75" : ""
+                } ${isCanceled ? "opacity-50 text-gray-500" : ""}`}
+                style={
+                  isCanceled ? { textDecoration: "line-through" } : undefined
+                }
               >
                 {value}
               </a>
             );
           }
-          return value;
+          return (
+            <span
+              className={`${isConfirmed ? "font-medium" : ""} ${
+                isCanceled ? "opacity-50 text-gray-500" : ""
+              }`}
+              style={
+                isCanceled ? { textDecoration: "line-through" } : undefined
+              }
+            >
+              {value}
+              {isConfirmed && header === "예약번호" && (
+                <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                  확정됨
+                </span>
+              )}
+              {isCanceled && header === "예약번호" && (
+                <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                  취소됨
+                </span>
+              )}
+            </span>
+          );
         },
       })),
     ];
-  }, []);
+  }, [
+    selectedRows,
+    filteredData,
+    handleSelectAll,
+    handleRowSelect,
+    confirmedReservationIds,
+    canceledReservationIds,
+    generateReservationId,
+  ]);
 
   React.useEffect(() => {
     setLoading(true);
-    fetch(
-      `/api/rentals/pending?page=${pagination.pageIndex + 1}&pageSize=${
-        pagination.pageSize
-      }`
-    )
+    // 전체 데이터 로드
+    fetch(`/api/rentals/pending?all=true`)
       .then((res) => res.json())
-      .then((json) => {
-        setData(json.data || []);
-        setTotal(json.total || 0);
+      .then(async (json) => {
+        const newData = json.data || [];
+        setData(newData);
+        setLoading(false);
+        setSelectedRows(new Set()); // 데이터 변경 시 선택 초기화
+
+        // 데이터베이스에서 모든 예약 상태 조회
+        try {
+          const statusResponse = await fetch(
+            `/api/pending-reservations/status`
+          );
+          const statusResult = await statusResponse.json();
+
+          if (statusResult.success) {
+            // 예약 키로 직접 매핑
+            const confirmedIds = new Set<string>(
+              statusResult.confirmed_reservation_keys || []
+            );
+            const canceledIds = new Set<string>(
+              statusResult.canceled_reservation_keys || []
+            );
+
+            setConfirmedReservationIds(confirmedIds);
+            setCanceledReservationIds(canceledIds);
+          }
+        } catch (error) {
+          console.error("확정 상태 조회 오류:", error);
+          console.error(
+            "에러 상세:",
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("데이터 로딩 오류:", error);
         setLoading(false);
       });
-  }, [pagination.pageIndex, pagination.pageSize]);
+  }, [generateReservationId]); // 전체 데이터 로드이므로 페이지네이션 의존성 제거
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    manualPagination: true,
-    pageCount: Math.ceil(total / pagination.pageSize),
+    getPaginationRowModel: getPaginationRowModel(),
+    manualPagination: false, // 클라이언트 사이드 페이지네이션
     state: { pagination },
     onPaginationChange: setPagination,
   });
 
+  // 사이드바 상태에 따른 테이블 너비 계산
+  const getTableWidth = () => {
+    if (state === "expanded") {
+      return "w-[calc(100vw-18rem)]"; // 사이드바가 열려있을 때
+    } else {
+      return "w-[calc(100vw-3rem)]"; // 사이드바가 닫혀있을 때
+    }
+  };
+
   return (
     <div className="w-full mx-auto py-8 overflow-auto">
-      <h1 className="text-2xl font-bold mb-4">예약 대기 목록</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">예약 대기 목록</h1>
+        <div className="flex items-center gap-4">
+          {selectedRows.size > 0 && (
+            <span className="text-sm text-gray-600">
+              {selectedRows.size}개 선택됨
+              {getSelectedConfirmedCount() > 0 && (
+                <span className="ml-2 text-green-600">
+                  ({getSelectedConfirmedCount()}개 확정됨)
+                </span>
+              )}
+            </span>
+          )}
+          <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+            <DialogTrigger asChild>
+              <Button
+                onClick={handleCancelClick}
+                disabled={selectedRows.size === 0 || isCanceling}
+                variant="destructive"
+                className="mr-2"
+              >
+                {isCanceling ? "처리 중..." : "예약 취소"}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>예약 취소 확인</DialogTitle>
+                <DialogDescription>
+                  선택한 {selectedRows.size}개의 예약을 취소하시겠습니까?
+                  <br />
+                  {getSelectedConfirmedCount() > 0 && (
+                    <>
+                      확정된 예약 {getSelectedConfirmedCount()}개는 렌탈
+                      예약에서 제거되며,{" "}
+                    </>
+                  )}
+                  이 작업은 되돌릴 수 없습니다.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="max-h-60 overflow-y-auto">
+                <div className="space-y-2">
+                  {Array.from(selectedRows).map((index) => {
+                    const reservation = filteredData[index];
+                    const reservationId = generateReservationId(reservation);
+                    const isConfirmed =
+                      confirmedReservationIds.has(reservationId);
+                    return (
+                      <div
+                        key={index}
+                        className={`flex items-center justify-between p-2 rounded ${
+                          isConfirmed ? "bg-red-50" : "bg-gray-50"
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium">
+                            {reservation["이름"]}
+                            {isConfirmed && (
+                              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                확정됨
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {reservation["대여품목"]} |{" "}
+                            {reservation["예약번호"]}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {reservation["픽업일"]} {reservation["픽업시간"]} ~{" "}
+                            {reservation["반납일"]} {reservation["반납시간"]}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCancelDialog(false)}
+                  disabled={isCanceling}
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={handleCancelReservations}
+                  disabled={isCanceling}
+                  variant="destructive"
+                >
+                  {isCanceling ? "처리 중..." : "취소 확정"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+            <DialogTrigger asChild>
+              <Button
+                onClick={handleConfirmClick}
+                disabled={selectedRows.size === 0 || isConfirming}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isConfirming ? "처리 중..." : "예약 확정"}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>예약 확정 확인</DialogTitle>
+                <DialogDescription>
+                  선택한 {selectedRows.size}개의 예약을 확정하시겠습니까?
+                  <br />
+                  확정된 예약은 실제 렌탈 예약으로 등록되며, 이 작업은 되돌릴 수
+                  없습니다.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="max-h-60 overflow-y-auto">
+                <div className="space-y-2">
+                  {Array.from(selectedRows).map((index) => {
+                    const reservation = filteredData[index];
+                    return (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium">
+                            {reservation["이름"]}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {reservation["대여품목"]} |{" "}
+                            {reservation["예약번호"]}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {reservation["픽업일"]} {reservation["픽업시간"]} ~{" "}
+                            {reservation["반납일"]} {reservation["반납시간"]}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowConfirmDialog(false)}
+                  disabled={isConfirming}
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={handleConfirmReservations}
+                  disabled={isConfirming}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isConfirming ? "처리 중..." : "확정"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* 검색 및 필터 UI */}
+      <div className="mb-6 bg-white p-2 rounded-lg border border-gray-200 space-y-2">
+        {/* 첫 번째 줄: 검색, 날짜, 버튼 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 검색 */}
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
+            <Input
+              placeholder="이름, 예약번호, 이메일로 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* 날짜 범위 필터 */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "justify-start text-left font-normal",
+                  !dateRange && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from && dateRange?.to
+                  ? `${format(dateRange.from, "yyyy-MM-dd", {
+                      locale: ko,
+                    })} ~ ${format(dateRange.to, "yyyy-MM-dd", { locale: ko })}`
+                  : "픽업 기간 선택"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                locale={ko}
+              />
+            </PopoverContent>
+          </Popover>
+
+          {/* 초기화 버튼 */}
+          <Button
+            variant="outline"
+            onClick={handleResetFilters}
+            className="flex items-center gap-2"
+          >
+            <RefreshCwIcon className="w-4 h-4" />
+            초기화
+          </Button>
+        </div>
+
+        {/* 두 번째 줄: 선택 필터 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 예약 사이트 필터 */}
+          <Select value={selectedSite} onValueChange={setSelectedSite}>
+            <SelectTrigger>
+              <SelectValue placeholder="예약 사이트 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 사이트</SelectItem>
+              {uniqueSites.map((site) => (
+                <SelectItem key={site} value={site}>
+                  {site}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* 대여품목 필터 */}
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger>
+              <SelectValue placeholder="대여품목 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 품목</SelectItem>
+              {uniqueCategories.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* 필터 결과 표시 */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
+          <div>
+            {dateRange?.from && dateRange?.to ? (
+              <span className="font-medium text-blue-600">
+                {format(dateRange.from, "yyyy.MM.dd", { locale: ko })} ~{" "}
+                {format(dateRange.to, "yyyy.MM.dd", { locale: ko })}
+              </span>
+            ) : (
+              <span className="font-medium text-blue-600">전체 기간</span>
+            )}
+            <span className="ml-2">
+              총 {filteredData.length}개의 예약 ({data.length}개 중)
+            </span>
+            {loading && <span className="ml-2 text-blue-600">로딩 중...</span>}
+          </div>
+
+          {/* 적용된 필터 표시 */}
+          {(searchTerm ||
+            dateRange?.from ||
+            selectedSite !== "all" ||
+            selectedCategory !== "all") && (
+            <div className="flex items-center gap-2">
+              <span className="text-blue-600 text-xs">필터 적용됨:</span>
+              {searchTerm && (
+                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                  검색: {searchTerm}
+                </span>
+              )}
+              {selectedSite !== "all" && (
+                <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                  사이트: {selectedSite}
+                </span>
+              )}
+              {selectedCategory !== "all" && (
+                <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">
+                  품목: {selectedCategory}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex flex-col items-center justify-center h-64 gap-2">
           <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
@@ -165,7 +865,12 @@ export default function RentalsPendingPage() {
           </span>
         </div>
       ) : (
-        <div className="rounded-lg border bg-background max-w-[calc(100vw-20rem)] max-h-[calc(100vh-12rem)] overflow-auto mx-auto">
+        <div
+          className={cn(
+            "rounded-lg border bg-background max-h-[calc(100vh-23rem)] overflow-auto",
+            getTableWidth()
+          )}
+        >
           <Table className="text-xs w-full table-fixed">
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -189,13 +894,35 @@ export default function RentalsPendingPage() {
             <TableBody>
               {table.getRowModel().rows.length ? (
                 table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
+                  <TableRow
+                    key={row.id}
+                    className={
+                      canceledReservationIds.has(
+                        generateReservationId(row.original)
+                      )
+                        ? "bg-red-50 border-red-200"
+                        : confirmedReservationIds.has(
+                            generateReservationId(row.original)
+                          )
+                        ? "bg-green-50 border-green-200"
+                        : ""
+                    }
+                  >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell
                         key={cell.id}
                         className={
                           (cell.column.columnDef as any).customWidth +
-                          " text-ellipsis overflow-hidden"
+                          " text-ellipsis overflow-hidden" +
+                          (canceledReservationIds.has(
+                            generateReservationId(row.original)
+                          )
+                            ? " text-red-800"
+                            : confirmedReservationIds.has(
+                                generateReservationId(row.original)
+                              )
+                            ? " text-green-800"
+                            : "")
                         }
                       >
                         {flexRender(

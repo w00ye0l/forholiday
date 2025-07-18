@@ -10,13 +10,12 @@ export interface CheckReservationResult {
 }
 
 export async function checkReservation(
-  reservationId: string,
-  phoneNumber: string
+  reservationId: string
 ): Promise<CheckReservationResult> {
-  if (!reservationId.trim() || !phoneNumber.trim()) {
+  if (!reservationId.trim()) {
     return {
       success: false,
-      error: "예약 번호와 전화번호를 모두 입력해주세요.",
+      error: "예약 번호를 입력해주세요.",
     };
   }
 
@@ -41,7 +40,6 @@ export async function checkReservation(
       .from("rental_reservations")
       .select("*")
       .eq("reservation_id", reservationId.trim())
-      .eq("renter_phone", phoneNumber.trim())
       .single();
 
     if (error) {
