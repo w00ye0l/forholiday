@@ -144,7 +144,7 @@ export interface RentalReservation {
   pickup_method: PickupMethod;
   return_method: ReturnMethod;
   data_transmission: boolean;
-  sd_option?: "대여" | "구매" | "구매+대여";
+  sd_option?: "대여" | "구매" | "구매+대여" | null;
   reservation_site: ReservationSite;
   renter_name: string;
   renter_phone: string;
@@ -169,7 +169,7 @@ export interface CreateRentalReservationDto {
   pickup_method: PickupMethod;
   return_method: ReturnMethod;
   data_transmission: boolean;
-  sd_option?: "대여" | "구매" | "구매+대여";
+  sd_option?: "대여" | "구매" | "구매+대여" | null;
   reservation_site: ReservationSite;
   renter_name: string;
   renter_phone?: string;

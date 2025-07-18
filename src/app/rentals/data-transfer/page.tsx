@@ -76,6 +76,10 @@ export default function DataTransferPage() {
     null
   );
 
+  // 체크박스 상태
+  const [selectedTransfers, setSelectedTransfers] = useState<string[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
+
   useEffect(() => {
     checkUser();
   }, []);
@@ -326,6 +330,42 @@ export default function DataTransferPage() {
 
   const statusCounts = getStatusCounts();
 
+  // 체크박스 핸들러 함수들
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedTransfers([]);
+    } else {
+      const uploadedTransfers = filteredTransfers
+        .filter(t => t.status === "UPLOADED")
+        .map(t => t.id);
+      setSelectedTransfers(uploadedTransfers);
+    }
+    setSelectAll(!selectAll);
+  };
+
+  const handleSelectTransfer = (transferId: string) => {
+    setSelectedTransfers(prev => {
+      if (prev.includes(transferId)) {
+        return prev.filter(id => id !== transferId);
+      } else {
+        return [...prev, transferId];
+      }
+    });
+  };
+
+  // 일괄 이메일 발송 핸들러
+  const handleBulkEmail = () => {
+    if (selectedTransfers.length === 0) {
+      toast.error("이메일을 발송할 항목을 선택해주세요.");
+      return;
+    }
+    
+    // 선택된 전송 데이터들을 쿼리 파라미터로 전달
+    const selectedData = filteredTransfers.filter(t => selectedTransfers.includes(t.id));
+    const transferIds = selectedData.map(t => t.id).join(',');
+    router.push(`/rentals/data-transfer/email?transfers=${transferIds}`);
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto py-6">
@@ -479,12 +519,34 @@ export default function DataTransferPage() {
         </div>
       </div>
 
+      {/* 일괄 이메일 발송 버튼 */}
+      {selectedTransfers.length > 0 && (
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-blue-800">
+              {selectedTransfers.length}개 항목이 선택되었습니다.
+            </span>
+            <Button 
+              onClick={handleBulkEmail}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              선택된 항목 이메일 발송
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-8">
-                <input type="checkbox" className="accent-primary" disabled />
+                <input 
+                  type="checkbox" 
+                  className="accent-primary" 
+                  checked={selectAll}
+                  onChange={handleSelectAll}
+                />
               </TableHead>
               <TableHead>대여자</TableHead>
               <TableHead>연락처</TableHead>
@@ -510,7 +572,13 @@ export default function DataTransferPage() {
               filteredTransfers.map((transfer) => (
                 <TableRow key={transfer.id}>
                   <TableCell className="w-8">
-                    <input type="checkbox" className="accent-primary" />
+                    <input 
+                      type="checkbox" 
+                      className="accent-primary" 
+                      checked={selectedTransfers.includes(transfer.id)}
+                      onChange={() => handleSelectTransfer(transfer.id)}
+                      disabled={transfer.status !== "UPLOADED"}
+                    />
                   </TableCell>
                   <TableCell>{transfer.rental?.renter_name || "-"}</TableCell>
                   <TableCell>{transfer.rental?.renter_phone || "-"}</TableCell>
