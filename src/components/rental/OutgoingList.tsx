@@ -34,7 +34,11 @@ import {
   STATUS_MAP,
   PICKUP_METHOD_LABELS,
 } from "@/types/rental";
-import { Device, DEVICE_CATEGORY_LABELS, DEVICE_FEATURES } from "@/types/device";
+import {
+  Device,
+  DEVICE_CATEGORY_LABELS,
+  DEVICE_FEATURES,
+} from "@/types/device";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -304,16 +308,6 @@ export function OutgoingList({
                     {rental.renter_name}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <PhoneIcon className="w-3 h-3" />
-                  <span className="text-xs text-gray-600">
-                    {rental.renter_phone}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-600 flex gap-2 items-center">
-                  <MapPinIcon className="w-3 h-3" />
-                  <span>{PICKUP_METHOD_LABELS[rental.pickup_method]}</span>
-                </div>
                 <div className="text-xs text-gray-600 flex gap-2 items-center">
                   <CalendarIcon className="w-3 h-3" />
                   <span>
@@ -321,6 +315,16 @@ export function OutgoingList({
                       locale: ko,
                     })}{" "}
                     {rental.pickup_time.slice(0, 5)}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-600 flex gap-2 items-center">
+                  <MapPinIcon className="w-3 h-3" />
+                  <span>{PICKUP_METHOD_LABELS[rental.pickup_method]}</span>
+                </div>
+                <div className="text-xs text-gray-600 flex gap-2 items-center">
+                  <PhoneIcon className="min-w-3 min-h-3 w-3 h-3" />
+                  <span className="text-xs text-gray-600 break-all">
+                    {rental.renter_phone}
                   </span>
                 </div>
               </div>
@@ -554,7 +558,9 @@ export function OutgoingList({
                           {/* 데이터 전송 및 SD 카드 옵션 - 기기 카테고리에 따라 조건부 렌더링 */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* 데이터 전송 옵션 (핸드폰 기종일 경우만) */}
-                            {DEVICE_FEATURES.PHONE_CATEGORIES.includes(editingRental.device_category) && (
+                            {DEVICE_FEATURES.PHONE_CATEGORIES.includes(
+                              editingRental.device_category
+                            ) && (
                               <div>
                                 <label className="text-sm font-medium">
                                   데이터 전송
@@ -577,14 +583,18 @@ export function OutgoingList({
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="true">예</SelectItem>
-                                    <SelectItem value="false">아니오</SelectItem>
+                                    <SelectItem value="false">
+                                      아니오
+                                    </SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
                             )}
-                            
+
                             {/* SD 카드 옵션 (카메라 기종일 경우만) */}
-                            {DEVICE_FEATURES.CAMERA_CATEGORIES.includes(editingRental.device_category) && (
+                            {DEVICE_FEATURES.CAMERA_CATEGORIES.includes(
+                              editingRental.device_category
+                            ) && (
                               <div>
                                 <label className="text-sm font-medium">
                                   SD 카드 옵션
@@ -648,9 +658,13 @@ export function OutgoingList({
                             <Button
                               onClick={async () => {
                                 try {
-                                  const originalRental = rentals.find(r => r.id === editingRental.id);
-                                  const dataTransmissionChanged = originalRental?.data_transmission !== editingRental.data_transmission;
-                                  
+                                  const originalRental = rentals.find(
+                                    (r) => r.id === editingRental.id
+                                  );
+                                  const dataTransmissionChanged =
+                                    originalRental?.data_transmission !==
+                                    editingRental.data_transmission;
+
                                   // 예약 정보 업데이트
                                   const { error } = await supabase
                                     .from("rental_reservations")
@@ -675,34 +689,43 @@ export function OutgoingList({
                                   if (dataTransmissionChanged) {
                                     if (editingRental.data_transmission) {
                                       // 데이터 전송이 활성화된 경우 - 기존 레코드 확인 후 생성
-                                      const { data: existingTransfer } = await supabase
-                                        .from("data_transfers")
-                                        .select("id")
-                                        .eq("rental_id", editingRental.id)
-                                        .single();
-                                      
-                                      if (!existingTransfer) {
-                                        const { error: insertError } = await supabase
+                                      const { data: existingTransfer } =
+                                        await supabase
                                           .from("data_transfers")
-                                          .insert({
-                                            rental_id: editingRental.id,
-                                            status: 'PENDING_UPLOAD'
-                                          });
-                                        
+                                          .select("id")
+                                          .eq("rental_id", editingRental.id)
+                                          .single();
+
+                                      if (!existingTransfer) {
+                                        const { error: insertError } =
+                                          await supabase
+                                            .from("data_transfers")
+                                            .insert({
+                                              rental_id: editingRental.id,
+                                              status: "PENDING_UPLOAD",
+                                            });
+
                                         if (insertError) {
-                                          console.error("데이터 전송 레코드 생성 실패:", insertError);
+                                          console.error(
+                                            "데이터 전송 레코드 생성 실패:",
+                                            insertError
+                                          );
                                           throw insertError;
                                         }
                                       }
                                     } else {
                                       // 데이터 전송이 비활성화된 경우 - data_transfers 레코드 삭제
-                                      const { error: deleteError } = await supabase
-                                        .from("data_transfers")
-                                        .delete()
-                                        .eq("rental_id", editingRental.id);
-                                      
+                                      const { error: deleteError } =
+                                        await supabase
+                                          .from("data_transfers")
+                                          .delete()
+                                          .eq("rental_id", editingRental.id);
+
                                       if (deleteError) {
-                                        console.error("데이터 전송 레코드 삭제 실패:", deleteError);
+                                        console.error(
+                                          "데이터 전송 레코드 삭제 실패:",
+                                          deleteError
+                                        );
                                         // 삭제 실패 시 경고만 출력하고 계속 진행
                                       }
                                     }
