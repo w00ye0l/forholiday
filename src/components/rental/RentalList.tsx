@@ -132,6 +132,7 @@ export function RentalList({
             <TableHead>예약번호</TableHead>
             <TableHead>고객명</TableHead>
             <TableHead>연락처</TableHead>
+            <TableHead>이메일</TableHead>
             <TableHead>대여기기</TableHead>
             <TableHead>수령일</TableHead>
             <TableHead>반납일</TableHead>
@@ -155,6 +156,9 @@ export function RentalList({
               </TableCell>
               <TableCell>
                 {highlightText(rental.renter_phone, searchTerm)}
+              </TableCell>
+              <TableCell>
+                {rental.renter_email ? highlightText(rental.renter_email, searchTerm) : "-"}
               </TableCell>
               <TableCell>
                 <div>
