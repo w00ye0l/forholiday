@@ -115,6 +115,27 @@ export default function RentalsPendingPage() {
   const [selectedSite, setSelectedSite] = React.useState("all");
   const [selectedCategory, setSelectedCategory] = React.useState("all");
 
+  // 검색어 하이라이트 함수
+  const highlightText = React.useCallback((text: string, searchTerm: string): React.ReactNode => {
+    if (!searchTerm.trim()) return text;
+
+    const regex = new RegExp(
+      `(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+      "gi"
+    );
+    const parts = text.split(regex);
+
+    return parts.map((part, index) =>
+      regex.test(part) ? (
+        <mark key={index} className="bg-yellow-200 px-0.5 rounded">
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  }, []);
+
   // 고유 식별자 생성 함수
   const generateReservationId = React.useCallback((reservation: any) => {
     const timestamp = reservation["타임스탬프"];
@@ -164,9 +185,9 @@ export default function RentalsPendingPage() {
       // 검색어 필터 (이름, 예약번호, 이메일)
       const matchesSearch =
         !searchTerm ||
-        item["이름"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item["예약번호"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item["이메일"]?.toLowerCase().includes(searchTerm.toLowerCase());
+        item["이름"]?.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item["예약번호"]?.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item["이메일"]?.toString().toLowerCase().includes(searchTerm.toLowerCase());
 
       // 예약 사이트 필터
       const matchesSite =
@@ -442,6 +463,10 @@ export default function RentalsPendingPage() {
           const isConfirmed = confirmedReservationIds.has(reservationId);
           const isCanceled = canceledReservationIds.has(reservationId);
 
+          // 검색 가능한 필드들에 하이라이트 적용
+          const searchableFields = ["이름", "예약번호", "이메일"];
+          const shouldHighlight = searchableFields.includes(header) && searchTerm;
+          
           // 디버깅용 로그 (개발 환경에서만)
           // if (process.env.NODE_ENV === 'development' && header === "예약번호") {
           //   console.log(`예약 ${reservationId}: 확정=${isConfirmed}, 취소=${isCanceled}`);
@@ -460,10 +485,15 @@ export default function RentalsPendingPage() {
                   isCanceled ? { textDecoration: "line-through" } : undefined
                 }
               >
-                {value}
+                {shouldHighlight ? highlightText(value, searchTerm) : value}
               </a>
             );
           }
+          
+          const displayValue = shouldHighlight && value 
+            ? highlightText(value.toString(), searchTerm)
+            : value;
+            
           return (
             <span
               className={`${isConfirmed ? "font-medium" : ""} ${
@@ -473,7 +503,7 @@ export default function RentalsPendingPage() {
                 isCanceled ? { textDecoration: "line-through" } : undefined
               }
             >
-              {value}
+              {displayValue}
               {isConfirmed && header === "예약번호" && (
                 <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                   확정됨
@@ -497,6 +527,8 @@ export default function RentalsPendingPage() {
     confirmedReservationIds,
     canceledReservationIds,
     generateReservationId,
+    searchTerm,
+    highlightText,
   ]);
 
   React.useEffect(() => {
