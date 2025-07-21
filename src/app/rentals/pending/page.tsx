@@ -412,7 +412,15 @@ export default function RentalsPendingPage() {
         });
         setSelectedRows(new Set());
 
-        // 데이터 새로고침 없이 현재 페이지 유지
+        // 확정된 예약이 취소된 경우, 기존 예약 목록에서도 업데이트되도록 알림
+        const hasConfirmedCancellations = result.results.some(
+          (r: any) => r.success && r.was_confirmed
+        );
+        
+        if (hasConfirmedCancellations) {
+          // 전역 이벤트 발생하여 다른 페이지에서 데이터 새로고침 필요함을 알림
+          window.dispatchEvent(new CustomEvent('reservationCanceled'));
+        }
       } else {
         alert("예약 취소에 실패했습니다.");
       }
@@ -932,12 +940,12 @@ export default function RentalsPendingPage() {
                       canceledReservationIds.has(
                         generateReservationId(row.original)
                       )
-                        ? "bg-red-50 border-red-200"
+                        ? "bg-red-50 border-red-200 hover:bg-red-100"
                         : confirmedReservationIds.has(
                             generateReservationId(row.original)
                           )
-                        ? "bg-green-50 border-green-200"
-                        : ""
+                        ? "bg-green-50 border-green-200 hover:bg-green-100"
+                        : "hover:bg-gray-50"
                     }
                   >
                     {row.getVisibleCells().map((cell) => (

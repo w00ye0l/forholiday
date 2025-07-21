@@ -108,10 +108,11 @@ export default function RentalsPage() {
       setLoading(true);
       setError(null);
 
-      // 예약 목록 조회 - 수령 날짜/시간 기준으로 정렬
+      // 예약 목록 조회 - 취소되지 않은 예약만, 수령 날짜/시간 기준으로 정렬
       const { data: rentals, error: rentalsError } = await supabase
         .from("rental_reservations")
         .select("*")
+        .is("cancelled_at", null) // 취소되지 않은 예약만 조회
         .order("pickup_date", { ascending: true })
         .order("pickup_time", { ascending: true });
 
@@ -224,6 +225,20 @@ export default function RentalsPage() {
 
   useEffect(() => {
     fetchRentals();
+  }, []);
+
+  // 예약 취소 이벤트 리스너 추가
+  useEffect(() => {
+    const handleReservationCanceled = () => {
+      // 예약이 취소되었을 때 데이터 새로고침
+      fetchRentals();
+    };
+
+    window.addEventListener('reservationCanceled', handleReservationCanceled);
+    
+    return () => {
+      window.removeEventListener('reservationCanceled', handleReservationCanceled);
+    };
   }, []);
 
   const handleReset = () => {
