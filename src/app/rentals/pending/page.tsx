@@ -68,7 +68,7 @@ const KOREAN_HEADERS = [
 ];
 
 const COLUMN_WIDTHS: Record<string, string> = {
-  타임스탬프: "w-40",
+  타임스탬프: "w-28",
   이름: "w-32",
   픽업일시: "w-28", // 날짜 + 시간 통합으로 더 넓게
   여권사진: "w-24",
@@ -559,14 +559,14 @@ export default function RentalsPendingPage() {
             const parts = timestamp.split(/(오전|오후)/);
             let datepart = "";
             let timepart = "";
-            
+
             if (parts.length >= 3) {
               datepart = parts[0].trim();
               timepart = (parts[1] + " " + parts[2]).trim();
             } else {
               datepart = timestamp;
             }
-            
+
             return (
               <div
                 className={`${isConfirmed ? "font-medium" : ""} ${
