@@ -19,7 +19,12 @@ import {
   ReservationStatus,
   STATUS_MAP,
   RETURN_METHOD_LABELS,
+  PICKUP_METHOD_LABELS,
+  RESERVATION_SITE_LABELS,
   CARD_BORDER_COLORS,
+  PickupMethod,
+  ReturnMethod,
+  ReservationSite,
 } from "@/types/rental";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -313,6 +318,49 @@ export function ReturnList({
                             </div>
                             <div>
                               <label className="text-sm font-medium">
+                                이메일
+                              </label>
+                              <Input
+                                value={editingRental.renter_email || ""}
+                                onChange={(e) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    renter_email: e.target.value,
+                                  })
+                                }
+                                className="text-sm"
+                                placeholder="이메일 주소"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">
+                                수령 방법
+                              </label>
+                              <Select
+                                value={editingRental.pickup_method}
+                                onValueChange={(value) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    pickup_method: value as PickupMethod,
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(PICKUP_METHOD_LABELS).map(
+                                    ([method, label]) => (
+                                      <SelectItem key={method} value={method}>
+                                        {label}
+                                      </SelectItem>
+                                    )
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">
                                 수령 날짜
                               </label>
                               <Popover>
@@ -393,6 +441,33 @@ export function ReturnList({
                                       {time}
                                     </SelectItem>
                                   ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">
+                                반납 방법
+                              </label>
+                              <Select
+                                value={editingRental.return_method}
+                                onValueChange={(value) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    return_method: value as ReturnMethod,
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(RETURN_METHOD_LABELS).map(
+                                    ([method, label]) => (
+                                      <SelectItem key={method} value={method}>
+                                        {label}
+                                      </SelectItem>
+                                    )
+                                  )}
                                 </SelectContent>
                               </Select>
                             </div>
@@ -558,6 +633,53 @@ export function ReturnList({
                             )}
                           </div>
 
+                          {/* 주소와 예약사이트 정보 */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm font-medium">
+                                주소
+                              </label>
+                              <Input
+                                value={editingRental.renter_address}
+                                onChange={(e) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    renter_address: e.target.value,
+                                  })
+                                }
+                                className="text-sm"
+                                placeholder="주소를 입력하세요"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">
+                                예약 사이트
+                              </label>
+                              <Select
+                                value={editingRental.reservation_site}
+                                onValueChange={(value) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    reservation_site: value as ReservationSite,
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(RESERVATION_SITE_LABELS).map(
+                                    ([site, label]) => (
+                                      <SelectItem key={site} value={site}>
+                                        {label}
+                                      </SelectItem>
+                                    )
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
                           <div>
                             <label className="text-sm font-medium">비고</label>
                             <Input
@@ -599,10 +721,15 @@ export function ReturnList({
                                     .update({
                                       renter_name: editingRental.renter_name,
                                       renter_phone: editingRental.renter_phone,
+                                      renter_email: editingRental.renter_email,
+                                      renter_address: editingRental.renter_address,
+                                      pickup_method: editingRental.pickup_method,
                                       pickup_date: editingRental.pickup_date,
                                       pickup_time: editingRental.pickup_time,
+                                      return_method: editingRental.return_method,
                                       return_date: editingRental.return_date,
                                       return_time: editingRental.return_time,
+                                      reservation_site: editingRental.reservation_site,
                                       data_transmission:
                                         editingRental.data_transmission,
                                       sd_option:
