@@ -280,12 +280,13 @@ export function ReturnList({
                         <EditIcon className="w-3 h-3" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
+                    <DialogContent className="sm:max-w-[600px] max-h-full overflow-auto">
                       <DialogHeader>
                         <DialogTitle>예약 상세 정보</DialogTitle>
                       </DialogHeader>
                       {editingRental && (
                         <div className="space-y-4">
+                          {/* 기본 정보 - 2컬럼 */}
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="text-sm font-medium">
@@ -317,49 +318,28 @@ export function ReturnList({
                                 className="text-sm"
                               />
                             </div>
-                            <div>
-                              <label className="text-sm font-medium">
-                                이메일
-                              </label>
-                              <Input
-                                value={editingRental.renter_email || ""}
-                                onChange={(e) =>
-                                  setEditingRental({
-                                    ...editingRental,
-                                    renter_email: e.target.value,
-                                  })
-                                }
-                                className="text-sm"
-                                placeholder="이메일 주소"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">
-                                수령 방법
-                              </label>
-                              <Select
-                                value={editingRental.pickup_method}
-                                onValueChange={(value) =>
-                                  setEditingRental({
-                                    ...editingRental,
-                                    pickup_method: value as PickupMethod,
-                                  })
-                                }
-                              >
-                                <SelectTrigger className="text-sm">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {Object.entries(PICKUP_METHOD_LABELS).map(
-                                    ([method, label]) => (
-                                      <SelectItem key={method} value={method}>
-                                        {label}
-                                      </SelectItem>
-                                    )
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                          </div>
+
+                          {/* 이메일 - 1컬럼 */}
+                          <div>
+                            <label className="text-sm font-medium">
+                              이메일
+                            </label>
+                            <Input
+                              value={editingRental.renter_email || ""}
+                              onChange={(e) =>
+                                setEditingRental({
+                                  ...editingRental,
+                                  renter_email: e.target.value,
+                                })
+                              }
+                              className="text-sm"
+                              placeholder="이메일 주소"
+                            />
+                          </div>
+
+                          {/* 수령 날짜/시간 - 2컬럼 */}
+                          <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="text-sm font-medium">
                                 수령 날짜
@@ -445,33 +425,10 @@ export function ReturnList({
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div>
-                              <label className="text-sm font-medium">
-                                반납 방법
-                              </label>
-                              <Select
-                                value={editingRental.return_method}
-                                onValueChange={(value) =>
-                                  setEditingRental({
-                                    ...editingRental,
-                                    return_method: value as ReturnMethod,
-                                  })
-                                }
-                              >
-                                <SelectTrigger className="text-sm">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {Object.entries(RETURN_METHOD_LABELS).map(
-                                    ([method, label]) => (
-                                      <SelectItem key={method} value={method}>
-                                        {label}
-                                      </SelectItem>
-                                    )
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                          </div>
+
+                          {/* 반납 날짜/시간 - 2컬럼 */}
+                          <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="text-sm font-medium">
                                 반납 날짜
@@ -559,12 +516,70 @@ export function ReturnList({
                             </div>
                           </div>
 
+                          {/* 수령/반납 방법 - 2컬럼 */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm font-medium">
+                                수령 방법
+                              </label>
+                              <Select
+                                value={editingRental.pickup_method}
+                                onValueChange={(value) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    pickup_method: value as PickupMethod,
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(PICKUP_METHOD_LABELS).map(
+                                    ([method, label]) => (
+                                      <SelectItem key={method} value={method}>
+                                        {label}
+                                      </SelectItem>
+                                    )
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">
+                                반납 방법
+                              </label>
+                              <Select
+                                value={editingRental.return_method}
+                                onValueChange={(value) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    return_method: value as ReturnMethod,
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(RETURN_METHOD_LABELS).map(
+                                    ([method, label]) => (
+                                      <SelectItem key={method} value={method}>
+                                        {label}
+                                      </SelectItem>
+                                    )
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
                           {/* 데이터 전송 및 SD 카드 옵션 - 기기 카테고리에 따라 조건부 렌더링 */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* 데이터 전송 옵션 (핸드폰 기종일 경우만) */}
-                            {DEVICE_FEATURES.PHONE_CATEGORIES.includes(
-                              editingRental.device_category
-                            ) && (
+                          {/* 데이터 전송 옵션 (핸드폰 기종일 경우만) */}
+                          {DEVICE_FEATURES.PHONE_CATEGORIES.includes(
+                            editingRental.device_category
+                          ) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
                                 <label className="text-sm font-medium">
                                   데이터 전송
@@ -593,46 +608,46 @@ export function ReturnList({
                                   </SelectContent>
                                 </Select>
                               </div>
-                            )}
+                            </div>
+                          )}
 
-                            {/* SD 카드 옵션 (카메라 기종일 경우만) */}
-                            {DEVICE_FEATURES.CAMERA_CATEGORIES.includes(
-                              editingRental.device_category
-                            ) && (
-                              <div>
-                                <label className="text-sm font-medium">
-                                  SD 카드 옵션
-                                </label>
-                                <Select
-                                  value={editingRental.sd_option || "none"}
-                                  onValueChange={(value) =>
-                                    setEditingRental({
-                                      ...editingRental,
-                                      sd_option:
-                                        value === "none"
-                                          ? undefined
-                                          : (value as
-                                              | "대여"
-                                              | "구매"
-                                              | "구매+대여"),
-                                    })
-                                  }
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="선택하세요" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none">없음</SelectItem>
-                                    <SelectItem value="대여">대여</SelectItem>
-                                    <SelectItem value="구매">구매</SelectItem>
-                                    <SelectItem value="구매+대여">
-                                      구매+대여
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                          </div>
+                          {/* SD 카드 옵션 (카메라 기종일 경우만) */}
+                          {DEVICE_FEATURES.CAMERA_CATEGORIES.includes(
+                            editingRental.device_category
+                          ) && (
+                            <div>
+                              <label className="text-sm font-medium">
+                                SD 카드 옵션
+                              </label>
+                              <Select
+                                value={editingRental.sd_option || "none"}
+                                onValueChange={(value) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    sd_option:
+                                      value === "none"
+                                        ? undefined
+                                        : (value as
+                                            | "대여"
+                                            | "구매"
+                                            | "구매+대여"),
+                                  })
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="선택하세요" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">없음</SelectItem>
+                                  <SelectItem value="대여">대여</SelectItem>
+                                  <SelectItem value="구매">구매</SelectItem>
+                                  <SelectItem value="구매+대여">
+                                    구매+대여
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
 
                           {/* 주소와 예약사이트 정보 */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
