@@ -36,6 +36,7 @@ import { ko } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
+import { DEVICE_CATEGORY_LABELS, DeviceCategory } from "@/types/device";
 import {
   Dialog,
   DialogContent,
@@ -48,15 +49,13 @@ import {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
 
-// 22개 한국어 헤더 예시 (실제 번역에 맞게 수정)
+// 한국어 헤더 (픽업일시, 반납일시 통합)
 const KOREAN_HEADERS = [
   "타임스탬프", // A
   "이름", // B
-  "픽업일", // C
-  "픽업시간", // D
+  "픽업일시", // C+D 통합
   "여권사진", // E
-  "반납일", // F
-  "반납시간", // G
+  "반납일시", // F+G 통합
   "예약사이트", // H
   "예약번호", // I
   "대여품목", // J
@@ -71,20 +70,18 @@ const KOREAN_HEADERS = [
 const COLUMN_WIDTHS: Record<string, string> = {
   타임스탬프: "w-40",
   이름: "w-32",
-  픽업일: "w-24",
-  픽업시간: "w-24",
+  픽업일시: "w-28", // 날짜 + 시간 통합으로 더 넓게
   여권사진: "w-24",
-  반납일: "w-24",
-  반납시간: "w-24",
+  반납일시: "w-28", // 날짜 + 시간 통합으로 더 넓게
   예약사이트: "w-32",
   예약번호: "w-36",
-  대여품목: "w-32",
+  대여품목: "w-20",
   이메일: "w-48",
   메신저: "w-24",
   메신저ID: "w-24",
   동의: "w-20",
-  픽업터미널: "w-32",
-  반납터미널: "w-32",
+  픽업터미널: "w-28",
+  반납터미널: "w-28",
 };
 
 export default function RentalsPendingPage() {
@@ -115,26 +112,88 @@ export default function RentalsPendingPage() {
   const [selectedSite, setSelectedSite] = React.useState("all");
   const [selectedCategory, setSelectedCategory] = React.useState("all");
 
-  // 검색어 하이라이트 함수
-  const highlightText = React.useCallback((text: string, searchTerm: string): React.ReactNode => {
-    if (!searchTerm.trim()) return text;
+  // 카테고리 매핑 함수 - Google Sheets 데이터를 표준 카테고리로 변환
+  const mapCategoryToStandard = React.useCallback(
+    (rawCategory: string): string => {
+      if (!rawCategory) return rawCategory;
 
-    const regex = new RegExp(
-      `(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-      "gi"
-    );
-    const parts = text.split(regex);
+      const categoryUpper = rawCategory.toUpperCase().trim();
 
-    return parts.map((part, index) =>
-      regex.test(part) ? (
-        <mark key={index} className="bg-yellow-200 px-0.5 rounded">
-          {part}
-        </mark>
-      ) : (
-        part
+      // 직접 매칭
+      if (categoryUpper in DEVICE_CATEGORY_LABELS) {
+        return DEVICE_CATEGORY_LABELS[categoryUpper as DeviceCategory];
+      }
+
+      // 패턴 매칭
+      if (categoryUpper.includes("GP13")) return DEVICE_CATEGORY_LABELS.GP13;
+      if (categoryUpper.includes("GP12")) return DEVICE_CATEGORY_LABELS.GP12;
+      if (categoryUpper.includes("GP11")) return DEVICE_CATEGORY_LABELS.GP11;
+      if (categoryUpper.includes("GP10")) return DEVICE_CATEGORY_LABELS.GP10;
+      if (categoryUpper.includes("GP8")) return DEVICE_CATEGORY_LABELS.GP8;
+      if (categoryUpper.includes("POCKET") || categoryUpper.includes("포켓"))
+        return DEVICE_CATEGORY_LABELS.POCKET3;
+      if (categoryUpper.includes("ACTION") || categoryUpper.includes("액션"))
+        return DEVICE_CATEGORY_LABELS.ACTION5;
+      if (categoryUpper.includes("S23")) return DEVICE_CATEGORY_LABELS.S23;
+      if (categoryUpper.includes("S24")) return DEVICE_CATEGORY_LABELS.S24;
+      if (categoryUpper.includes("S25")) return DEVICE_CATEGORY_LABELS.S25;
+      if (categoryUpper.includes("PS5")) return DEVICE_CATEGORY_LABELS.PS5;
+      if (categoryUpper.includes("GLAMPAM") || categoryUpper.includes("글램팜"))
+        return DEVICE_CATEGORY_LABELS.GLAMPAM;
+      if (categoryUpper.includes("AIRWRAP") || categoryUpper.includes("에어랩"))
+        return DEVICE_CATEGORY_LABELS.AIRWRAP;
+      if (
+        categoryUpper.includes("AIRSTRAIGHT") ||
+        categoryUpper.includes("에어스트레이트")
       )
-    );
-  }, []);
+        return DEVICE_CATEGORY_LABELS.AIRSTRAIGHT;
+      if (
+        categoryUpper.includes("INSTA360") ||
+        categoryUpper.includes("인스타")
+      )
+        return DEVICE_CATEGORY_LABELS.INSTA360;
+      if (
+        categoryUpper.includes("STROLLER") ||
+        categoryUpper.includes("유모차")
+      )
+        return DEVICE_CATEGORY_LABELS.STROLLER;
+      if (categoryUpper.includes("WAGON") || categoryUpper.includes("웨건"))
+        return DEVICE_CATEGORY_LABELS.WAGON;
+      if (
+        categoryUpper.includes("MINIEVO") ||
+        categoryUpper.includes("미니에보")
+      )
+        return DEVICE_CATEGORY_LABELS.MINIEVO;
+
+      // 매칭되지 않으면 기타로 분류
+      return DEVICE_CATEGORY_LABELS.ETC;
+    },
+    []
+  );
+
+  // 검색어 하이라이트 함수
+  const highlightText = React.useCallback(
+    (text: string, searchTerm: string): React.ReactNode => {
+      if (!searchTerm.trim()) return text;
+
+      const regex = new RegExp(
+        `(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+        "gi"
+      );
+      const parts = text.split(regex);
+
+      return parts.map((part, index) =>
+        regex.test(part) ? (
+          <mark key={index} className="bg-yellow-200 px-0.5 rounded">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      );
+    },
+    []
+  );
 
   // 고유 식별자 생성 함수
   const generateReservationId = React.useCallback((reservation: any) => {
@@ -185,17 +244,27 @@ export default function RentalsPendingPage() {
       // 검색어 필터 (이름, 예약번호, 이메일)
       const matchesSearch =
         !searchTerm ||
-        item["이름"]?.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item["예약번호"]?.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item["이메일"]?.toString().toLowerCase().includes(searchTerm.toLowerCase());
+        item["이름"]
+          ?.toString()
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        item["예약번호"]
+          ?.toString()
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        item["이메일"]
+          ?.toString()
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
 
       // 예약 사이트 필터
       const matchesSite =
         selectedSite === "all" || item["예약사이트"] === selectedSite;
 
-      // 대여품목 필터
+      // 대여품목 필터 - 표준화된 카테고리로 비교
+      const standardizedCategory = mapCategoryToStandard(item["대여품목"]);
       const matchesCategory =
-        selectedCategory === "all" || item["대여품목"] === selectedCategory;
+        selectedCategory === "all" || standardizedCategory === selectedCategory;
 
       // 날짜 필터 (픽업일 기준)
       const matchesDateRange =
@@ -238,7 +307,14 @@ export default function RentalsPendingPage() {
         matchesSearch && matchesSite && matchesCategory && matchesDateRange
       );
     });
-  }, [data, searchTerm, selectedSite, selectedCategory, dateRange]);
+  }, [
+    data,
+    searchTerm,
+    selectedSite,
+    selectedCategory,
+    dateRange,
+    mapCategoryToStandard,
+  ]);
 
   const getSelectedConfirmedCount = React.useCallback(() => {
     return Array.from(selectedRows).filter((index) =>
@@ -261,10 +337,10 @@ export default function RentalsPendingPage() {
 
   const uniqueCategories = React.useMemo(() => {
     const categories = Array.from(
-      new Set(data.map((item) => item["대여품목"]))
+      new Set(data.map((item) => mapCategoryToStandard(item["대여품목"])))
     ).filter(Boolean);
     return categories.sort();
-  }, [data]);
+  }, [data, mapCategoryToStandard]);
 
   // 필터 초기화
   const handleResetFilters = React.useCallback(() => {
@@ -416,10 +492,10 @@ export default function RentalsPendingPage() {
         const hasConfirmedCancellations = result.results.some(
           (r: any) => r.success && r.was_confirmed
         );
-        
+
         if (hasConfirmedCancellations) {
           // 전역 이벤트 발생하여 다른 페이지에서 데이터 새로고침 필요함을 알림
-          window.dispatchEvent(new CustomEvent('reservationCanceled'));
+          window.dispatchEvent(new CustomEvent("reservationCanceled"));
         }
       } else {
         alert("예약 취소에 실패했습니다.");
@@ -473,12 +549,76 @@ export default function RentalsPendingPage() {
 
           // 검색 가능한 필드들에 하이라이트 적용
           const searchableFields = ["이름", "예약번호", "이메일"];
-          const shouldHighlight = searchableFields.includes(header) && searchTerm;
-          
-          // 디버깅용 로그 (개발 환경에서만)
-          // if (process.env.NODE_ENV === 'development' && header === "예약번호") {
-          //   console.log(`예약 ${reservationId}: 확정=${isConfirmed}, 취소=${isCanceled}`);
-          // }
+          const shouldHighlight =
+            searchableFields.includes(header) && searchTerm;
+
+          // 타임스탬프 두 줄 표시
+          if (header === "타임스탬프") {
+            const timestamp = value?.toString() || "";
+            // 오전/오후를 기준으로 분리
+            const parts = timestamp.split(/(오전|오후)/);
+            let datepart = "";
+            let timepart = "";
+            
+            if (parts.length >= 3) {
+              datepart = parts[0].trim();
+              timepart = (parts[1] + " " + parts[2]).trim();
+            } else {
+              datepart = timestamp;
+            }
+            
+            return (
+              <div
+                className={`${isConfirmed ? "font-medium" : ""} ${
+                  isCanceled ? "opacity-50 text-gray-500" : ""
+                }`}
+                style={
+                  isCanceled ? { textDecoration: "line-through" } : undefined
+                }
+              >
+                <div className="text-sm">{datepart}</div>
+                <div className="text-xs text-gray-600">{timepart}</div>
+              </div>
+            );
+          }
+
+          // 픽업일시 통합 표시 (두 줄)
+          if (header === "픽업일시") {
+            const pickupDate = rowData["픽업일"];
+            const pickupTime = rowData["픽업시간"];
+            return (
+              <div
+                className={`${isConfirmed ? "font-medium" : ""} ${
+                  isCanceled ? "opacity-50 text-gray-500" : ""
+                }`}
+                style={
+                  isCanceled ? { textDecoration: "line-through" } : undefined
+                }
+              >
+                <div className="text-sm">{pickupDate || ""}</div>
+                <div className="text-xs text-gray-600">{pickupTime || ""}</div>
+              </div>
+            );
+          }
+
+          // 반납일시 통합 표시 (두 줄)
+          if (header === "반납일시") {
+            const returnDate = rowData["반납일"];
+            const returnTime = rowData["반납시간"];
+            return (
+              <div
+                className={`${isConfirmed ? "font-medium" : ""} ${
+                  isCanceled ? "opacity-50 text-gray-500" : ""
+                }`}
+                style={
+                  isCanceled ? { textDecoration: "line-through" } : undefined
+                }
+              >
+                <div className="text-sm">{returnDate || ""}</div>
+                <div className="text-xs text-gray-600">{returnTime || ""}</div>
+              </div>
+            );
+          }
 
           if (typeof value === "string" && value.startsWith("https://")) {
             return (
@@ -497,11 +637,20 @@ export default function RentalsPendingPage() {
               </a>
             );
           }
-          
-          const displayValue = shouldHighlight && value 
-            ? highlightText(value.toString(), searchTerm)
-            : value;
-            
+
+          // 대여품목 필드인 경우 표준화된 카테고리로 표시
+          let displayValue: React.ReactNode = value;
+          if (header === "대여품목" && value) {
+            const standardizedCategory = mapCategoryToStandard(
+              value.toString()
+            );
+            displayValue = shouldHighlight
+              ? highlightText(standardizedCategory, searchTerm)
+              : standardizedCategory;
+          } else if (shouldHighlight && value) {
+            displayValue = highlightText(value.toString(), searchTerm);
+          }
+
           return (
             <span
               className={`${isConfirmed ? "font-medium" : ""} ${
@@ -537,6 +686,7 @@ export default function RentalsPendingPage() {
     generateReservationId,
     searchTerm,
     highlightText,
+    mapCategoryToStandard,
   ]);
 
   React.useEffect(() => {
