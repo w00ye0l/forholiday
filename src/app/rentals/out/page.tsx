@@ -55,10 +55,11 @@ export default function RentalOutPage() {
     setLoading(true);
     const supabase = createClient();
 
-    // 출고 대상 예약 목록 조회 (모든 상태 - 임시)
+    // 출고 대상 예약 목록 조회 (반납 완료 제외)
     const { data: rentalsData } = await supabase
       .from("rental_reservations")
       .select("*")
+      .neq("status", "returned")
       .order("pickup_date", { ascending: true })
       .order("pickup_time", { ascending: true });
 
