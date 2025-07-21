@@ -74,12 +74,8 @@ export default function RentalsPage() {
   const [activeTab, setActiveTab] = useState("list");
   const [exporting, setExporting] = useState(false);
 
-  // 날짜 범위 필터 - 오늘 날짜를 기본값으로 설정
-  const today = new Date();
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: today,
-    to: today,
-  });
+  // 날짜 범위 필터 - 기본값 없음
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   const supabase = createClient();
 
@@ -174,6 +170,11 @@ export default function RentalsPage() {
             rental.device_tag_name.toLowerCase().includes(term))
         );
       });
+      
+      // 검색어가 있을 때 날짜 필터를 자동으로 제거
+      if (dateRange) {
+        setDateRange(undefined);
+      }
     }
 
     // 날짜 범위 필터링 (수령일 기준)
@@ -224,10 +225,7 @@ export default function RentalsPage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    setDateRange({
-      from: today,
-      to: today,
-    });
+    setDateRange(undefined);
     setSelectedCategory("all");
     setSelectedStatus("all");
     setSelectedPickupMethod("all");
