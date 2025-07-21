@@ -53,6 +53,7 @@ import {
   PhoneIcon,
   MapPinIcon,
   EditIcon,
+  Map,
 } from "lucide-react";
 
 interface OutgoingListProps {
@@ -326,6 +327,15 @@ export function OutgoingList({
                   <MapPinIcon className="w-3 h-3" />
                   <span>{PICKUP_METHOD_LABELS[rental.pickup_method]}</span>
                 </div>
+                {rental.pickup_method === "delivery" &&
+                  rental.renter_address && (
+                    <div className="text-xs text-gray-600 flex gap-2 items-center">
+                      <Map className="min-w-3 min-h-3 w-3 h-3" />
+                      <span className="text-xs text-gray-600 break-all">
+                        {rental.renter_address}
+                      </span>
+                    </div>
+                  )}
                 <div className="text-xs text-gray-600 flex gap-2 items-center">
                   <PhoneIcon className="min-w-3 min-h-3 w-3 h-3" />
                   <span className="text-xs text-gray-600 break-all">
@@ -794,14 +804,18 @@ export function OutgoingList({
                                       renter_name: editingRental.renter_name,
                                       renter_phone: editingRental.renter_phone,
                                       renter_email: editingRental.renter_email,
-                                      renter_address: editingRental.renter_address,
-                                      pickup_method: editingRental.pickup_method,
+                                      renter_address:
+                                        editingRental.renter_address,
+                                      pickup_method:
+                                        editingRental.pickup_method,
                                       pickup_date: editingRental.pickup_date,
                                       pickup_time: editingRental.pickup_time,
-                                      return_method: editingRental.return_method,
+                                      return_method:
+                                        editingRental.return_method,
                                       return_date: editingRental.return_date,
                                       return_time: editingRental.return_time,
-                                      reservation_site: editingRental.reservation_site,
+                                      reservation_site:
+                                        editingRental.reservation_site,
                                       data_transmission:
                                         editingRental.data_transmission,
                                       sd_option:
