@@ -114,11 +114,8 @@ export function OutgoingList({
       case "returned":
         // 반납완료 - 초록색
         return `${baseClasses} bg-green-50 border-l-green-500`;
-      case "overdue":
-        // 미반납 - 노란색 (향후 구현)
-        return `${baseClasses} bg-yellow-50 border-l-yellow-500`;
       case "problem":
-        // 문제있음 - 빨간색 (향후 구현)
+        // 문제있음 - 빨간색
         return `${baseClasses} bg-red-50 border-l-red-500`;
       default:
         // 알 수 없는 상태는 기본 스타일
@@ -243,54 +240,6 @@ export function OutgoingList({
     } catch (error) {
       console.error("기기 할당/해제 실패:", error);
       toast.error("기기 할당/해제에 실패했습니다.");
-    } finally {
-      setIsUpdating((prev) => ({ ...prev, [id]: false }));
-    }
-  };
-
-  // 수령 완료 처리 함수 추가 (확인 단계 포함)
-  const handleCompletePickup = async (id: string) => {
-    const rental = rentals.find((r) => r.id === id);
-    if (!rental?.device_tag_name) {
-      toast.error("먼저 기기를 선택해주세요.");
-      return;
-    }
-
-    // 확인 단계 추가
-    const confirmed = window.confirm(
-      `${rental.renter_name}님의 ${rental.device_tag_name} 기기 수령을 완료 처리하시겠습니까?\n\n처리 후에는 상태가 '수령완료'로 변경됩니다.`
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setIsUpdating((prev) => ({ ...prev, [id]: true }));
-
-      const { error } = await supabase
-        .from("rental_reservations")
-        .update({
-          status: "picked_up",
-        })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      setRentals((prev) =>
-        prev.map((rental) =>
-          rental.id === id
-            ? {
-                ...rental,
-                status: "picked_up" as ReservationStatus,
-              }
-            : rental
-        )
-      );
-
-      toast.success("수령 완료 처리되었습니다.");
-      onStatusUpdate?.();
-    } catch (error) {
-      console.error("수령 완료 처리 실패:", error);
-      toast.error("수령 완료 처리에 실패했습니다.");
     } finally {
       setIsUpdating((prev) => ({ ...prev, [id]: false }));
     }
@@ -959,7 +908,7 @@ export function OutgoingList({
                   )}
                 </div>
 
-                {/* 상태 수동 변경 (개발자/관리자용) */}
+                {/* 상태 수동 변경 (출고관리용 - 반납완료, 미반납 제외) */}
                 <div className="w-24">
                   <Select
                     value={rental.status}
@@ -972,8 +921,12 @@ export function OutgoingList({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(STATUS_MAP).map(
-                        ([status, statusInfo]) => (
+                      {/* 출고관리에서는 반납완료 상태 제외 */}
+                      {Object.entries(STATUS_MAP)
+                        .filter(([status]) => 
+                          status !== "returned"
+                        )
+                        .map(([status, statusInfo]) => (
                           <SelectItem key={status} value={status}>
                             {statusInfo.label}
                           </SelectItem>

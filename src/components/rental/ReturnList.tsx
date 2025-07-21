@@ -17,11 +17,11 @@ import { Card } from "@/components/ui/card";
 import {
   RentalReservation,
   ReservationStatus,
+  DisplayStatus,
   STATUS_MAP,
   RETURN_METHOD_LABELS,
   PICKUP_METHOD_LABELS,
   RESERVATION_SITE_LABELS,
-  CARD_BORDER_COLORS,
   PickupMethod,
   ReturnMethod,
   ReservationSite,
@@ -33,7 +33,6 @@ import {
   PencilIcon,
   PhoneIcon,
   MapPinIcon,
-  CheckCircle,
   EditIcon,
 } from "lucide-react";
 import {
@@ -51,16 +50,12 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import {
-  Device,
-  DEVICE_CATEGORY_LABELS,
-  DEVICE_FEATURES,
-} from "@/types/device";
+import { DEVICE_FEATURES } from "@/types/device";
 
 interface ReturnListProps {
   rentals: RentalReservation[];
   onStatusUpdate?: () => void;
-  getDisplayStatus: (rental: RentalReservation) => ReservationStatus;
+  getDisplayStatus: (rental: RentalReservation) => DisplayStatus;
 }
 
 export function ReturnList({
@@ -96,7 +91,7 @@ export function ReturnList({
   const supabase = createClient();
 
   // 상태별 카드 스타일 반환
-  const getCardStyle = (status: ReservationStatus) => {
+  const getCardStyle = (status: DisplayStatus) => {
     const baseClasses = "p-3 shadow-sm border-l-4";
 
     switch (status) {
@@ -113,10 +108,10 @@ export function ReturnList({
         // 반납완료 - 초록색
         return `${baseClasses} bg-green-50 border-l-green-500`;
       case "overdue":
-        // 미반납 - 노란색 (향후 구현)
+        // 지연반납 - 노란색
         return `${baseClasses} bg-yellow-50 border-l-yellow-500`;
       case "problem":
-        // 문제있음 - 빨간색 (향후 구현)
+        // 문제있음 - 빨간색
         return `${baseClasses} bg-red-50 border-l-red-500`;
       default:
         // 알 수 없는 상태는 기본 스타일
@@ -208,6 +203,11 @@ export function ReturnList({
                     variant="outline"
                     className={`
                       ${
+                        getDisplayStatus(rental) === "pending"
+                          ? "bg-gray-100 text-gray-800 border-gray-300"
+                          : ""
+                      }
+                      ${
                         getDisplayStatus(rental) === "picked_up"
                           ? "bg-blue-100 text-blue-800 border-blue-300"
                           : ""
@@ -234,6 +234,7 @@ export function ReturnList({
                       }
                     `}
                   >
+                    {getDisplayStatus(rental) === "pending" && "수령전"}
                     {getDisplayStatus(rental) === "picked_up" && "수령완료"}
                     {getDisplayStatus(rental) === "not_picked_up" && "미수령"}
                     {getDisplayStatus(rental) === "returned" && "반납완료"}
@@ -722,14 +723,18 @@ export function ReturnList({
                                       renter_name: editingRental.renter_name,
                                       renter_phone: editingRental.renter_phone,
                                       renter_email: editingRental.renter_email,
-                                      renter_address: editingRental.renter_address,
-                                      pickup_method: editingRental.pickup_method,
+                                      renter_address:
+                                        editingRental.renter_address,
+                                      pickup_method:
+                                        editingRental.pickup_method,
                                       pickup_date: editingRental.pickup_date,
                                       pickup_time: editingRental.pickup_time,
-                                      return_method: editingRental.return_method,
+                                      return_method:
+                                        editingRental.return_method,
                                       return_date: editingRental.return_date,
                                       return_time: editingRental.return_time,
-                                      reservation_site: editingRental.reservation_site,
+                                      reservation_site:
+                                        editingRental.reservation_site,
                                       data_transmission:
                                         editingRental.data_transmission,
                                       sd_option:
@@ -817,10 +822,10 @@ export function ReturnList({
                   </div>
                 </div>
 
-                {/* 상태 수동 변경 (개발자/관리자용) */}
+                {/* 상태 수동 변경 (반납관리용 - 제한된 상태만 선택 가능) */}
                 <div className="w-24">
                   <Select
-                    value={getDisplayStatus(rental)}
+                    value={rental.status}
                     onValueChange={(value: ReservationStatus) =>
                       handleStatusChange(rental.id, value)
                     }
@@ -830,13 +835,20 @@ export function ReturnList({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(STATUS_MAP).map(
-                        ([status, statusInfo]) => (
+                      {/* 반납관리에서는 수령완료, 미수령, 반납완료, 문제있음만 선택 가능 */}
+                      {Object.entries(STATUS_MAP)
+                        .filter(
+                          ([status]) =>
+                            status === "picked_up" ||
+                            status === "not_picked_up" ||
+                            status === "returned" ||
+                            status === "problem"
+                        )
+                        .map(([status, statusInfo]) => (
                           <SelectItem key={status} value={status}>
                             {statusInfo.label}
                           </SelectItem>
-                        )
-                      )}
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>

@@ -18,7 +18,7 @@ import { ko } from "date-fns/locale";
 import type {
   RentalReservation,
   ReturnMethod,
-  ReservationStatus,
+  DisplayStatus,
 } from "@/types/rental";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -40,7 +40,7 @@ export default function RentalReturnPage() {
     ReturnMethod | "all"
   >("all");
   const [activeStatusFilter, setActiveStatusFilter] = useState<
-    ReservationStatus | "all"
+    DisplayStatus | "all"
   >("all");
 
   const loadData = async () => {
@@ -48,11 +48,11 @@ export default function RentalReturnPage() {
     const supabase = createClient();
 
     try {
-      // 반납 예정 및 완료된 예약 목록 조회 (기존 상태만)
+      // 반납 예정 및 완료된 예약 목록 조회 (반납관리에서 필요한 상태만)
       const { data: rentalsData, error } = await supabase
         .from("rental_reservations")
         .select("*")
-        .in("status", ["picked_up", "not_picked_up", "returned"])
+        .in("status", ["picked_up", "not_picked_up", "returned", "problem"])
         .order("return_date", { ascending: true })
         .order("return_time", { ascending: true });
 
@@ -61,6 +61,7 @@ export default function RentalReturnPage() {
         setRentals([]);
       } else {
         console.log("반납 관리 데이터 로드됨:", rentalsData?.length, "건");
+        console.log({ rentalsData });
         setRentals(rentalsData || []);
       }
     } catch (error) {
@@ -72,7 +73,7 @@ export default function RentalReturnPage() {
   };
 
   // 예약의 실제 상태와 표시 상태를 구분
-  const getDisplayStatus = (rental: RentalReservation) => {
+  const getDisplayStatus = (rental: RentalReservation): DisplayStatus => {
     const now = new Date();
     const returnDateTime = new Date(
       `${rental.return_date} ${rental.return_time}`
@@ -136,24 +137,18 @@ export default function RentalReturnPage() {
       );
     }
 
-    // 정렬: 반납 완료 항목은 하단에 배치, 나머지는 시간순 정렬
+    // 정렬: 지연반납 맨 위, 나머지는 시간순
     filtered.sort((a, b) => {
+      const aDisplayStatus = getDisplayStatus(a);
+      const bDisplayStatus = getDisplayStatus(b);
       const aReturnDate = new Date(`${a.return_date} ${a.return_time}`);
       const bReturnDate = new Date(`${b.return_date} ${b.return_time}`);
 
-      // 1. 반납 완료 항목은 맨 아래
-      if (
-        getDisplayStatus(a) === "returned" &&
-        getDisplayStatus(b) !== "returned"
-      )
-        return 1;
-      if (
-        getDisplayStatus(a) !== "returned" &&
-        getDisplayStatus(b) === "returned"
-      )
-        return -1;
+      // 지연반납만 맨 위로
+      if (aDisplayStatus === "overdue" && bDisplayStatus !== "overdue") return -1;
+      if (aDisplayStatus !== "overdue" && bDisplayStatus === "overdue") return 1;
 
-      // 2. 같은 카테고리 내에서는 시간순 정렬
+      // 나머지는 반납 시간순 정렬
       return aReturnDate.getTime() - bReturnDate.getTime();
     });
 

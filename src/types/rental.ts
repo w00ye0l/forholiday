@@ -3,8 +3,10 @@ export type ReservationStatus =
   | "picked_up" // 수령완료
   | "not_picked_up" // 미수령
   | "returned" // 반납완료
-  | "overdue" // 미반납 (반납 예정일 지남)
   | "problem"; // 문제있음
+
+// overdue는 계산된 상태로만 사용 (DB에 저장되지 않음)
+export type DisplayStatus = ReservationStatus | "overdue";
 
 export type PickupMethod = "T1" | "T2" | "delivery" | "office" | "hotel";
 export type ReturnMethod = "T1" | "T2" | "delivery" | "office" | "hotel";
@@ -23,8 +25,14 @@ export type ReservationSite =
   | "waug"
   | "hanatour";
 
-// 상태별 라벨 및 스타일 매핑
-export const STATUS_MAP = {
+// 상태별 라벨 및 스타일 매핑 (DB 상태만 포함)
+export const STATUS_MAP: Record<ReservationStatus, {
+  label: string;
+  variant: "default" | "secondary" | "destructive" | "outline";
+  color: string;
+  badge: string;
+  button: string;
+}> = {
   pending: {
     label: "수령전",
     variant: "secondary" as const,
@@ -57,14 +65,6 @@ export const STATUS_MAP = {
     button:
       "bg-green-100 hover:bg-green-200 text-green-800 data-[state=on]:bg-green-200 data-[state=on]:border-2 data-[state=on]:border-green-400",
   },
-  overdue: {
-    label: "미반납",
-    variant: "outline" as const,
-    color: "bg-yellow-50 text-yellow-800 border-yellow-200",
-    badge: "bg-yellow-100 text-yellow-800",
-    button:
-      "bg-yellow-100 hover:bg-yellow-200 text-yellow-800 data-[state=on]:bg-yellow-200 data-[state=on]:border-2 data-[state=on]:border-yellow-400",
-  },
   problem: {
     label: "문제있음",
     variant: "destructive" as const,
@@ -72,6 +72,19 @@ export const STATUS_MAP = {
     badge: "bg-red-100 text-red-800",
     button:
       "bg-red-100 hover:bg-red-200 text-red-800 data-[state=on]:bg-red-200 data-[state=on]:border-2 data-[state=on]:border-red-400",
+  },
+} as const;
+
+// 표시용 상태 맵 (overdue 포함)
+export const DISPLAY_STATUS_MAP = {
+  ...STATUS_MAP,
+  overdue: {
+    label: "지연반납",
+    variant: "outline" as const,
+    color: "bg-yellow-50 text-yellow-800 border-yellow-200",
+    badge: "bg-yellow-100 text-yellow-800",
+    button:
+      "bg-yellow-100 hover:bg-yellow-200 text-yellow-800 data-[state=on]:bg-yellow-200 data-[state=on]:border-2 data-[state=on]:border-yellow-400",
   },
 } as const;
 
@@ -115,7 +128,6 @@ export const CARD_BORDER_COLORS: Record<ReservationStatus, string> = {
   picked_up: "border-blue-500",
   not_picked_up: "border-red-500",
   returned: "border-green-500",
-  overdue: "border-yellow-500",
   problem: "border-red-600",
 } as const;
 

@@ -33,9 +33,12 @@ import {
 import {
   RentalReservation,
   STATUS_MAP,
+  DISPLAY_STATUS_MAP,
   PICKUP_METHOD_PRIORITY,
   PICKUP_METHOD_LABELS,
   PickupMethod,
+  ReservationStatus,
+  DisplayStatus,
 } from "@/types/rental";
 import {
   exportToExcel,
@@ -359,7 +362,12 @@ export default function RentalsPage() {
       not_picked_up: filtered.filter((r) => r.status === "not_picked_up")
         .length,
       returned: filtered.filter((r) => r.status === "returned").length,
-      overdue: filtered.filter((r) => r.status === "overdue").length,
+      overdue: filtered.filter((r) => {
+        // overdue는 계산된 상태이므로 실제 DB 상태를 확인
+        const now = new Date();
+        const returnDateTime = new Date(`${r.return_date} ${r.return_time}`);
+        return returnDateTime < now && r.status === "picked_up";
+      }).length,
       problem: filtered.filter((r) => r.status === "problem").length,
     };
 
@@ -633,11 +641,11 @@ export default function RentalsPage() {
                   onClick={() => setSelectedStatus("overdue")}
                   className={`h-6 px-2 py-1 text-xs ${
                     selectedStatus === "overdue"
-                      ? STATUS_MAP.overdue.button
-                      : STATUS_MAP.overdue.badge
+                      ? DISPLAY_STATUS_MAP.overdue.button
+                      : DISPLAY_STATUS_MAP.overdue.badge
                   }`}
                 >
-                  {STATUS_MAP.overdue.label}: {statusCounts.overdue}건
+                  {DISPLAY_STATUS_MAP.overdue.label}: {statusCounts.overdue}건
                 </Button>
                 <Button
                   variant="ghost"
