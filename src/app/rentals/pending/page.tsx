@@ -367,6 +367,8 @@ export default function RentalsPendingPage() {
         (index) => filteredData[index]
       );
 
+      console.log("확정 요청 데이터:", selectedData);
+
       // 새로운 API 엔드포인트로 예약 확정 요청
       const response = await fetch("/api/pending-reservations/confirm", {
         method: "POST",
@@ -381,50 +383,33 @@ export default function RentalsPendingPage() {
       }
 
       const result = await response.json();
+      console.log("확정 API 응답:", result);
 
       if (result.success) {
         alert(result.message);
 
-        // 확정된 예약들을 상태에 추가 (고유 식별자 사용)
-        const newConfirmedReservationIds = selectedData.map((item) =>
-          generateReservationId(item)
-        );
-        setConfirmedReservationIds(
-          (prev) =>
-            new Set([...Array.from(prev), ...newConfirmedReservationIds])
-        );
+        // 성공한 예약 번호들을 수집
+        const successfulBookingNumbers = result.results
+          .filter((r: any) => r.success)
+          .map((r: any) => String(r.booking_number));
+
+        // 성공한 예약들의 ID 생성
+        const confirmedReservationIds = selectedData
+          .filter((item) => successfulBookingNumbers.includes(String(item["예약번호"])))
+          .map((item) => generateReservationId(item));
+
+        setCanceledReservationIds((prev) => {
+          const newSet = new Set(prev);
+          confirmedReservationIds.forEach((id: string) => newSet.delete(id));
+          return newSet;
+        });
+
+        setConfirmedReservationIds((prev) => {
+          const newSet = new Set(prev);
+          confirmedReservationIds.forEach((id: string) => newSet.add(id));
+          return newSet;
+        });
         setSelectedRows(new Set());
-
-        // 데이터 새로고침
-        const refreshResponse = await fetch(`/api/rentals/pending?all=true`);
-        const refreshData = await refreshResponse.json();
-        setData(refreshData.data || []);
-
-        // 상태 정보 새로고침
-        try {
-          const statusResponse = await fetch(
-            `/api/pending-reservations/status`
-          );
-          const statusResult = await statusResponse.json();
-
-          if (statusResult.success) {
-            const confirmedIds = new Set<string>(
-              statusResult.confirmed_reservation_keys || []
-            );
-            const canceledIds = new Set<string>(
-              statusResult.canceled_reservation_keys || []
-            );
-
-            setConfirmedReservationIds(confirmedIds);
-            setCanceledReservationIds(canceledIds);
-          }
-        } catch (error) {
-          console.error("상태 새로고침 오류:", error);
-          console.error(
-            "에러 상세:",
-            error instanceof Error ? error.message : String(error)
-          );
-        }
       } else {
         alert("예약 확정에 실패했습니다.");
       }
