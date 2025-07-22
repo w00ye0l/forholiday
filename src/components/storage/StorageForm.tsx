@@ -42,7 +42,7 @@ import {
 } from "@/types/storage";
 import { Textarea } from "../ui/textarea";
 
-const STORAGE_LOCATIONS: StorageLocation[] = ["T1", "T2", "delivery", "office", "hotel"];
+const STORAGE_LOCATIONS: StorageLocation[] = ["T1", "T2", "office"];
 
 const formSchema = z.object({
   items_description: z.string().optional(),
@@ -52,10 +52,10 @@ const formSchema = z.object({
   tag_number: z.string().optional(),
   drop_off_date: z.date().optional(),
   drop_off_time: z.string().optional(),
-  drop_off_location: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const).optional(),
+  drop_off_location: z.enum(["T1", "T2", "office"] as const).optional(),
   pickup_date: z.date().optional(),
   pickup_time: z.string().optional(),
-  pickup_location: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const).optional(),
+  pickup_location: z.enum(["T1", "T2", "office"] as const).optional(),
   notes: z.string().optional(),
   reservation_site: z.enum(RESERVATION_SITES).optional(),
 });

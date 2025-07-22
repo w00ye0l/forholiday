@@ -57,12 +57,9 @@ export default function StoragePage() {
     useState<string>("all");
   const [exporting, setExporting] = useState(false);
 
-  // 날짜 범위 필터 - 오늘 날짜를 기본값으로 설정
+  // 날짜 범위 필터 - 기본값 없음
   const today = new Date();
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: today,
-    to: today,
-  });
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   const supabase = createClient();
 
@@ -72,8 +69,7 @@ export default function StoragePage() {
       const { data } = await supabase
         .from("storage_reservations")
         .select("*")
-        .order("drop_off_date", { ascending: true })
-        .order("drop_off_time", { ascending: true });
+        .order("created_at", { ascending: false });
       setStorages(data || []);
       setFilteredStorages(data || []);
     } catch (error) {
@@ -142,10 +138,7 @@ export default function StoragePage() {
 
   const handleReset = () => {
     setSearchTerm("");
-    setDateRange({
-      from: today,
-      to: today,
-    });
+    setDateRange(undefined);
     setSelectedStatus("all");
     setSelectedReservationSite("all");
   };
@@ -313,7 +306,10 @@ export default function StoragePage() {
                   <Input
                     placeholder="고객명, 전화번호, 예약번호, 물품명으로 검색..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setDateRange(undefined);
+                    }}
                     className="text-sm pl-9"
                   />
                 </div>
