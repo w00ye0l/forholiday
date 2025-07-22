@@ -17,6 +17,8 @@ import {
   Clock,
   User,
   Phone,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import type { RentalReservation } from "@/types/rental";
 import type { StorageReservation } from "@/types/storage";
@@ -59,6 +61,13 @@ export default function Page() {
   const [savingNotes, setSavingNotes] = useState<{ T1: boolean; T2: boolean }>({
     T1: false,
     T2: false,
+  });
+  const [showZeroCategories, setShowZeroCategories] = useState<{
+    today: boolean;
+    tomorrow: boolean;
+  }>({
+    today: false,
+    tomorrow: false,
   });
 
   const today = format(new Date(), "yyyy-MM-dd");
@@ -249,26 +258,63 @@ export default function Page() {
               "border-"
             )} rounded-lg`}
           >
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3">
               <div
                 className={`font-semibold ${colorClass} flex items-center gap-2 text-sm`}
               >
                 <Package className="w-4 h-4" />
                 {group.categoryLabel}
               </div>
-              <Badge variant="outline" className="text-xs">
-                {group.count}건
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs">
+                  {group.count}건
+                </Badge>
+                {/* 우선순위 표시 - 오전 픽업이 있는 경우 */}
+                {group.rentals.some((r) => r.pickup_time <= "12:00") && (
+                  <Badge variant="destructive" className="text-xs">
+                    오전
+                  </Badge>
+                )}
+                {/* 수령 대기가 있는 경우 */}
+                {group.rentals.some((r) => r.status === "pending") && (
+                  <Badge variant="secondary" className="text-xs">
+                    수령대기
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* 카테고리별 간단 요약 */}
+            <div className="flex items-center justify-between mb-3 text-xs text-gray-600">
+              <div className="flex gap-4">
+                <span>
+                  수령전:{" "}
+                  {group.rentals.filter((r) => r.status === "pending").length}건
+                </span>
+                <span>
+                  수령완료:{" "}
+                  {group.rentals.filter((r) => r.status === "picked_up").length}
+                  건
+                </span>
+              </div>
+              <div className="text-gray-500">
+                {group.rentals.length > 0 && (
+                  <>
+                    {group.rentals[0].pickup_time} ~{" "}
+                    {group.rentals[group.rentals.length - 1].pickup_time}
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="grid gap-2">
               {group.rentals.map((rental) => (
                 <div
                   key={rental.id}
-                  className="bg-white/70 p-2 rounded text-xs border"
+                  className="bg-white/70 p-3 rounded-lg text-xs border shadow-sm"
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="font-medium text-gray-900 flex items-center gap-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-semibold text-gray-900 flex items-center gap-1">
                       <User className="w-3 h-3" />
                       {rental.renter_name}
                     </div>
@@ -281,21 +327,93 @@ export default function Page() {
                       {rental.status === "picked_up" ? "수령완료" : "수령전"}
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-between text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {rental.pickup_time}
+
+                  {/* 기본 정보 */}
+                  <div className="space-y-1 mb-2">
+                    <div className="flex items-center justify-between text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        <span className="font-medium">픽업시간:</span>
+                        {rental.pickup_time}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Phone className="w-3 h-3" />
+                        {rental.renter_phone}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Phone className="w-3 h-3" />
-                      {rental.renter_phone}
+
+                    {/* 예약 ID */}
+                    <div className="flex items-center gap-1 text-gray-500">
+                      <span className="font-medium">예약번호:</span>
+                      <span className="font-mono text-xs">{rental.id}</span>
                     </div>
+
+                    {/* 반납 예정일 */}
+                    {rental.return_date && (
+                      <div className="flex items-center gap-1 text-gray-500">
+                        <Calendar className="w-3 h-3" />
+                        <span className="font-medium">반납예정:</span>
+                        {rental.return_date} {rental.return_time}
+                      </div>
+                    )}
+
+                    {/* 예약 생성일 */}
+                    {rental.created_at && (
+                      <div className="flex items-center gap-1 text-gray-400">
+                        <span className="font-medium">예약일:</span>
+                        {format(new Date(rental.created_at), "MM/dd HH:mm")}
+                      </div>
+                    )}
                   </div>
+
+                  {/* 설명 */}
                   {rental.description && (
-                    <div className="mt-1 text-gray-500 italic text-xs">
+                    <div className="mt-2 p-2 bg-gray-50 rounded text-gray-600 italic text-xs">
+                      <span className="font-medium">요청사항:</span>{" "}
                       {rental.description}
                     </div>
                   )}
+
+                  {/* 추가 정보 */}
+                  <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600">예약 사이트:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {rental.reservation_site === "naver"
+                          ? "네이버"
+                          : rental.reservation_site === "forholiday"
+                          ? "포할리데이"
+                          : rental.reservation_site}
+                      </Badge>
+                    </div>
+                    {rental.data_transmission && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600">데이터 전송:</span>
+                        <Badge
+                          variant="default"
+                          className="text-xs bg-green-500"
+                        >
+                          필요
+                        </Badge>
+                      </div>
+                    )}
+                    {rental.sd_option && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600">SD카드:</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {rental.sd_option}
+                        </Badge>
+                      </div>
+                    )}
+                    {rental.device_tag_name && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600">할당기기:</span>
+                        <span className="font-mono text-xs font-medium">
+                          {rental.device_tag_name}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -310,128 +428,179 @@ export default function Page() {
       {/* 헤더 */}
       <div className="flex flex-col">
         <h1 className="text-2xl md:text-3xl font-bold">직원 대시보드</h1>
-        <p className="text-gray-600 mt-1">
-          {format(new Date(), "yyyy년 MM월 dd일 EEEE", { locale: ko })}
-        </p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-2">
+          <p className="text-gray-600">
+            {format(new Date(), "yyyy년 MM월 dd일 EEEE", { locale: ko })}
+          </p>
+          <div className="flex items-center gap-4 mt-2 md:mt-0 text-sm">
+            <div className="flex items-center gap-1">
+              <Badge variant="secondary" className="text-xs">
+                오늘 출고: {stats.todayRentals.length}건
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1">
+              <Badge variant="outline" className="text-xs">
+                내일 출고: {stats.tomorrowRentals.length}건
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1">
+              <Badge variant="default" className="text-xs bg-green-500">
+                이용가능: {stats.totalDevicesAvailable}대
+              </Badge>
+            </div>
+          </div>
+        </div>
       </div>
       {/* 요약 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-2 md:gap-4">
         {/* 오늘 출고 예정 - 카테고리별 */}
         <Card>
-          <CardHeader className="p-3 md:p-6 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-600">
-              오늘 출고 예정
-            </CardTitle>
+          <CardHeader className="p-3 md:p-6 pb-2 md:pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-blue-600">
+                오늘 출고 예정
+              </CardTitle>
+              {groupRentalsByCategory(stats.todayRentals).some(
+                (g) => g.count === 0
+              ) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setShowZeroCategories((prev) => ({
+                      ...prev,
+                      today: !prev.today,
+                    }))
+                  }
+                  className="text-xs p-1 h-auto"
+                >
+                  {showZeroCategories.today ? (
+                    <>
+                      <ChevronUp className="w-3 h-3 mr-1" />
+                      접기
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-3 h-3 mr-1" />
+                      전체보기
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <div className="text-2xl font-bold mb-2">
-              {stats.todayRentals.length}건
+            <div className="text-2xl font-bold mb-4">
+              총 {stats.todayRentals.length}건
             </div>
-            <div className="space-y-1">
-              {/* 예약이 있는 상위 3개 카테고리 */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-2 gap-y-1">
+              {/* 카테고리 표시 - 접기/펼치기에 따라 필터링 */}
               {groupRentalsByCategory(stats.todayRentals)
-                .filter((group) => group.count > 0)
-                .slice(0, 3)
+                .filter((group) => showZeroCategories.today || group.count > 0)
                 .map((group) => (
                   <div
                     key={group.category}
-                    className="flex items-center justify-between text-xs"
+                    className={`flex items-center justify-between border p-1 rounded-sm ${
+                      group.count > 0
+                        ? "border-2 border-blue-500"
+                        : "border-gray-300"
+                    }`}
                   >
-                    <span className="text-gray-600 truncate">
+                    <span
+                      className={`text-sm truncate ${
+                        group.count > 0 ? "text-blue-700" : "text-gray-400"
+                      }`}
+                    >
                       {group.categoryLabel}
                     </span>
-                    <Badge variant="outline" className="text-xs">
+                    <span
+                      className={`text-sm font-mono ${
+                        group.count > 0
+                          ? "text-blue-600 font-bold"
+                          : "text-gray-400"
+                      }`}
+                    >
                       {group.count}
-                    </Badge>
+                    </span>
                   </div>
                 ))}
-
-              {/* 0건 카테고리가 있을 경우 요약 표시 */}
-              {groupRentalsByCategory(stats.todayRentals).filter(
-                (group) => group.count === 0
-              ).length > 0 && (
-                <div className="text-xs text-gray-400 italic">
-                  {
-                    groupRentalsByCategory(stats.todayRentals).filter(
-                      (group) => group.count === 0
-                    ).length
-                  }
-                  개 카테고리 예약 없음
-                </div>
-              )}
-
-              {/* 3개 초과 예약 카테고리가 있을 경우 */}
-              {groupRentalsByCategory(stats.todayRentals).filter(
-                (group) => group.count > 0
-              ).length > 3 && (
-                <div className="text-xs text-blue-600">
-                  +
-                  {groupRentalsByCategory(stats.todayRentals).filter(
-                    (group) => group.count > 0
-                  ).length - 3}
-                  개 카테고리 더 있음
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
 
         {/* 내일 출고 예정 - 카테고리별 */}
         <Card>
-          <CardHeader className="p-3 md:p-6 pb-2">
-            <CardTitle className="text-sm font-medium text-orange-600">
-              내일 출고 예정
-            </CardTitle>
+          <CardHeader className="p-3 md:p-6 pb-2 md:pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-orange-600">
+                내일 출고 예정
+              </CardTitle>
+              {groupRentalsByCategory(stats.tomorrowRentals).some(
+                (g) => g.count === 0
+              ) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setShowZeroCategories((prev) => ({
+                      ...prev,
+                      tomorrow: !prev.tomorrow,
+                    }))
+                  }
+                  className="text-xs p-1 h-auto"
+                >
+                  {showZeroCategories.tomorrow ? (
+                    <>
+                      <ChevronUp className="w-3 h-3 mr-1" />
+                      접기
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-3 h-3 mr-1" />
+                      전체보기
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <div className="text-2xl font-bold mb-2">
-              {stats.tomorrowRentals.length}건
+            <div className="text-2xl font-bold mb-4">
+              총 {stats.tomorrowRentals.length}건
             </div>
-            <div className="space-y-1">
-              {/* 예약이 있는 상위 3개 카테고리 */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-2 gap-y-1">
+              {/* 카테고리 표시 - 접기/펼치기에 따라 필터링 */}
               {groupRentalsByCategory(stats.tomorrowRentals)
-                .filter((group) => group.count > 0)
-                .slice(0, 3)
+                .filter(
+                  (group) => showZeroCategories.tomorrow || group.count > 0
+                )
                 .map((group) => (
                   <div
                     key={group.category}
-                    className="flex items-center justify-between text-xs"
+                    className={`flex items-center justify-between border p-1 rounded-sm ${
+                      group.count > 0
+                        ? "border-2 border-orange-500"
+                        : "border-gray-300"
+                    }`}
                   >
-                    <span className="text-gray-600 truncate">
+                    <span
+                      className={`text-sm truncate ${
+                        group.count > 0 ? "text-orange-700" : "text-gray-400"
+                      }`}
+                    >
                       {group.categoryLabel}
                     </span>
-                    <Badge variant="outline" className="text-xs">
+                    <span
+                      className={`text-sm font-mono ${
+                        group.count > 0
+                          ? "text-orange-600 font-bold"
+                          : "text-gray-400"
+                      }`}
+                    >
                       {group.count}
-                    </Badge>
+                    </span>
                   </div>
                 ))}
-
-              {/* 0건 카테고리가 있을 경우 요약 표시 */}
-              {groupRentalsByCategory(stats.tomorrowRentals).filter(
-                (group) => group.count === 0
-              ).length > 0 && (
-                <div className="text-xs text-gray-400 italic">
-                  {
-                    groupRentalsByCategory(stats.tomorrowRentals).filter(
-                      (group) => group.count === 0
-                    ).length
-                  }
-                  개 카테고리 예약 없음
-                </div>
-              )}
-
-              {/* 3개 초과 예약 카테고리가 있을 경우 */}
-              {groupRentalsByCategory(stats.tomorrowRentals).filter(
-                (group) => group.count > 0
-              ).length > 3 && (
-                <div className="text-xs text-orange-600">
-                  +
-                  {groupRentalsByCategory(stats.tomorrowRentals).filter(
-                    (group) => group.count > 0
-                  ).length - 3}
-                  개 카테고리 더 있음
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -581,7 +750,7 @@ export default function Page() {
           </CardContent>
         </Card>
       </div>
-      상세 예정 건수
+      {/* 상세 예정 건수 */}
       <div className="grid gap-3 md:gap-6">
         {/* 오늘 출고 예정 상세 */}
         <Card>
