@@ -14,126 +14,21 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import Image from "next/image";
+import { useArrivalCheckinContent } from "@/lib/hooks/useArrivalCheckinContent";
 
-// 언어별 번역
-const translations = {
-  ko: {
-    selectLanguage: "언어 선택",
-    title: "도착 체크인",
-    description:
-      "공항 도착 후, 이름과 터미널 위치를 입력해 주시면 직원이 빠르게 준비하여 찾아뵙겠습니다.",
-    foreignerNotice: "※ 외국인 고객님은 이름을 영문으로 기입해 주세요 ※",
-    terminal1Location: "제 1터미널: 3층 14번 출구 안쪽 만남의 장소",
-    terminal2Location: "제 2터미널: 3층 9번 출구, J카운터 맞은편 수하물정리대",
-    serviceTypes: {
-      rentalReturn: "대여 - 반납",
-      rentalPickup: "대여 - 수령",
-      storageDropoff: "짐보관 - 맡기기",
-      storagePickup: "짐보관 - 찾기",
-    },
-    name: "이름",
-    tagName: "짐 태그 번호",
-    tagNamePlaceholder: "짐 태그 번호를 입력하세요",
-    selectTerminal: "터미널을 선택하세요",
-    terminal1: "제 1터미널",
-    terminal2: "제 2터미널",
-    arrivalStatus: "도착 상태",
-    arrivalStatusPlaceholder: "--- 도착 상태 ---",
-    arrivalOptions: {
-      thirtyMinBefore: "도착 30분 전(예정)",
-      tenMinBefore: "도착 10분 전(예정)",
-      atCounter: "카운터 도착",
-    },
-    submit: "전송",
-    sending: "전송 중...",
-    success: "체크인이 완료되었습니다. 직원이 곧 찾아뵙겠습니다!",
-    successEarly:
-      "체크인이 완료되었습니다. 직원이 찾아가겠습니다. 2~3분 걸릴 수 있습니다!",
-    error: "전송에 실패했습니다. 다시 시도해주세요.",
-    confirmMessage:
-      "아직 도착 전이라면 전송 시 혼선이 발생할 수 있습니다. 계속 하시겠습니까?",
-  },
-  en: {
-    selectLanguage: "Select Language",
-    title: "Arrival Check-in",
-    description:
-      "After arriving at the airport, please enter your name and terminal location. Our staff will quickly prepare and meet you.",
-    foreignerNotice: "※ Foreign customers, please write your name in English ※",
-    terminal1Location: "Terminal 1: 3F Exit 14, Inside Meeting Point",
-    terminal2Location:
-      "Terminal 2: 3F Exit 9, Baggage Arrangement Area opposite J Counter",
-    serviceTypes: {
-      rentalReturn: "Rental - Return",
-      rentalPickup: "Rental - Pickup",
-      storageDropoff: "Storage - Drop-off",
-      storagePickup: "Storage - Pickup",
-    },
-    name: "Name",
-    tagName: "Luggage Tag Number",
-    tagNamePlaceholder: "Please enter luggage tag number",
-    selectTerminal: "Please select terminal",
-    terminal1: "Terminal 1",
-    terminal2: "Terminal 2",
-    arrivalStatus: "Arrival Status",
-    arrivalStatusPlaceholder: "--- Select Arrival Status ---",
-    arrivalOptions: {
-      thirtyMinBefore: "30 minutes before arrival (scheduled)",
-      tenMinBefore: "10 minutes before arrival (scheduled)",
-      atCounter: "Arrived at counter",
-    },
-    submit: "Submit",
-    sending: "Sending...",
-    success: "Check-in completed. Our staff will meet you soon!",
-    successEarly:
-      "Check-in completed. Our staff will come to find you. It may take 2-3 minutes!",
-    error: "Failed to send. Please try again.",
-    confirmMessage:
-      "If you haven't arrived yet, sending now may cause confusion. Do you want to continue?",
-  },
-  ja: {
-    selectLanguage: "言語選択",
-    title: "到着チェックイン",
-    description:
-      "空港到着後、お名前とターミナル位置を入力していただければ、スタッフが迅速に準備してお会いいたします。",
-    foreignerNotice: "※ 外国人のお客様はお名前を英語でご記入ください ※",
-    terminal1Location: "第1ターミナル：3階14番出口内側待ち合わせ場所",
-    terminal2Location: "第2ターミナル：3階9番出口、Jカウンター向かい荷物整理台",
-    serviceTypes: {
-      rentalReturn: "レンタル - 返却",
-      rentalPickup: "レンタル - 受取",
-      storageDropoff: "荷物保管 - 預ける",
-      storagePickup: "荷物保管 - 受取",
-    },
-    name: "お名前",
-    tagName: "荷物タグ番号",
-    tagNamePlaceholder: "荷物タグ番号を入力してください",
-    selectTerminal: "ターミナルを選択してください",
-    terminal1: "第1ターミナル",
-    terminal2: "第2ターミナル",
-    arrivalStatus: "到着状況",
-    arrivalStatusPlaceholder: "--- 到着状況 ---",
-    arrivalOptions: {
-      thirtyMinBefore: "到着30分前（予定）",
-      tenMinBefore: "到着10分前（予定）",
-      atCounter: "カウンター到着",
-    },
-    submit: "送信",
-    sending: "送信中...",
-    success: "チェックインが完了しました。スタッフがすぐにお会いいたします！",
-    successEarly:
-      "チェックインが完了しました。スタッフがお探しいたします。2〜3分かかる場合があります！",
-    error: "送信に失敗しました。もう一度お試しください。",
-    confirmMessage:
-      "まだ到着前の場合、送信時に混乱が生じる可能性があります。続行しますか？",
-  },
+// 언어 선택 옵션
+const selectLanguageLabels = {
+  ko: "언어 선택",
+  en: "Select Language",
+  ja: "言語選択",
 };
 
-type LanguageCode = keyof typeof translations;
+type LanguageCode = "ko" | "en" | "ja";
 
 const languages = [
-  { code: "ko" as LanguageCode, name: "한국어" },
-  { code: "en" as LanguageCode, name: "English" },
-  { code: "ja" as LanguageCode, name: "日本語" },
+  { code: "ko" as const, name: "한국어" },
+  { code: "en" as const, name: "English" },
+  { code: "ja" as const, name: "日本語" },
 ];
 
 interface CheckinFormData {
@@ -155,7 +50,24 @@ export default function ArrivalCheckinPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const t = translations[language];
+  // 동적 콘텐츠 훅 사용
+  const {
+    isLoading: isContentLoading,
+    getContentByKey,
+    getImageByKey,
+  } = useArrivalCheckinContent();
+
+  // 로딩 중일 때는 로딩 표시
+  if (isContentLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">콘텐츠를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   const isEarlyArrival = () => {
     return (
@@ -169,7 +81,9 @@ export default function ArrivalCheckinPage() {
 
     // 아직 도착 전이라면 확인 팝업 표시
     if (isEarlyArrival()) {
-      const confirmed = window.confirm(t.confirmMessage);
+      const confirmed = window.confirm(
+        getContentByKey("message_confirm", language)
+      );
       if (!confirmed) {
         return;
       }
@@ -199,7 +113,9 @@ export default function ArrivalCheckinPage() {
       }
 
       // 성공 메시지를 도착 상태에 따라 다르게 표시
-      const successMessage = isEarlyArrival() ? t.successEarly : t.success;
+      const successMessage = isEarlyArrival()
+        ? getContentByKey("message_success_early", language)
+        : getContentByKey("message_success", language);
       toast.success(successMessage);
 
       // 폼 초기화
@@ -212,7 +128,7 @@ export default function ArrivalCheckinPage() {
       });
     } catch (error) {
       console.error("체크인 전송 실패:", error);
-      toast.error(t.error);
+      toast.error(getContentByKey("message_error", language));
     } finally {
       setIsSubmitting(false);
     }
@@ -224,10 +140,12 @@ export default function ArrivalCheckinPage() {
         <CardHeader className="pb-4">
           {/* 언어 선택 */}
           <div className="flex justify-between items-center mb-4">
-            <span className="text-lg font-bold">{t.selectLanguage}</span>
+            <span className="text-lg font-bold">
+              {selectLanguageLabels[language]}
+            </span>
             <Select
               value={language}
-              onValueChange={(value) => setLanguage(value as LanguageCode)}
+              onValueChange={(value: LanguageCode) => setLanguage(value)}
             >
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -242,14 +160,20 @@ export default function ArrivalCheckinPage() {
             </Select>
           </div>
 
-          <CardTitle className="text-2xl font-bold">{t.title}</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            {getContentByKey("page_title", language)}
+          </CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-4">
           {/* 설명 */}
           <div className="text-sm text-gray-700">
-            <p className="mb-2">{t.description}</p>
-            <p className="text-red-600 font-medium">{t.foreignerNotice}</p>
+            <p className="mb-2">
+              {getContentByKey("page_description", language)}
+            </p>
+            <p className="text-red-600 font-medium">
+              {getContentByKey("foreigner_notice", language)}
+            </p>
           </div>
 
           {/* 터미널 위치 정보 */}
@@ -258,14 +182,24 @@ export default function ArrivalCheckinPage() {
               <div className="w-full max-w-xs bg-gray-200 rounded-lg shadow-md flex items-center justify-center mb-2 overflow-hidden">
                 <Image
                   className="w-full object-contain"
-                  src="/images/terminal1.png"
-                  alt="Terminal 1"
+                  src={
+                    getImageByKey("terminal1_image")?.image_url ||
+                    "/images/terminal1.png"
+                  }
+                  alt={
+                    getImageByKey("terminal1_image")?.alt_text[language] ||
+                    "Terminal 1"
+                  }
                   width={320}
                   height={240}
+                  key={
+                    getImageByKey("terminal1_image")?.image_url ||
+                    "default-terminal1"
+                  }
                 />
               </div>
               <span className="text-base font-semibold text-gray-700 text-center">
-                {t.terminal1Location}
+                {getContentByKey("terminal1_location", language)}
               </span>
             </div>
 
@@ -273,21 +207,36 @@ export default function ArrivalCheckinPage() {
               <div className="w-full max-w-xs bg-gray-200 rounded-lg shadow-md flex items-center justify-center mb-2 overflow-hidden">
                 <Image
                   className="w-full object-contain"
-                  src="/images/terminal2.png"
-                  alt="Terminal 2"
+                  src={
+                    getImageByKey("terminal2_image")?.image_url ||
+                    "/images/terminal2.png"
+                  }
+                  alt={
+                    getImageByKey("terminal2_image")?.alt_text[language] ||
+                    "Terminal 2"
+                  }
                   width={320}
                   height={180}
+                  key={
+                    getImageByKey("terminal2_image")?.image_url ||
+                    "default-terminal2"
+                  }
                 />
               </div>
               <span className="text-base font-semibold text-gray-700 text-center">
-                {t.terminal2Location}
+                {getContentByKey("terminal2_location", language)}
               </span>
             </div>
           </div>
 
           {/* 서비스 타입 선택 */}
           <div className="grid grid-cols-2 gap-2">
-            {Object.entries(t.serviceTypes).map(([key, label]) => (
+            {[
+              { key: "rentalReturn", contentKey: "service_rental_return" },
+              { key: "rentalPickup", contentKey: "service_rental_pickup" },
+              { key: "storageDropoff", contentKey: "service_storage_dropoff" },
+              { key: "storagePickup", contentKey: "service_storage_pickup" },
+            ].map(({ key, contentKey }) => (
               <Button
                 key={key}
                 type="button"
@@ -299,7 +248,7 @@ export default function ArrivalCheckinPage() {
                 }`}
                 onClick={() => setFormData({ ...formData, serviceType: key })}
               >
-                {label}
+                {getContentByKey(contentKey, language)}
               </Button>
             ))}
           </div>
@@ -309,7 +258,7 @@ export default function ArrivalCheckinPage() {
             {/* 이름 */}
             <div>
               <Label htmlFor="name" className="text-sm font-medium">
-                {t.name}
+                {getContentByKey("label_name", language)}
               </Label>
               <Input
                 id="name"
@@ -318,6 +267,7 @@ export default function ArrivalCheckinPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
+                placeholder={getContentByKey("placeholder_name", language)}
                 required
                 className="mt-1"
               />
@@ -327,7 +277,7 @@ export default function ArrivalCheckinPage() {
             {formData.serviceType === "storagePickup" && (
               <div>
                 <Label htmlFor="tagName" className="text-sm font-medium">
-                  {t.tagName}
+                  {getContentByKey("label_tag_name", language)}
                 </Label>
                 <Input
                   id="tagName"
@@ -336,7 +286,10 @@ export default function ArrivalCheckinPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, tagName: e.target.value })
                   }
-                  placeholder={t.tagNamePlaceholder}
+                  placeholder={getContentByKey(
+                    "placeholder_tag_name",
+                    language
+                  )}
                   required
                   className="mt-1"
                 />
@@ -346,7 +299,7 @@ export default function ArrivalCheckinPage() {
             {/* 터미널 선택 */}
             <div>
               <Label htmlFor="terminal" className="text-sm font-medium">
-                {t.selectTerminal}
+                {getContentByKey("label_terminal", language)}
               </Label>
               <Select
                 value={formData.terminal}
@@ -356,11 +309,17 @@ export default function ArrivalCheckinPage() {
                 required
               >
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder={t.selectTerminal} />
+                  <SelectValue
+                    placeholder={getContentByKey("label_terminal", language)}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="terminal1">{t.terminal1}</SelectItem>
-                  <SelectItem value="terminal2">{t.terminal2}</SelectItem>
+                  <SelectItem value="terminal1">
+                    {getContentByKey("terminal1_name", language)}
+                  </SelectItem>
+                  <SelectItem value="terminal2">
+                    {getContentByKey("terminal2_name", language)}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -368,7 +327,7 @@ export default function ArrivalCheckinPage() {
             {/* 도착 상태 */}
             <div>
               <Label htmlFor="arrivalStatus" className="text-sm font-medium">
-                {t.arrivalStatus}
+                {getContentByKey("label_arrival_status", language)}
               </Label>
               <Select
                 value={formData.arrivalStatus}
@@ -378,17 +337,22 @@ export default function ArrivalCheckinPage() {
                 required
               >
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder={t.arrivalStatusPlaceholder} />
+                  <SelectValue
+                    placeholder={getContentByKey(
+                      "placeholder_arrival_status",
+                      language
+                    )}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="thirtyMinBefore">
-                    {t.arrivalOptions.thirtyMinBefore}
+                    {getContentByKey("arrival_thirty_min", language)}
                   </SelectItem>
                   <SelectItem value="tenMinBefore">
-                    {t.arrivalOptions.tenMinBefore}
+                    {getContentByKey("arrival_ten_min", language)}
                   </SelectItem>
                   <SelectItem value="atCounter">
-                    {t.arrivalOptions.atCounter}
+                    {getContentByKey("arrival_at_counter", language)}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -400,7 +364,9 @@ export default function ArrivalCheckinPage() {
               className="w-full bg-green-500 hover:bg-green-600"
               disabled={isSubmitting}
             >
-              {isSubmitting ? t.sending : t.submit}
+              {isSubmitting
+                ? getContentByKey("button_sending", language)
+                : getContentByKey("button_submit", language)}
             </Button>
           </form>
         </CardContent>

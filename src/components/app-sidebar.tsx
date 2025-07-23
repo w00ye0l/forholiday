@@ -115,11 +115,11 @@ const data = {
       url: "/arrival-checkin",
       icon: PlaneIcon,
     },
-    // {
-    //   title: "환경설정",
-    //   url: "#",
-    //   icon: SettingsIcon,
-    // },
+    {
+      title: "도착 체크인 관리",
+      url: "/admin/arrival-checkin",
+      icon: SettingsIcon,
+    },
   ],
 };
 
