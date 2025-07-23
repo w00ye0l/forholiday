@@ -91,6 +91,11 @@ const data = {
   ],
   systemMenu: [
     {
+      title: "사용자 관리",
+      url: "/users",
+      icon: UserIcon,
+    },
+    {
       title: "기기 관리",
       url: "/devices",
       icon: BoxIcon,
@@ -109,11 +114,6 @@ const data = {
       title: "도착 체크인",
       url: "/arrival-checkin",
       icon: PlaneIcon,
-    },
-    {
-      title: "사용자 관리",
-      url: "/users",
-      icon: UserIcon,
     },
     // {
     //   title: "환경설정",

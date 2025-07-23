@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET() {
   try {
@@ -18,8 +19,19 @@ export async function GET() {
       );
     }
 
-    // 현재 사용자의 권한 확인
-    const { data: currentUserProfile } = await supabase
+    // 서비스 클라이언트로 현재 사용자 권한 확인 (RLS 우회)
+    const serviceSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
+    const { data: currentUserProfile } = await serviceSupabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
@@ -38,8 +50,8 @@ export async function GET() {
       );
     }
 
-    // 모든 프로필 조회
-    const { data: profiles, error: profilesError } = await supabase
+    // 모든 프로필 조회 (서비스 클라이언트 사용)
+    const { data: profiles, error: profilesError } = await serviceSupabase
       .from("profiles")
       .select(
         `
