@@ -41,6 +41,8 @@ export const TimelineView = function TimelineView({
 }: TimelineViewProps) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
+  const [loadingPrevious, setLoadingPrevious] = React.useState(false);
+  const [loadingNext, setLoadingNext] = React.useState(false);
 
   // 예약 블록 계산 (메모이제이션)
   const reservationBlocks = useMemo(() => {
@@ -57,7 +59,8 @@ export const TimelineView = function TimelineView({
 
         if (
           reservation &&
-          !processedReservations.has(reservation.reservation_id)
+          !processedReservations.has(reservation.reservation_id) &&
+          reservation.status !== "not_picked_up" // 미수령 상태 제외
         ) {
           processedReservations.add(reservation.reservation_id);
 
@@ -103,15 +106,27 @@ export const TimelineView = function TimelineView({
   });
 
   const handleLoadPrevious = async () => {
-    const newStartDate = new Date(startDate);
-    newStartDate.setDate(newStartDate.getDate() - daysToShow);
-    await onLoadMore(newStartDate, endDate);
+    if (loadingPrevious || loading) return;
+    setLoadingPrevious(true);
+    try {
+      const newStartDate = new Date(startDate);
+      newStartDate.setDate(newStartDate.getDate() - daysToShow);
+      await onLoadMore(newStartDate, endDate);
+    } finally {
+      setLoadingPrevious(false);
+    }
   };
 
   const handleLoadNext = async () => {
-    const newEndDate = new Date(endDate);
-    newEndDate.setDate(newEndDate.getDate() + daysToShow);
-    await onLoadMore(startDate, newEndDate);
+    if (loadingNext || loading) return;
+    setLoadingNext(true);
+    try {
+      const newEndDate = new Date(endDate);
+      newEndDate.setDate(newEndDate.getDate() + daysToShow);
+      await onLoadMore(startDate, newEndDate);
+    } finally {
+      setLoadingNext(false);
+    }
   };
 
   // 특정 슬롯 인덱스에서 시작하는 예약 블록 찾기
@@ -165,27 +180,25 @@ export const TimelineView = function TimelineView({
   return (
     <div className="bg-white rounded-lg border border-gray-200 w-full h-full overflow-x-auto">
       {/* 고정 헤더 */}
-      <div
-        ref={headerRef}
-        className="sticky top-0 z-10 flex overflow-hidden bg-gray-50"
-      >
-        {/* 날짜 레이블 헤더 */}
-        <div className="w-24 shrink-0 border-r border-gray-200">
-          <div className="h-8 border-b border-gray-200 flex items-center justify-center font-medium">
+      <div className="sticky top-0 z-30 flex bg-gray-50">
+        {/* 날짜 레이블 헤더 - 완전 고정 */}
+        <div className="w-20 shrink-0 border-r border-gray-200 bg-gray-50">
+          <div className="h-6 border-b border-gray-200 flex items-center justify-center font-medium text-xs">
             날짜
           </div>
         </div>
 
-        {/* 기기 헤더 */}
-        <div className="flex">
+        {/* 기기 헤더 - 스크롤 가능 */}
+        <div
+          ref={headerRef}
+          className="flex overflow-hidden"
+        >
           {devices.map((deviceTag, deviceIdx) => (
             <div
               key={deviceTag}
-              className="w-32 min-w-[8rem] border-r border-gray-200"
+              className="w-20 border-r border-gray-200 h-6 border-b px-1 py-0.5 bg-gray-50 shrink-0"
             >
-              <div className="h-8 border-b border-gray-200 p-2">
-                <div className="text-sm font-medium">{deviceTag}</div>
-              </div>
+              <div className="text-xs font-medium truncate">{deviceTag}</div>
             </div>
           ))}
         </div>
@@ -194,57 +207,69 @@ export const TimelineView = function TimelineView({
       {/* 스크롤 가능한 타임라인 */}
       <div
         ref={timelineRef}
-        className="flex overflow-auto max-h-[calc(100vh-16rem)]"
+        className="overflow-auto max-h-[calc(100vh-16rem)]"
         onScroll={(e) => {
           if (headerRef.current) {
             headerRef.current.scrollLeft = e.currentTarget.scrollLeft;
           }
         }}
       >
-        {/* 날짜 레이블 열 */}
-        <div className="w-24 shrink-0 border-r border-gray-200">
-          {/* 이전 데이터 로드 버튼 */}
-          <Button
-            variant="ghost"
-            className="w-full h-8 bg-green-200 border-b border-gray-200 flex items-center justify-center gap-1 text-sm text-gray-600 hover:text-gray-900 hover:bg-green-300"
-            onClick={handleLoadPrevious}
-            disabled={loading}
-          >
-            <ChevronUp className="w-4 h-4" />
-            이전 날짜
-          </Button>
-
-          {/* 날짜 목록 */}
-          {timeSlots.map((slot) => (
-            <div
-              key={slot.date}
-              className="h-8 border-b border-gray-200 flex items-center justify-center text-xs font-medium bg-gray-50"
+        <div className="flex min-w-fit">
+          {/* 날짜 레이블 열 - 절대 고정 */}
+          <div className="w-20 shrink-0 border-r border-gray-200 bg-white sticky left-0 z-20">
+            {/* 이전 데이터 로드 버튼 */}
+            <Button
+              variant="ghost"
+              className="w-full h-6 bg-green-200 border-b border-gray-200 flex items-center justify-center gap-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-green-300"
+              onClick={handleLoadPrevious}
+              disabled={loadingPrevious || loading}
             >
-              {format(new Date(slot.date), "MM/dd (eee)", { locale: ko })}
-            </div>
-          ))}
+              {loadingPrevious ? (
+                <div className="animate-spin rounded-full h-2 w-2 border-b border-gray-600"></div>
+              ) : (
+                <>
+                  <ChevronUp className="w-3 h-3" />
+                  <span className="hidden sm:inline text-xs">이전</span>
+                </>
+              )}
+            </Button>
 
-          {/* 다음 데이터 로드 버튼 */}
-          <Button
-            variant="ghost"
-            className="w-full h-8 bg-green-200 border-b border-gray-200 flex items-center justify-center gap-1 text-sm text-gray-600 hover:text-gray-900 hover:bg-green-300"
-            onClick={handleLoadNext}
-            disabled={loading}
-          >
-            다음 날짜
-            <ChevronDown className="w-4 h-4" />
-          </Button>
-        </div>
+            {/* 날짜 목록 */}
+            {timeSlots.map((slot) => (
+              <div
+                key={slot.date}
+                className="h-6 border-b border-gray-200 flex items-center justify-center text-xs font-medium bg-gray-50"
+              >
+                {format(new Date(slot.date), "MM/dd", { locale: ko })}
+              </div>
+            ))}
 
-        {/* 기기별 열 */}
-        <div className="flex border-r border-gray-200">
+            {/* 다음 데이터 로드 버튼 */}
+            <Button
+              variant="ghost"
+              className="w-full h-6 bg-green-200 border-b border-gray-200 flex items-center justify-center gap-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-green-300"
+              onClick={handleLoadNext}
+              disabled={loadingNext || loading}
+            >
+              {loadingNext ? (
+                <div className="animate-spin rounded-full h-2 w-2 border-b border-gray-600"></div>
+              ) : (
+                <>
+                  <span className="hidden sm:inline text-xs">다음</span>
+                  <ChevronDown className="w-3 h-3" />
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* 기기별 열 */}
           {devices.map((deviceTag) => (
             <div
               key={deviceTag}
-              className="w-32 min-w-[8rem] border-r border-gray-200 relative"
+              className="w-20 border-r border-gray-200 relative shrink-0"
             >
               {/* 이전 데이터 로드 버튼 공간 */}
-              <div className="h-8 border-b border-gray-200" />
+              <div className="h-6 border-b border-gray-200" />
 
               {/* 날짜별 예약 상태 */}
               {timeSlots.map((slot, slotIndex) => {
@@ -259,7 +284,7 @@ export const TimelineView = function TimelineView({
                   return (
                     <div
                       key={`${slot.date}-${deviceTag}`}
-                      className="h-8 border-b border-gray-200"
+                      className="h-6 border-b border-gray-200"
                     />
                   );
                 }
@@ -267,17 +292,17 @@ export const TimelineView = function TimelineView({
                 // 블록의 시작 부분
                 if (reservationBlock) {
                   const { reservation, duration } = reservationBlock;
-                  const blockHeight = duration * 32; // 16 * 4 = 64px per slot + border
+                  const blockHeight = duration * 24; // 24px per slot (줄어든 높이)
 
                   return (
                     <div
                       key={`${slot.date}-${deviceTag}-block`}
-                      className={`absolute w-full p-1 z-10 border-b border-gray-200 ${
+                      className={`absolute w-full px-0.5 py-0.5 z-10 border-2 border-gray-400 rounded-sm shadow-sm ${
                         STATUS_MAP[reservation.status]?.color || "bg-blue-50"
                       }`}
                       style={{
                         height: `${blockHeight}px`,
-                        top: `${32 + slotIndex * 32}px`, // 로드 버튼 높이(64px) + 슬롯 위치(각 슬롯 64px + 보더 1px)
+                        top: `${24 + slotIndex * 24}px`, // 로드 버튼 높이(24px) + 슬롯 위치
                       }}
                       title={`${reservation.renter_name}\n상태: ${
                         STATUS_MAP[reservation.status]?.label ||
@@ -294,22 +319,9 @@ export const TimelineView = function TimelineView({
                         reservation.return_method
                       }\n사이트: ${reservation.reservation_site}`}
                     >
-                      <div className="flex flex-col h-full justify-between">
+                      <div className="flex items-center justify-center h-full text-center">
                         <div className="text-xs font-medium truncate">
                           {reservation.renter_name}
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          <div>{reservation.pickup_date}</div>
-                          <div>~{reservation.return_date}</div>
-                        </div>
-                        <div
-                          className={`text-xs font-medium text-center px-1 py-0.5 rounded ${
-                            STATUS_MAP[reservation.status]?.badge ||
-                            "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {STATUS_MAP[reservation.status]?.label ||
-                            reservation.status}
                         </div>
                       </div>
                     </div>
@@ -320,13 +332,13 @@ export const TimelineView = function TimelineView({
                 return (
                   <div
                     key={`${slot.date}-${deviceTag}`}
-                    className="h-8 border-b border-gray-200 bg-white"
+                    className="h-6 border-b border-gray-200 bg-white"
                   />
                 );
               })}
 
               {/* 다음 데이터 로드 버튼 공간 */}
-              <div className="h-8 border-b border-gray-200" />
+              <div className="h-6 border-b border-gray-200" />
             </div>
           ))}
         </div>
