@@ -100,7 +100,6 @@ const formSchema = z.object({
     "picked_up",
     "not_picked_up",
     "returned",
-    "overdue",
     "problem",
   ] as const),
 });
