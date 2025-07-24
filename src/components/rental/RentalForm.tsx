@@ -108,7 +108,7 @@ const formSchema = z.object({
     "waug",
     "hanatour",
   ] as const),
-  order_number: z.string().optional(),
+  order_number: z.string().min(1, "주문번호는 필수입니다"),
   description: z.string().optional(),
 });
 

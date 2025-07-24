@@ -33,9 +33,12 @@ import {
 import {
   RentalReservation,
   STATUS_MAP,
+  DISPLAY_STATUS_MAP,
   PICKUP_METHOD_PRIORITY,
   PICKUP_METHOD_LABELS,
   PickupMethod,
+  ReservationStatus,
+  DisplayStatus,
 } from "@/types/rental";
 import {
   exportToExcel,
@@ -74,12 +77,8 @@ export default function RentalsPage() {
   const [activeTab, setActiveTab] = useState("list");
   const [exporting, setExporting] = useState(false);
 
-  // 날짜 범위 필터 - 오늘 날짜를 기본값으로 설정
-  const today = new Date();
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: today,
-    to: today,
-  });
+  // 날짜 범위 필터 - 기본값 없음
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   const supabase = createClient();
 
@@ -109,10 +108,11 @@ export default function RentalsPage() {
       setLoading(true);
       setError(null);
 
-      // 예약 목록 조회 - 수령 날짜/시간 기준으로 정렬
+      // 예약 목록 조회 - 취소되지 않은 예약만, 수령 날짜/시간 기준으로 정렬
       const { data: rentals, error: rentalsError } = await supabase
         .from("rental_reservations")
         .select("*")
+        .is("cancelled_at", null) // 취소되지 않은 예약만 조회
         .order("pickup_date", { ascending: true })
         .order("pickup_time", { ascending: true });
 
@@ -174,6 +174,11 @@ export default function RentalsPage() {
             rental.device_tag_name.toLowerCase().includes(term))
         );
       });
+      
+      // 검색어가 있을 때 날짜 필터를 자동으로 제거
+      if (dateRange) {
+        setDateRange(undefined);
+      }
     }
 
     // 날짜 범위 필터링 (수령일 기준)
@@ -222,12 +227,23 @@ export default function RentalsPage() {
     fetchRentals();
   }, []);
 
+  // 예약 취소 이벤트 리스너 추가
+  useEffect(() => {
+    const handleReservationCanceled = () => {
+      // 예약이 취소되었을 때 데이터 새로고침
+      fetchRentals();
+    };
+
+    window.addEventListener('reservationCanceled', handleReservationCanceled);
+    
+    return () => {
+      window.removeEventListener('reservationCanceled', handleReservationCanceled);
+    };
+  }, []);
+
   const handleReset = () => {
     setSearchTerm("");
-    setDateRange({
-      from: today,
-      to: today,
-    });
+    setDateRange(undefined);
     setSelectedCategory("all");
     setSelectedStatus("all");
     setSelectedPickupMethod("all");
@@ -361,7 +377,12 @@ export default function RentalsPage() {
       not_picked_up: filtered.filter((r) => r.status === "not_picked_up")
         .length,
       returned: filtered.filter((r) => r.status === "returned").length,
-      overdue: filtered.filter((r) => r.status === "overdue").length,
+      overdue: filtered.filter((r) => {
+        // overdue는 계산된 상태이므로 실제 DB 상태를 확인
+        const now = new Date();
+        const returnDateTime = new Date(`${r.return_date} ${r.return_time}`);
+        return returnDateTime < now && r.status === "picked_up";
+      }).length,
       problem: filtered.filter((r) => r.status === "problem").length,
     };
 
@@ -635,11 +656,11 @@ export default function RentalsPage() {
                   onClick={() => setSelectedStatus("overdue")}
                   className={`h-6 px-2 py-1 text-xs ${
                     selectedStatus === "overdue"
-                      ? STATUS_MAP.overdue.button
-                      : STATUS_MAP.overdue.badge
+                      ? DISPLAY_STATUS_MAP.overdue.button
+                      : DISPLAY_STATUS_MAP.overdue.badge
                   }`}
                 >
-                  {STATUS_MAP.overdue.label}: {statusCounts.overdue}건
+                  {DISPLAY_STATUS_MAP.overdue.label}: {statusCounts.overdue}건
                 </Button>
                 <Button
                   variant="ghost"

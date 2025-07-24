@@ -33,15 +33,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // 예약 ID 생성 함수
-    const generateReservationId = () => {
-      const now = new Date();
-      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
-      const randomStr = Math.random()
-        .toString(36)
-        .substring(2, 6)
-        .toUpperCase();
-      return `RT${dateStr}${randomStr}`;
+    // 예약 번호에서 예약 ID 생성
+    const getReservationIdFromOrderNumber = (orderNumber: string) => {
+      return String(orderNumber);
     };
 
     // 기기 카테고리 매핑 함수
@@ -124,61 +118,83 @@ export async function POST(req: Request) {
 
     const results = [];
 
+    console.log("받은 예약 데이터:", reservations);
+
     for (const reservation of reservations) {
       try {
-        const rentalReservationId = generateReservationId();
+        console.log("처리 중인 예약:", reservation);
+        const rentalReservationId = getReservationIdFromOrderNumber(reservation["예약번호"]);
+        console.log("생성된 예약 ID:", rentalReservationId);
 
-        // 1. rental_reservations 테이블에 예약 추가
-        const { error: insertError } = await supabase
+        // 1. 기존 예약이 있는지 확인
+        const { data: existingRental } = await supabase
           .from("rental_reservations")
-          .insert({
-            reservation_id: rentalReservationId,
-            user_id: null,
-            device_category: mapDeviceCategory(reservation["대여품목"]),
-            device_tag_name: null,
-            status: "pending",
-            pickup_date: parseKoreanDate(reservation["픽업일"]),
-            pickup_time: parseKoreanTime(reservation["픽업시간"]),
-            return_date: parseKoreanDate(reservation["반납일"]),
-            return_time: parseKoreanTime(reservation["반납시간"]),
-            pickup_method: mapTerminal(reservation["픽업터미널"]),
-            return_method: mapTerminal(reservation["반납터미널"]),
-            data_transmission: false,
-            reservation_site: mapReservationSite(reservation["예약사이트"]),
-            renter_name: reservation["이름"],
-            renter_phone: reservation["메신저ID"] || "",
-            renter_email: reservation["이메일"] || "",
-            renter_address: "",
-            order_number: String(reservation["예약번호"]),
-            contact_input_type: "text",
-          });
+          .select("id, status")
+          .eq("reservation_id", rentalReservationId)
+          .single();
 
-        if (insertError) {
-          throw insertError;
+        if (!existingRental) {
+          // 새로운 예약 생성
+          const { error: insertError } = await supabase
+            .from("rental_reservations")
+            .insert({
+              reservation_id: rentalReservationId,
+              user_id: null,
+              device_category: mapDeviceCategory(reservation["대여품목"]),
+              device_tag_name: null,
+              status: "pending",
+              pickup_date: parseKoreanDate(reservation["픽업일"]),
+              pickup_time: parseKoreanTime(reservation["픽업시간"]),
+              return_date: parseKoreanDate(reservation["반납일"]),
+              return_time: parseKoreanTime(reservation["반납시간"]),
+              pickup_method: mapTerminal(reservation["픽업터미널"]),
+              return_method: mapTerminal(reservation["반납터미널"]),
+              data_transmission: false,
+              reservation_site: mapReservationSite(reservation["예약사이트"]),
+              renter_name: reservation["이름"],
+              renter_phone: reservation["메신저ID"] || "",
+              renter_email: reservation["이메일"] || "",
+              renter_address: "",
+              order_number: rentalReservationId, // 예약번호와 동일한 값 사용
+              contact_input_type: "text",
+            });
+
+          if (insertError) {
+            console.error("Insert 오류:", insertError);
+            throw insertError;
+          }
+          console.log("rental_reservations 삽입 성공");
+        } else {
+          console.log("기존 예약 발견, 상태만 업데이트할 예정");
         }
 
         // 고유 키 생성 (타임스탬프 + 예약번호)
         const reservationKey = `${reservation["타임스탬프"]}|${reservation["예약번호"]}`;
 
         // 2. reservation_key로 기존 확정 여부 확인
-        const { data: existingReservation } = await supabase
+        const { data: existingReservation, error: selectError } = await supabase
           .from("pending_reservations_status")
           .select("id, status")
           .eq("reservation_key", reservationKey)
           .single();
 
+        console.log("기존 예약 상태 조회:", { existingReservation, selectError, reservationKey });
+
         if (existingReservation) {
           // 이미 확정된 예약인 경우
           if (existingReservation.status === "confirmed") {
+            console.log("이미 확정된 예약:", reservationKey);
             results.push({
-              success: false,
+              success: true, // 이미 확정되어 있으므로 성공으로 처리
               booking_number: reservation["예약번호"],
-              error: "이미 확정된 예약입니다.",
+              rental_reservation_id: rentalReservationId,
             });
             continue;
           }
-          // 취소된 예약인 경우 - 상태를 confirmed로 업데이트
+          // 취소된 예약인 경우 - 상태를 confirmed로 업데이트하고 취소 관련 필드 제거
           else if (existingReservation.status === "canceled") {
+            console.log("취소된 예약을 다시 확정 처리:", reservationKey);
+            
             const { error: updateError } = await supabase
               .from("pending_reservations_status")
               .update({
@@ -190,11 +206,33 @@ export async function POST(req: Request) {
               .eq("reservation_key", reservationKey);
 
             if (updateError) {
+              console.error("pending_reservations_status 업데이트 오류:", updateError);
               throw updateError;
+            }
+            console.log("pending_reservations_status 업데이트 성공");
+
+            // rental_reservations 테이블에서도 취소 관련 필드 정리 (존재하는 경우)
+            if (existingRental) {
+              console.log("rental_reservations도 업데이트 시도");
+              const { error: rentalUpdateError } = await supabase
+                .from("rental_reservations")
+                .update({
+                  status: "pending",
+                  cancel_reason: null,
+                  cancelled_at: null, // rental_reservations 테이블은 cancelled_at (double l)
+                })
+                .eq("reservation_id", rentalReservationId);
+
+              if (rentalUpdateError) {
+                console.warn("rental_reservations 취소 필드 정리 실패:", rentalUpdateError);
+              } else {
+                console.log("rental_reservations 업데이트 성공");
+              }
             }
           }
         } else {
           // 새로운 예약 확정 - pending_reservations_status 테이블에 추가
+          console.log("새로운 예약 확정 처리:", reservationKey);
           const { error: statusError } = await supabase
             .from("pending_reservations_status")
             .insert({
@@ -210,10 +248,13 @@ export async function POST(req: Request) {
             });
 
           if (statusError) {
+            console.error("새로운 예약 상태 추가 오류:", statusError);
             throw statusError;
           }
+          console.log("새로운 예약 상태 추가 성공");
         }
 
+        console.log("예약 확정 성공:", reservation["예약번호"]);
         results.push({
           success: true,
           booking_number: reservation["예약번호"],
@@ -233,6 +274,8 @@ export async function POST(req: Request) {
     }
 
     const successCount = results.filter((r) => r.success).length;
+    console.log("최종 결과:", results);
+    console.log("성공 개수:", successCount);
 
     return NextResponse.json({
       success: true,

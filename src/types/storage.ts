@@ -1,6 +1,6 @@
 export type StorageStatus = "pending" | "stored" | "retrieved";
 
-export type StorageLocation = "T1" | "T2" | "delivery" | "office" | "hotel";
+export type StorageLocation = "T1" | "T2" | "office";
 
 export interface StorageReservation {
   id: string;
@@ -34,9 +34,7 @@ export const STORAGE_STATUS_LABELS: Record<StorageStatus, string> = {
 export const STORAGE_LOCATION_LABELS: Record<StorageLocation, string> = {
   T1: "터미널1",
   T2: "터미널2",
-  delivery: "택배",
   office: "사무실",
-  hotel: "호텔",
 };
 
 // 예약 사이트 옵션

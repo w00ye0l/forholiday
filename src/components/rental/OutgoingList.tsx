@@ -33,6 +33,11 @@ import {
   ReservationStatus,
   STATUS_MAP,
   PICKUP_METHOD_LABELS,
+  RETURN_METHOD_LABELS,
+  RESERVATION_SITE_LABELS,
+  PickupMethod,
+  ReturnMethod,
+  ReservationSite,
 } from "@/types/rental";
 import {
   Device,
@@ -48,6 +53,7 @@ import {
   PhoneIcon,
   MapPinIcon,
   EditIcon,
+  Map,
 } from "lucide-react";
 
 interface OutgoingListProps {
@@ -108,11 +114,8 @@ export function OutgoingList({
       case "returned":
         // 반납완료 - 초록색
         return `${baseClasses} bg-green-50 border-l-green-500`;
-      case "overdue":
-        // 미반납 - 노란색 (향후 구현)
-        return `${baseClasses} bg-yellow-50 border-l-yellow-500`;
       case "problem":
-        // 문제있음 - 빨간색 (향후 구현)
+        // 문제있음 - 빨간색
         return `${baseClasses} bg-red-50 border-l-red-500`;
       default:
         // 알 수 없는 상태는 기본 스타일
@@ -242,54 +245,6 @@ export function OutgoingList({
     }
   };
 
-  // 수령 완료 처리 함수 추가 (확인 단계 포함)
-  const handleCompletePickup = async (id: string) => {
-    const rental = rentals.find((r) => r.id === id);
-    if (!rental?.device_tag_name) {
-      toast.error("먼저 기기를 선택해주세요.");
-      return;
-    }
-
-    // 확인 단계 추가
-    const confirmed = window.confirm(
-      `${rental.renter_name}님의 ${rental.device_tag_name} 기기 수령을 완료 처리하시겠습니까?\n\n처리 후에는 상태가 '수령완료'로 변경됩니다.`
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setIsUpdating((prev) => ({ ...prev, [id]: true }));
-
-      const { error } = await supabase
-        .from("rental_reservations")
-        .update({
-          status: "picked_up",
-        })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      setRentals((prev) =>
-        prev.map((rental) =>
-          rental.id === id
-            ? {
-                ...rental,
-                status: "picked_up" as ReservationStatus,
-              }
-            : rental
-        )
-      );
-
-      toast.success("수령 완료 처리되었습니다.");
-      onStatusUpdate?.();
-    } catch (error) {
-      console.error("수령 완료 처리 실패:", error);
-      toast.error("수령 완료 처리에 실패했습니다.");
-    } finally {
-      setIsUpdating((prev) => ({ ...prev, [id]: false }));
-    }
-  };
-
   const startEditingNotes = (id: string, currentDescription?: string) => {
     setEditingNotes((prev) => ({ ...prev, [id]: true }));
     setNotes((prev) => ({ ...prev, [id]: currentDescription || "" }));
@@ -321,6 +276,15 @@ export function OutgoingList({
                   <MapPinIcon className="w-3 h-3" />
                   <span>{PICKUP_METHOD_LABELS[rental.pickup_method]}</span>
                 </div>
+                {rental.pickup_method === "delivery" &&
+                  rental.renter_address && (
+                    <div className="text-xs text-gray-600 flex gap-2 items-center">
+                      <Map className="min-w-3 min-h-3 w-3 h-3" />
+                      <span className="text-xs text-gray-600 break-all">
+                        {rental.renter_address}
+                      </span>
+                    </div>
+                  )}
                 <div className="text-xs text-gray-600 flex gap-2 items-center">
                   <PhoneIcon className="min-w-3 min-h-3 w-3 h-3" />
                   <span className="text-xs text-gray-600 break-all">
@@ -346,12 +310,13 @@ export function OutgoingList({
                         <EditIcon className="w-3 h-3" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
+                    <DialogContent className="sm:max-w-[600px] max-h-full overflow-auto">
                       <DialogHeader>
                         <DialogTitle>예약 상세 정보</DialogTitle>
                       </DialogHeader>
                       {editingRental && (
                         <div className="space-y-4">
+                          {/* 기본 정보 - 2컬럼 */}
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="text-sm font-medium">
@@ -383,6 +348,28 @@ export function OutgoingList({
                                 className="text-sm"
                               />
                             </div>
+                          </div>
+
+                          {/* 이메일 - 1컬럼 */}
+                          <div>
+                            <label className="text-sm font-medium">
+                              이메일
+                            </label>
+                            <Input
+                              value={editingRental.renter_email || ""}
+                              onChange={(e) =>
+                                setEditingRental({
+                                  ...editingRental,
+                                  renter_email: e.target.value,
+                                })
+                              }
+                              className="text-sm"
+                              placeholder="이메일 주소"
+                            />
+                          </div>
+
+                          {/* 수령 날짜/시간 - 2컬럼 */}
+                          <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="text-sm font-medium">
                                 수령 날짜
@@ -468,6 +455,10 @@ export function OutgoingList({
                                 </SelectContent>
                               </Select>
                             </div>
+                          </div>
+
+                          {/* 반납 날짜/시간 - 2컬럼 */}
+                          <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="text-sm font-medium">
                                 반납 날짜
@@ -555,12 +546,70 @@ export function OutgoingList({
                             </div>
                           </div>
 
+                          {/* 수령/반납 방법 - 2컬럼 */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm font-medium">
+                                수령 방법
+                              </label>
+                              <Select
+                                value={editingRental.pickup_method}
+                                onValueChange={(value) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    pickup_method: value as PickupMethod,
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(PICKUP_METHOD_LABELS).map(
+                                    ([method, label]) => (
+                                      <SelectItem key={method} value={method}>
+                                        {label}
+                                      </SelectItem>
+                                    )
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">
+                                반납 방법
+                              </label>
+                              <Select
+                                value={editingRental.return_method}
+                                onValueChange={(value) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    return_method: value as ReturnMethod,
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(RETURN_METHOD_LABELS).map(
+                                    ([method, label]) => (
+                                      <SelectItem key={method} value={method}>
+                                        {label}
+                                      </SelectItem>
+                                    )
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
                           {/* 데이터 전송 및 SD 카드 옵션 - 기기 카테고리에 따라 조건부 렌더링 */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* 데이터 전송 옵션 (핸드폰 기종일 경우만) */}
-                            {DEVICE_FEATURES.PHONE_CATEGORIES.includes(
-                              editingRental.device_category
-                            ) && (
+                          {/* 데이터 전송 옵션 (핸드폰 기종일 경우만) */}
+                          {DEVICE_FEATURES.PHONE_CATEGORIES.includes(
+                            editingRental.device_category
+                          ) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
                                 <label className="text-sm font-medium">
                                   데이터 전송
@@ -589,45 +638,92 @@ export function OutgoingList({
                                   </SelectContent>
                                 </Select>
                               </div>
-                            )}
+                            </div>
+                          )}
 
-                            {/* SD 카드 옵션 (카메라 기종일 경우만) */}
-                            {DEVICE_FEATURES.CAMERA_CATEGORIES.includes(
-                              editingRental.device_category
-                            ) && (
-                              <div>
-                                <label className="text-sm font-medium">
-                                  SD 카드 옵션
-                                </label>
-                                <Select
-                                  value={editingRental.sd_option || "none"}
-                                  onValueChange={(value) =>
-                                    setEditingRental({
-                                      ...editingRental,
-                                      sd_option:
-                                        value === "none"
-                                          ? undefined
-                                          : (value as
-                                              | "대여"
-                                              | "구매"
-                                              | "구매+대여"),
-                                    })
-                                  }
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="선택하세요" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none">없음</SelectItem>
-                                    <SelectItem value="대여">대여</SelectItem>
-                                    <SelectItem value="구매">구매</SelectItem>
-                                    <SelectItem value="구매+대여">
-                                      구매+대여
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
+                          {/* SD 카드 옵션 (카메라 기종일 경우만) */}
+                          {DEVICE_FEATURES.CAMERA_CATEGORIES.includes(
+                            editingRental.device_category
+                          ) && (
+                            <div>
+                              <label className="text-sm font-medium">
+                                SD 카드 옵션
+                              </label>
+                              <Select
+                                value={editingRental.sd_option || "none"}
+                                onValueChange={(value) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    sd_option:
+                                      value === "none"
+                                        ? undefined
+                                        : (value as
+                                            | "대여"
+                                            | "구매"
+                                            | "구매+대여"),
+                                  })
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="선택하세요" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">없음</SelectItem>
+                                  <SelectItem value="대여">대여</SelectItem>
+                                  <SelectItem value="구매">구매</SelectItem>
+                                  <SelectItem value="구매+대여">
+                                    구매+대여
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {/* 주소와 예약사이트 정보 */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm font-medium">
+                                주소
+                              </label>
+                              <Input
+                                value={editingRental.renter_address}
+                                onChange={(e) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    renter_address: e.target.value,
+                                  })
+                                }
+                                className="text-sm"
+                                placeholder="주소를 입력하세요"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">
+                                예약 사이트
+                              </label>
+                              <Select
+                                value={editingRental.reservation_site}
+                                onValueChange={(value) =>
+                                  setEditingRental({
+                                    ...editingRental,
+                                    reservation_site: value as ReservationSite,
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(RESERVATION_SITE_LABELS).map(
+                                    ([site, label]) => (
+                                      <SelectItem key={site} value={site}>
+                                        {label}
+                                      </SelectItem>
+                                    )
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
 
                           <div>
@@ -671,10 +767,19 @@ export function OutgoingList({
                                     .update({
                                       renter_name: editingRental.renter_name,
                                       renter_phone: editingRental.renter_phone,
+                                      renter_email: editingRental.renter_email,
+                                      renter_address:
+                                        editingRental.renter_address,
+                                      pickup_method:
+                                        editingRental.pickup_method,
                                       pickup_date: editingRental.pickup_date,
                                       pickup_time: editingRental.pickup_time,
+                                      return_method:
+                                        editingRental.return_method,
                                       return_date: editingRental.return_date,
                                       return_time: editingRental.return_time,
+                                      reservation_site:
+                                        editingRental.reservation_site,
                                       data_transmission:
                                         editingRental.data_transmission,
                                       sd_option:
@@ -818,7 +923,7 @@ export function OutgoingList({
                   )}
                 </div>
 
-                {/* 상태 수동 변경 (개발자/관리자용) */}
+                {/* 상태 수동 변경 (출고관리용 - 반납완료, 미반납 제외) */}
                 <div className="w-24">
                   <Select
                     value={rental.status}
@@ -831,13 +936,14 @@ export function OutgoingList({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(STATUS_MAP).map(
-                        ([status, statusInfo]) => (
+                      {/* 출고관리에서는 반납완료 상태 제외 */}
+                      {Object.entries(STATUS_MAP)
+                        .filter(([status]) => status !== "returned")
+                        .map(([status, statusInfo]) => (
                           <SelectItem key={status} value={status}>
                             {statusInfo.label}
                           </SelectItem>
-                        )
-                      )}
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>

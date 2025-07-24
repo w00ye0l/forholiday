@@ -349,7 +349,7 @@ export default function StorageIncomingPage() {
         onValueChange={setLocationTab}
         className="mb-6 w-full"
       >
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="all">
             전체{" "}
             <span className="ml-1 text-xs">
@@ -368,22 +368,10 @@ export default function StorageIncomingPage() {
               ({getLocationTabCount("T2")})
             </span>
           </TabsTrigger>
-          <TabsTrigger value="delivery">
-            택배{" "}
-            <span className="ml-1 text-xs">
-              ({getLocationTabCount("delivery")})
-            </span>
-          </TabsTrigger>
           <TabsTrigger value="office">
             사무실{" "}
             <span className="ml-1 text-xs">
               ({getLocationTabCount("office")})
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value="hotel">
-            호텔{" "}
-            <span className="ml-1 text-xs">
-              ({getLocationTabCount("hotel")})
             </span>
           </TabsTrigger>
         </TabsList>

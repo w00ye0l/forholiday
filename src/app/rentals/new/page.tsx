@@ -46,14 +46,6 @@ export default function NewRentalPage() {
     );
   };
 
-  // 예약 번호 생성 함수
-  const generateReservationId = () => {
-    const today = new Date();
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
-    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `RT${dateStr}${randomStr}`;
-  };
-
   // 예약 생성 함수
   const createRental = async (
     formId: string,
@@ -63,9 +55,10 @@ export default function NewRentalPage() {
 
     try {
       const supabase = createClient();
+      
       const { error } = await supabase.from("rental_reservations").insert({
         ...data,
-        reservation_id: generateReservationId(),
+        reservation_id: data.order_number, // 사용자가 입력한 주문번호를 예약 ID로 사용
       });
 
       if (error) {

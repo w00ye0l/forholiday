@@ -61,18 +61,6 @@ export default function LoginPage() {
             로그인
           </Button>
         </form>
-        <div className="text-center text-sm">
-          <p className="text-muted-foreground">
-            계정이 없으신가요?{" "}
-            <Button
-              variant="link"
-              className="h-auto p-0 font-semibold"
-              onClick={() => router.push("/auth/register")}
-            >
-              회원가입
-            </Button>
-          </p>
-        </div>
       </div>
     </div>
   );

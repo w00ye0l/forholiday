@@ -17,6 +17,7 @@ import {
   DatabaseIcon,
   TableIcon,
   ClockIcon,
+  BoltIcon,
 } from "lucide-react";
 
 import { NavStorage } from "@/components/nav-storage";
@@ -90,6 +91,11 @@ const data = {
   ],
   systemMenu: [
     {
+      title: "사용자 관리",
+      url: "/users",
+      icon: UserIcon,
+    },
+    {
       title: "기기 관리",
       url: "/devices",
       icon: BoxIcon,
@@ -102,18 +108,18 @@ const data = {
     {
       title: "고객 조회 페이지",
       url: "/check-reservation",
-      icon: UserIcon,
+      icon: BoltIcon,
     },
     {
       title: "도착 체크인",
       url: "/arrival-checkin",
       icon: PlaneIcon,
     },
-    // {
-    //   title: "환경설정",
-    //   url: "#",
-    //   icon: SettingsIcon,
-    // },
+    {
+      title: "도착 체크인 관리",
+      url: "/admin/arrival-checkin",
+      icon: SettingsIcon,
+    },
   ],
 };
 
