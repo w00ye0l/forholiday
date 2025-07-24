@@ -46,12 +46,11 @@ export async function GET() {
       });
     }
 
-    if (profileError || !profile?.role || !['admin', 'super_admin'].includes(profile.role)) {
+    if (!profile?.role || !['admin', 'super_admin'].includes(profile.role)) {
       return NextResponse.json({ 
         error: "관리자 권한이 필요합니다",
         debug: {
           userId: user.id,
-          profileError: profileError?.message,
           profile: profile,
           hasRole: !!profile?.role,
           role: profile?.role
@@ -213,7 +212,7 @@ export async function PUT(request: NextRequest) {
     // 콘텐츠 업데이트
     if (content && Array.isArray(content)) {
       for (const item of content) {
-        const { error: updateError } = await supabase
+        const { error: updateError } = await adminSupabase
           .from("arrival_checkin_content")
           .update({
             content: item.content,
@@ -233,7 +232,7 @@ export async function PUT(request: NextRequest) {
     // 이미지 Alt 텍스트 업데이트
     if (images && Array.isArray(images)) {
       for (const item of images) {
-        const { error: updateError } = await supabase
+        const { error: updateError } = await adminSupabase
           .from("arrival_checkin_images")
           .update({
             alt_text: item.alt_text,

@@ -193,7 +193,7 @@ export const TimelineView = function TimelineView({
           ref={headerRef}
           className="flex overflow-hidden"
         >
-          {devices.map((deviceTag, deviceIdx) => (
+          {devices.map((deviceTag) => (
             <div
               key={deviceTag}
               className="w-20 border-r border-gray-200 h-6 border-b px-1 py-0.5 bg-gray-50 shrink-0"
