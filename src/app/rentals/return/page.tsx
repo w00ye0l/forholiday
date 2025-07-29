@@ -48,11 +48,12 @@ export default function RentalReturnPage() {
     const supabase = createClient();
 
     try {
-      // 반납 예정 및 완료된 예약 목록 조회 (반납관리에서 필요한 상태만)
+      // 반납 예정 및 완료된 예약 목록 조회 (반납관리에서 필요한 상태만, 취소된 예약 제외)
       const { data: rentalsData, error } = await supabase
         .from("rental_reservations")
         .select("*")
         .in("status", ["picked_up", "not_picked_up", "returned", "problem"])
+        .is("cancelled_at", null)
         .order("return_date", { ascending: true })
         .order("return_time", { ascending: true });
 
