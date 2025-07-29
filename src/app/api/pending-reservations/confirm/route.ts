@@ -51,6 +51,7 @@ export async function POST(req: Request) {
         "DJI Action 5": "ACTION5",
         "Galaxy S23 Ultra": "S23",
         "Galaxy S24 Ultra": "S24",
+        "Galaxy S25 Ultra": "S25",
         PS5: "PS5",
         Glampam: "GLAMPAM",
         "Dyson Airwrap / ダイソン·エアラップ / 戴森航空實驗室": "AIRWRAP",
