@@ -21,6 +21,9 @@ export interface StorageReservation {
   status: StorageStatus;
   created_at: string;
   updated_at: string;
+  email_sent?: boolean;
+  email_sent_at?: string;
+  customer_email?: string;
 }
 
 // 상태 한글 라벨
