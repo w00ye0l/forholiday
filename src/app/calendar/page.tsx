@@ -4,25 +4,19 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  CalendarIcon,
-  MapPinIcon,
-  UserIcon,
-  RefreshCw,
-  AlertCircle,
-} from "lucide-react";
+import { CalendarIcon, RefreshCw, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import {
-  RESERVATION_SITE_LABELS,
   PICKUP_METHOD_LABELS,
   RETURN_METHOD_LABELS,
-  type ReservationSite,
   type PickupMethod,
   type ReturnMethod,
   type RentalReservation,
 } from "@/types/rental";
 import { type DeviceCategory } from "@/types/device";
+import { matchPickupAndReturn } from "@/lib/algorithms/calendar-matching";
+import { ReservationSite } from "@/types/rental";
 
 interface CalendarEvent {
   [key: string]: any; // 원본 데이터를 받기 위해 유연한 타입으로 변경
@@ -33,56 +27,69 @@ interface CalendarResponse {
   events: CalendarEvent[];
   total: number;
   calendarId: string;
+  period?: {
+    year: number;
+    startMonth: number;
+    endMonth: number;
+  };
   rawResponse?: any;
   error?: string;
   detail?: string;
   serviceAccountEmail?: string;
 }
 
+interface MatchedReservation extends Partial<RentalReservation> {
+  pickup_event?: CalendarEvent;
+  return_event?: CalendarEvent;
+  match_confidence: number;
+  match_reason: string[];
+}
+
+// 캘린더 데이터를 예약 생성용 DTO로 변환
+interface CalendarToReservationDto {
+  device_category: DeviceCategory;
+  pickup_date: string;
+  pickup_time: string;
+  return_date: string;
+  return_time: string;
+  pickup_method: PickupMethod;
+  return_method: ReturnMethod;
+  data_transmission: boolean;
+  sd_option?: "대여" | "구매" | "구매+대여" | null;
+  reservation_site: ReservationSite;
+  renter_name: string;
+  renter_phone?: string;
+  renter_email?: string;
+  renter_address: string;
+  order_number?: string;
+  contact_input_type: "text" | "image";
+  description?: string;
+}
+
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [matchedReservations, setMatchedReservations] = useState<
+    MatchedReservation[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [calendarId, setCalendarId] = useState<string>("");
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    return `${year}-${month}`;
-  });
-  const [viewMode, setViewMode] = useState<"simple" | "raw" | "matched">(
-    "simple"
+  const [viewMode, setViewMode] = useState<"raw" | "matched" | "reservations">(
+    "reservations"
   );
+  const [selectedYear, setSelectedYear] = useState<number>(
+    new Date().getFullYear()
+  );
+  const [selectedMonth, setSelectedMonth] = useState<number>(5);
+  const [showIncompleteOnly, setShowIncompleteOnly] = useState<boolean>(false);
+  const [creatingReservation, setCreatingReservation] = useState<string | null>(null);
 
-  const fetchCalendarEvents = async (month?: string) => {
+  const fetchMonthlyEvents = async (year: number, month: number) => {
     try {
       setLoading(true);
       setError(null);
 
-      let url = "/api/calendar/events";
-      const params = new URLSearchParams();
-
-      if (month) {
-        const [year, monthNum] = month.split("-");
-        const startDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-        const endDate = new Date(
-          parseInt(year),
-          parseInt(monthNum),
-          0,
-          23,
-          59,
-          59
-        );
-
-        params.append("timeMin", startDate.toISOString());
-        params.append("timeMax", endDate.toISOString());
-        params.append("maxResults", "100");
-      }
-
-      if (params.toString()) {
-        url += `?${params.toString()}`;
-      }
-
+      const url = `/api/calendar/monthly?year=${year}&month=${month}`;
       const response = await fetch(url);
       const data: CalendarResponse = await response.json();
 
@@ -91,14 +98,16 @@ export default function CalendarPage() {
         if (data.detail) {
           errorMessage += ` (${data.detail})`;
         }
-        if (data.serviceAccountEmail) {
-          errorMessage += ` 서비스 계정: ${data.serviceAccountEmail}`;
-        }
         throw new Error(errorMessage);
       }
 
-      setEvents(data.events || []);
+      const allEvents = data.events || [];
+      setEvents(allEvents);
       setCalendarId(data.calendarId || "");
+
+      // 수령/반납 이벤트 매칭 (수령 월 기준)
+      const matched = matchPickupAndReturn(allEvents);
+      setMatchedReservations(matched);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다."
@@ -108,9 +117,10 @@ export default function CalendarPage() {
     }
   };
 
+  // 초기 로드만 수행
   useEffect(() => {
-    fetchCalendarEvents(selectedMonth);
-  }, [selectedMonth]);
+    fetchMonthlyEvents(selectedYear, selectedMonth);
+  }, []); // 빈 배열로 초기 로드만 수행
 
   const formatDateTime = (dateTimeString: string | undefined) => {
     if (!dateTimeString) return "N/A";
@@ -134,15 +144,6 @@ export default function CalendarPage() {
     const summary = event.summary || "";
     const description = event.description || "";
     const fullText = summary + " " + description;
-
-    // 예약 사이트 파싱
-    let reservation_site: ReservationSite | null = null;
-    for (const [key, label] of Object.entries(RESERVATION_SITE_LABELS)) {
-      if (fullText.includes(label)) {
-        reservation_site = key as ReservationSite;
-        break;
-      }
-    }
 
     // 캘린더 이벤트 패턴: 수령or반납 방법/이름/연락처/기기카테고리
     // 수령/반납 구분 및 방법 파싱
@@ -261,19 +262,12 @@ export default function CalendarPage() {
     // 슬래시(/)로 구분된 패턴에서 이름 추출
     const slashParts = summary.split("/").map((part: string) => part.trim());
 
-    // 1. 슬래시 구분에서 이름 찾기 (방법 다음 부분)
+    // 1. 슬래시 구분에서 이름 찾기 - 첫 번째 슬래시 뒤의 문자열이 이름
     if (slashParts.length >= 2) {
-      // 첫 번째 부분이 수령/반납 방법이라고 가정하고, 두 번째 부분을 이름으로 시도
       const namePart = slashParts[1];
-      // 한글 이름 (2-4글자)
-      const koreanNameMatch = namePart.match(/^([가-힣]{2,4})$/);
-      // 영어 이름 (2-20글자, 공백 포함 가능)
-      const englishNameMatch = namePart.match(/^([A-Za-z\s]{2,20})$/);
-
-      if (koreanNameMatch) {
-        renter_name = koreanNameMatch[1];
-      } else if (englishNameMatch) {
-        renter_name = englishNameMatch[1].trim();
+      // 빈 문자열이 아니면 이름으로 사용
+      if (namePart && namePart.length > 0) {
+        renter_name = namePart;
       }
     }
 
@@ -567,7 +561,6 @@ export default function CalendarPage() {
       fullText.includes("사진 전송");
 
     const hasMatchedData = !!(
-      reservation_site ||
       pickup_method ||
       return_method ||
       renter_name ||
@@ -590,7 +583,6 @@ export default function CalendarPage() {
       return_method: return_method || undefined,
       data_transmission,
       sd_option: sd_option || undefined,
-      reservation_site: reservation_site || undefined,
       renter_name: renter_name || undefined,
       renter_phone: renter_phone || undefined,
       renter_address: renter_address || "",
@@ -600,6 +592,83 @@ export default function CalendarPage() {
       isPickup,
       isReturn,
     };
+  };
+
+  // 캘린더 매칭 데이터를 예약 생성용 DTO로 변환
+  const convertToReservationDto = (matchedReservation: MatchedReservation): CalendarToReservationDto | null => {
+    // 필수 필드 검증
+    if (!matchedReservation.device_category ||
+        !matchedReservation.pickup_date ||
+        !matchedReservation.pickup_time ||
+        !matchedReservation.return_date ||
+        !matchedReservation.return_time ||
+        !matchedReservation.pickup_method ||
+        !matchedReservation.return_method ||
+        !matchedReservation.renter_name) {
+      return null;
+    }
+
+    // 기본값 설정
+    const reservationSite: ReservationSite = "forholiday"; // 기본값: 포할리데이 홈페이지
+    const contactInputType: "text" | "image" = "text"; // 기본값: 텍스트 입력
+    const renterAddress = matchedReservation.renter_address || ""; // 빈 문자열 기본값
+
+    return {
+      device_category: matchedReservation.device_category,
+      pickup_date: matchedReservation.pickup_date,
+      pickup_time: matchedReservation.pickup_time,
+      return_date: matchedReservation.return_date,
+      return_time: matchedReservation.return_time,
+      pickup_method: matchedReservation.pickup_method,
+      return_method: matchedReservation.return_method,
+      data_transmission: matchedReservation.data_transmission || false,
+      sd_option: matchedReservation.sd_option || null,
+      reservation_site: reservationSite,
+      renter_name: matchedReservation.renter_name,
+      renter_phone: matchedReservation.renter_phone,
+      renter_email: undefined, // 캘린더에서 파싱 불가
+      renter_address: renterAddress,
+      order_number: matchedReservation.order_number,
+      contact_input_type: contactInputType,
+      description: matchedReservation.description,
+    };
+  };
+
+  // 예약 생성 핸들러
+  const handleCreateReservation = async (matchedReservation: MatchedReservation) => {
+    const reservationDto = convertToReservationDto(matchedReservation);
+    if (!reservationDto) {
+      alert("필수 데이터가 부족하여 예약을 생성할 수 없습니다.");
+      return;
+    }
+
+    const reservationKey = (matchedReservation.renter_name || "") + (matchedReservation.pickup_date || "");
+    setCreatingReservation(reservationKey);
+
+    try {
+      const response = await fetch("/api/rentals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(reservationDto),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        alert(`예약이 성공적으로 생성되었습니다.\n예약번호: ${result.data.reservation_id}`);
+        // 성공 후 페이지 새로고침 또는 상태 업데이트
+        fetchMonthlyEvents(selectedYear, selectedMonth);
+      } else {
+        alert(`예약 생성에 실패했습니다.\n오류: ${result.error || "알 수 없는 오류"}`);
+      }
+    } catch (error) {
+      console.error("예약 생성 에러:", error);
+      alert("예약 생성 중 오류가 발생했습니다.");
+    } finally {
+      setCreatingReservation(null);
+    }
   };
 
   if (loading) {
@@ -628,7 +697,9 @@ export default function CalendarPage() {
           <CardContent>
             <p className="text-red-600 mb-4">{error}</p>
             <Button
-              onClick={() => fetchCalendarEvents(selectedMonth)}
+              onClick={() => {
+                fetchMonthlyEvents(selectedYear, selectedMonth);
+              }}
               variant="outline"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -649,71 +720,100 @@ export default function CalendarPage() {
             캘린더 ID: {calendarId} | 총 {events.length}개 이벤트
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-4 py-2 border rounded-md"
-          >
-            {(() => {
-              const options = [];
-              const currentDate = new Date();
-              const currentYear = currentDate.getFullYear();
-
-              // 작년부터 내년까지 3년간의 월 옵션 생성
-              for (
-                let year = currentYear - 1;
-                year <= currentYear + 1;
-                year++
-              ) {
-                for (let month = 1; month <= 12; month++) {
-                  const monthStr = String(month).padStart(2, "0");
-                  const value = `${year}-${monthStr}`;
-                  const label = `${year}년 ${month}월`;
-                  options.push(
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  );
-                }
-              }
-              return options;
-            })()}
-          </select>
-          <div className="flex gap-2">
+        <div className="flex flex-col gap-4">
+          {/* 첫 번째 줄: 데이터 조회 컨트롤 */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                className="px-3 py-2 border rounded text-sm"
+              >
+                <option value={2023}>2023년</option>
+                <option value={2024}>2024년</option>
+                <option value={2025}>2025년</option>
+              </select>
+              <select
+                className="px-3 py-2 border rounded text-sm"
+                value={selectedMonth}
+                id="monthSelect"
+                onChange={(e) => {
+                  setSelectedMonth(parseInt(e.target.value));
+                }}
+              >
+                <option value={1}>1월</option>
+                <option value={2}>2월</option>
+                <option value={3}>3월</option>
+                <option value={4}>4월</option>
+                <option value={5}>5월</option>
+                <option value={6}>6월</option>
+                <option value={7}>7월</option>
+                <option value={8}>8월</option>
+                <option value={9}>9월</option>
+                <option value={10}>10월</option>
+                <option value={11}>11월</option>
+                <option value={12}>12월</option>
+              </select>
+              <Button
+                onClick={() => {
+                  fetchMonthlyEvents(selectedYear, selectedMonth);
+                }}
+                variant="default"
+                size="sm"
+              >
+                월별 조회 (다음달 반납 포함)
+              </Button>
+            </div>
+            <div className="h-6 w-px bg-gray-300" />
             <Button
-              onClick={() => setViewMode("simple")}
-              variant={viewMode === "simple" ? "default" : "outline"}
+              onClick={() => {
+                fetchMonthlyEvents(selectedYear, selectedMonth);
+              }}
+              variant="outline"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              새로고침
+            </Button>
+          </div>
+
+          {/* 두 번째 줄: 보기 모드 선택 */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 mr-2">보기 모드:</span>
+            <Button
+              onClick={() => setViewMode("reservations")}
+              variant={viewMode === "reservations" ? "default" : "outline"}
               size="sm"
             >
-              간단히 보기
+              예약 매칭 결과
             </Button>
             <Button
               onClick={() => setViewMode("matched")}
               variant={viewMode === "matched" ? "default" : "outline"}
               size="sm"
             >
-              사이트 매칭 데이터 보기
+              이벤트 파싱 결과
             </Button>
             <Button
               onClick={() => setViewMode("raw")}
               variant={viewMode === "raw" ? "default" : "outline"}
               size="sm"
             >
-              원본 데이터 보기
+              원본 데이터
+            </Button>
+            <div className="h-6 w-px bg-gray-300 mx-2" />
+            <Button
+              onClick={() => setShowIncompleteOnly(!showIncompleteOnly)}
+              variant={showIncompleteOnly ? "default" : "outline"}
+              size="sm"
+              className={showIncompleteOnly ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700 text-white"}
+            >
+              {showIncompleteOnly ? "불완전 매칭만 보기" : "완전 매칭만 보기"} ({showIncompleteOnly ? "ON" : "ON"})
             </Button>
           </div>
-          <Button
-            onClick={() => fetchCalendarEvents(selectedMonth)}
-            variant="outline"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            새로고침
-          </Button>
         </div>
       </div>
 
-      {events.length === 0 ? (
+      {events.length === 0 && (
         <Card>
           <CardContent className="flex items-center justify-center min-h-[200px]">
             <div className="text-center">
@@ -724,135 +824,332 @@ export default function CalendarPage() {
             </div>
           </CardContent>
         </Card>
-      ) : (
+      )}
+
+      {events.length > 0 && viewMode === "reservations" && (
+        // 예약 데이터 보기 - 매칭된 예약 정보
         <div className="space-y-4">
-          {viewMode === "raw" ? (
-            // 원본 데이터 보기 - 간단한 리스트 형태
-            <div className="space-y-2">
-              {events.map((event, index) => (
-                <div key={event.id || index} className="border rounded-lg p-4 bg-gray-50">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-sm">{event.summary || `이벤트 #${index + 1}`}</h3>
-                    <span className="text-xs text-gray-500">
-                      {event.start?.dateTime ? formatDateTime(event.start.dateTime) : event.start?.date || "날짜 없음"}
-                    </span>
-                  </div>
-                  <pre className="text-xs whitespace-pre-wrap break-words overflow-auto max-h-40 bg-white p-2 rounded">
-                    {JSON.stringify(event, null, 2)}
-                  </pre>
-                </div>
-              ))}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">
+              매칭된 예약 데이터
+              <span className={`text-base ml-2 ${showIncompleteOnly ? 'text-orange-600' : 'text-green-600'}`}>
+                ({showIncompleteOnly ? '불완전 매칭만' : '완전 매칭만'})
+              </span>
+            </h2>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-sm">
+                {showIncompleteOnly
+                  ? `표시: ${matchedReservations.filter(r => (r.match_confidence || 0) < 0.9999).length}개`
+                  : `표시: ${matchedReservations.filter(r => (r.match_confidence || 0) >= 0.9999).length}개`}
+              </Badge>
+              <Badge variant="outline" className="text-sm text-gray-500">
+                전체: {matchedReservations.length}개
+              </Badge>
             </div>
-          ) : viewMode === "matched" ? (
-            // 매칭 데이터 보기 - 테이블 형태
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-100 border-b">
-                    <th className="text-left p-2 text-xs font-medium">시간</th>
-                    <th className="text-left p-2 text-xs font-medium">제목</th>
-                    <th className="text-left p-2 text-xs font-medium">유형</th>
-                    <th className="text-left p-2 text-xs font-medium">고객명</th>
-                    <th className="text-left p-2 text-xs font-medium">연락처</th>
-                    <th className="text-left p-2 text-xs font-medium">기기</th>
-                    <th className="text-left p-2 text-xs font-medium">수령/반납</th>
-                    <th className="text-left p-2 text-xs font-medium">예약처</th>
-                    <th className="text-left p-2 text-xs font-medium">상태</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {events.map((event, index) => {
-                    const parsedInfo = parseReservationInfo(event);
-                    return (
-                      <tr key={event.id || index} className="border-b hover:bg-gray-50">
-                        <td className="p-2 text-xs">
-                          {event.start?.dateTime ? format(new Date(event.start.dateTime), "MM/dd HH:mm") : event.start?.date || "-"}
-                        </td>
-                        <td className="p-2 text-xs truncate max-w-xs" title={event.summary}>
-                          {event.summary || "-"}
-                        </td>
-                        <td className="p-2">
-                          <div className="flex gap-1">
-                            {parsedInfo.isPickup && <Badge variant="default" className="text-xs">수령</Badge>}
-                            {parsedInfo.isReturn && <Badge variant="secondary" className="text-xs">반납</Badge>}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-100 border-b">
+                  <th className="text-left p-3 text-sm font-medium">예약 ID</th>
+                  <th className="text-left p-3 text-sm font-medium">고객명</th>
+                  <th className="text-left p-3 text-sm font-medium">연락처</th>
+                  <th className="text-left p-3 text-sm font-medium">기기</th>
+                  <th className="text-left p-3 text-sm font-medium">수령</th>
+                  <th className="text-left p-3 text-sm font-medium">반납</th>
+                  <th className="text-left p-3 text-sm font-medium">매칭도</th>
+                  <th className="text-left p-3 text-sm font-medium">
+                    매칭 이유
+                  </th>
+                  <th className="text-left p-3 text-sm font-medium">
+                    액션
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {matchedReservations
+                  .filter((reservation) => {
+                    const confidence = reservation.match_confidence || 0;
+                    
+                    if (showIncompleteOnly) {
+                      // 불완전 매칭만 보기가 켜져있으면, 매칭도가 100% 미만인 것만 표시
+                      return confidence < 0.9999;
+                    } else {
+                      // 완전 매칭만 보기가 켜져있으면, 매칭도가 100%인 것만 표시
+                      return confidence >= 0.9999;
+                    }
+                  })
+                  .map((reservation, index) => (
+                  <tr
+                    key={reservation.reservation_id || index}
+                    className="border-b hover:bg-gray-50"
+                  >
+                    <td className="p-3 text-sm font-mono">
+                      {reservation.reservation_id || "-"}
+                    </td>
+                    <td className="p-3 text-sm">
+                      {reservation.renter_name || "-"}
+                    </td>
+                    <td className="p-3 text-sm font-mono">
+                      {reservation.renter_phone || "-"}
+                    </td>
+                    <td className="p-3 text-sm">
+                      {reservation.device_category ? (
+                        <Badge variant="outline" className="text-xs">
+                          {reservation.device_category}
+                        </Badge>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="p-3 text-sm">
+                      <div className="space-y-1">
+                        {reservation.pickup_date && (
+                          <div className="text-xs">
+                            {format(new Date(reservation.pickup_date), "MM/dd")}{" "}
+                            {reservation.pickup_time}
                           </div>
-                        </td>
-                        <td className="p-2 text-xs">{parsedInfo.renter_name || "-"}</td>
-                        <td className="p-2 text-xs">
-                          {parsedInfo.renter_phone ? (
-                            <span className={/^\d+$/.test(parsedInfo.renter_phone) ? "font-mono" : ""}>
-                              {parsedInfo.renter_phone}
-                            </span>
-                          ) : "-"}
-                        </td>
-                        <td className="p-2 text-xs">
-                          {parsedInfo.device_category ? (
-                            <Badge variant="outline" className="text-xs">{parsedInfo.device_category}</Badge>
-                          ) : "-"}
-                        </td>
-                        <td className="p-2 text-xs">
-                          {parsedInfo.pickup_method && (
-                            <span className="text-green-600">{PICKUP_METHOD_LABELS[parsedInfo.pickup_method]}</span>
-                          )}
-                          {parsedInfo.pickup_method && parsedInfo.return_method && " / "}
-                          {parsedInfo.return_method && (
-                            <span className="text-orange-600">{RETURN_METHOD_LABELS[parsedInfo.return_method]}</span>
-                          )}
-                          {!parsedInfo.pickup_method && !parsedInfo.return_method && "-"}
-                        </td>
-                        <td className="p-2 text-xs">
-                          {parsedInfo.reservation_site ? RESERVATION_SITE_LABELS[parsedInfo.reservation_site] : "-"}
-                        </td>
-                        <td className="p-2 text-xs">
-                          {parsedInfo.hasMatchedData ? (
-                            <Badge variant="outline" className="text-xs">매칭됨</Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">미매칭</Badge>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        )}
+                        {reservation.pickup_method && (
+                          <Badge variant="default" className="text-xs">
+                            {
+                              PICKUP_METHOD_LABELS[
+                                reservation.pickup_method as PickupMethod
+                              ]
+                            }
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3 text-sm">
+                      <div className="space-y-1">
+                        {reservation.return_date && (
+                          <div className="text-xs">
+                            {format(new Date(reservation.return_date), "MM/dd")}{" "}
+                            {reservation.return_time}
+                          </div>
+                        )}
+                        {reservation.return_method && (
+                          <Badge variant="secondary" className="text-xs">
+                            {
+                              RETURN_METHOD_LABELS[
+                                reservation.return_method as ReturnMethod
+                              ]
+                            }
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3 text-sm">
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            reservation.match_confidence >= 0.8
+                              ? "bg-green-500"
+                              : reservation.match_confidence >= 0.5
+                              ? "bg-yellow-500"
+                              : reservation.match_confidence > 0
+                              ? "bg-orange-500"
+                              : "bg-gray-400"
+                          }`}
+                        />
+                        <span className="text-xs">
+                          {reservation.match_confidence > 0
+                            ? `${Math.round(
+                                reservation.match_confidence * 100
+                              )}%`
+                            : "없음"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="p-3 text-sm">
+                      <div className="text-xs text-gray-600 max-w-xs">
+                        {reservation.match_reason.join(", ")}
+                      </div>
+                    </td>
+                    <td className="p-3 text-sm">
+                      {convertToReservationDto(reservation) ? (
+                        <Button
+                          onClick={() => handleCreateReservation(reservation)}
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          disabled={creatingReservation === ((reservation.renter_name || "") + (reservation.pickup_date || ""))}
+                        >
+                          {creatingReservation === ((reservation.renter_name || "") + (reservation.pickup_date || "")) 
+                            ? "생성 중..." 
+                            : "예약 생성"}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-gray-400">
+                          데이터 부족
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {/* 필터링 결과가 비어있을 때 메시지 */}
+            {matchedReservations.filter(r => {
+              const confidence = r.match_confidence || 0;
+              return showIncompleteOnly ? confidence < 0.9999 : confidence >= 0.9999;
+            }).length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                {showIncompleteOnly ? (
+                  <>
+                    <p className="text-lg">🎯 모든 예약이 완벽하게 매칭되었습니다!</p>
+                    <p className="text-sm mt-2">100% 미만의 매칭 예약이 없습니다.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-lg">⚠️ 완전 매칭된 예약이 없습니다!</p>
+                    <p className="text-sm mt-2">100%로 매칭된 예약이 없습니다. 데이터를 확인해보세요.</p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {events.length > 0 && viewMode === "raw" && (
+        // 원본 데이터 보기 - 간단한 리스트 형태
+        <div className="space-y-2">
+          {events.map((event, index) => (
+            <div
+              key={event.id || index}
+              className="border rounded-lg p-4 bg-gray-50"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium text-sm">
+                  {event.summary || `이벤트 #${index + 1}`}
+                </h3>
+                <span className="text-xs text-gray-500">
+                  {event.start?.dateTime
+                    ? formatDateTime(event.start.dateTime)
+                    : event.start?.date || "날짜 없음"}
+                </span>
+              </div>
+              <pre className="text-xs whitespace-pre-wrap break-words overflow-auto max-h-40 bg-white p-2 rounded">
+                {JSON.stringify(event, null, 2)}
+              </pre>
             </div>
-          ) : (
-            // 간단히 보기 - 최소한의 정보만 표시
-            <div className="space-y-2">
-              {events.map((event, index) => (
-                <div key={event.id || index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm font-medium">{event.summary || `이벤트 #${index + 1}`}</span>
-                      <span className="text-xs text-gray-500">
-                        {event.start?.dateTime ? formatDateTime(event.start.dateTime) : event.start?.date || "날짜 없음"}
-                      </span>
-                    </div>
-                    {event.description && (
-                      <p className="text-xs text-gray-600 mt-1 truncate" title={event.description}>
-                        {event.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={event.status === "confirmed" ? "default" : "secondary"} className="text-xs">
-                      {event.status || "N/A"}
-                    </Badge>
-                    {event.htmlLink && (
-                      <a
-                        href={event.htmlLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 text-xs"
-                      >
-                        보기
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          ))}
+        </div>
+      )}
+
+      {events.length > 0 && viewMode === "matched" && (
+        // 매칭 데이터 보기 - 테이블 형태
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-100 border-b">
+                <th className="text-left p-2 text-xs font-medium">시간</th>
+                <th className="text-left p-2 text-xs font-medium">제목</th>
+                <th className="text-left p-2 text-xs font-medium">유형</th>
+                <th className="text-left p-2 text-xs font-medium">고객명</th>
+                <th className="text-left p-2 text-xs font-medium">연락처</th>
+                <th className="text-left p-2 text-xs font-medium">기기</th>
+                <th className="text-left p-2 text-xs font-medium">수령/반납</th>
+                <th className="text-left p-2 text-xs font-medium">상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((event, index) => {
+                const parsedInfo = parseReservationInfo(event);
+                return (
+                  <tr
+                    key={event.id || index}
+                    className="border-b hover:bg-gray-50"
+                  >
+                    <td className="p-2 text-xs">
+                      {event.start?.dateTime
+                        ? format(new Date(event.start.dateTime), "MM/dd HH:mm")
+                        : event.start?.date || "-"}
+                    </td>
+                    <td
+                      className="p-2 text-xs truncate max-w-xs"
+                      title={event.summary}
+                    >
+                      {event.summary || "-"}
+                    </td>
+                    <td className="p-2">
+                      <div className="flex gap-1">
+                        {parsedInfo.isPickup && (
+                          <Badge variant="default" className="text-xs">
+                            수령
+                          </Badge>
+                        )}
+                        {parsedInfo.isReturn && (
+                          <Badge variant="secondary" className="text-xs">
+                            반납
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-2 text-xs">
+                      {parsedInfo.renter_name || "-"}
+                    </td>
+                    <td className="p-2 text-xs">
+                      {parsedInfo.renter_phone ? (
+                        <span
+                          className={
+                            /^\d+$/.test(parsedInfo.renter_phone)
+                              ? "font-mono"
+                              : ""
+                          }
+                        >
+                          {parsedInfo.renter_phone}
+                        </span>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="p-2 text-xs">
+                      {parsedInfo.device_category ? (
+                        <Badge variant="outline" className="text-xs">
+                          {parsedInfo.device_category}
+                        </Badge>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="p-2 text-xs">
+                      {parsedInfo.pickup_method && (
+                        <span className="text-green-600">
+                          {PICKUP_METHOD_LABELS[parsedInfo.pickup_method]}
+                        </span>
+                      )}
+                      {parsedInfo.pickup_method &&
+                        parsedInfo.return_method &&
+                        " / "}
+                      {parsedInfo.return_method && (
+                        <span className="text-orange-600">
+                          {RETURN_METHOD_LABELS[parsedInfo.return_method]}
+                        </span>
+                      )}
+                      {!parsedInfo.pickup_method &&
+                        !parsedInfo.return_method &&
+                        "-"}
+                    </td>
+                    <td className="p-2 text-xs">
+                      {parsedInfo.hasMatchedData ? (
+                        <Badge variant="outline" className="text-xs">
+                          매칭됨
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs">
+                          미매칭
+                        </Badge>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
