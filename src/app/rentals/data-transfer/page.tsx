@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { DropboxCredentialsModal } from "@/components/admin/DropboxCredentialsModal";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -79,6 +80,11 @@ export default function DataTransferPage() {
   // 체크박스 상태
   const [selectedTransfers, setSelectedTransfers] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
+
+  // 드롭박스 모달 상태
+  const [showDropboxModal, setShowDropboxModal] = useState(false);
+  const [currentTransferIds, setCurrentTransferIds] = useState<string[]>([]);
+  const [isEmailSending, setIsEmailSending] = useState(false);
 
   useEffect(() => {
     checkUser();
@@ -354,16 +360,108 @@ export default function DataTransferPage() {
   };
 
   // 일괄 이메일 발송 핸들러
-  const handleBulkEmail = () => {
+  const handleBulkEmail = async () => {
     if (selectedTransfers.length === 0) {
       toast.error("이메일을 발송할 항목을 선택해주세요.");
       return;
     }
-    
-    // 선택된 전송 데이터들을 쿼리 파라미터로 전달
+
     const selectedData = filteredTransfers.filter(t => selectedTransfers.includes(t.id));
-    const transferIds = selectedData.map(t => t.id).join(',');
-    router.push(`/rentals/data-transfer/email?transfers=${transferIds}`);
+    
+    // 이메일 주소가 없는 항목 확인
+    const itemsWithoutEmail = selectedData.filter(t => !t.rental?.renter_email);
+    if (itemsWithoutEmail.length > 0) {
+      toast.error(`${itemsWithoutEmail.length}개 항목에 이메일 주소가 없습니다.`);
+      return;
+    }
+
+    // 드롭박스 모달 열기
+    setCurrentTransferIds(selectedTransfers);
+    setShowDropboxModal(true);
+  };
+
+  // 드롭박스 정보로 이메일 발송
+  const handleEmailWithDropbox = async (credentials: { username: string; password: string; accessInstructions?: string }) => {
+    try {
+      const selectedData = filteredTransfers.filter(t => currentTransferIds.includes(t.id));
+      
+      const emailPromises = selectedData.map(async (transfer) => {
+        try {
+          const formData = new FormData();
+          formData.append("to", transfer.rental!.renter_email || "");
+          formData.append("subject", ""); // 템플릿에서 자동 생성
+          formData.append("content", ""); // 템플릿에서 자동 생성
+          formData.append("transferId", transfer.id);
+          formData.append("templateType", "data-transfer-completion");
+          formData.append("reservationId", transfer.rental_id);
+          
+          // 드롭박스 정보 추가
+          formData.append("dropboxUsername", credentials.username);
+          formData.append("dropboxPassword", credentials.password);
+          if (credentials.accessInstructions) {
+            formData.append("accessInstructions", credentials.accessInstructions);
+          }
+
+          const response = await fetch("/api/send-email", {
+            method: "POST",
+            body: formData,
+          });
+
+          const result = await response.json();
+          if (!result.success) {
+            throw new Error(result.error || "Email sending failed");
+          }
+
+          // 상태 업데이트
+          await supabase
+            .from("data_transfers")
+            .update({
+              status: "EMAIL_SENT",
+              email_sent_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", transfer.id);
+
+          return { success: true, transferId: transfer.id };
+        } catch (error) {
+          console.error(`Error sending email for transfer ${transfer.id}:`, error);
+          return {
+            success: false,
+            transferId: transfer.id,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
+
+      const results = await Promise.all(emailPromises);
+      const successCount = results.filter((r) => r.success).length;
+      const failCount = results.filter((r) => !r.success).length;
+
+      if (successCount > 0) {
+        toast.success(`${successCount}개의 이메일이 성공적으로 발송되었습니다.`);
+      }
+
+      if (failCount > 0) {
+        toast.error(`${failCount}개의 이메일 발송에 실패했습니다.`);
+      }
+
+      // 데이터 새로고침 및 상태 초기화
+      if (successCount > 0) {
+        setSelectedTransfers([]);
+        setSelectAll(false);
+        fetchTransfers();
+      }
+      
+      // 모달 닫기
+      setShowDropboxModal(false);
+      setCurrentTransferIds([]);
+      
+    } catch (error) {
+      console.error("Error sending bulk emails:", error);
+      toast.error("이메일 발송 중 오류가 발생했습니다.");
+    } finally {
+      setIsEmailSending(false);
+    }
   };
 
   if (loading) {
@@ -689,6 +787,19 @@ export default function DataTransferPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 드롭박스 정보 입력 모달 */}
+      <DropboxCredentialsModal
+        isOpen={showDropboxModal}
+        onClose={() => {
+          if (!isEmailSending) {
+            setShowDropboxModal(false);
+            setCurrentTransferIds([]);
+          }
+        }}
+        onSubmit={handleEmailWithDropbox}
+        isLoading={isEmailSending}
+      />
     </div>
   );
 }

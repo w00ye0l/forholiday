@@ -18,6 +18,8 @@ import {
   ClockIcon,
   BoltIcon,
   HomeIcon,
+  SettingsIcon,
+  MailIcon,
 } from "lucide-react";
 
 import { NavStorage } from "@/components/nav-storage";
@@ -151,6 +153,12 @@ const allMenuItems = {
       url: "/admin/arrival-checkin",
       icon: PlaneIcon,
       menuKey: 'arrival_checkin_admin' as MenuKey,
+    },
+    {
+      title: "이메일 템플릿 관리",
+      url: "/admin/email-templates",
+      icon: MailIcon,
+      menuKey: 'data_management' as MenuKey,
     },
   ],
 };

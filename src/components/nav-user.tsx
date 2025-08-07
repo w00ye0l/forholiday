@@ -71,20 +71,6 @@ export function NavUser({
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem className="gap-2 p-2">
-            <UserCircleIcon className="size-4" />내 계정
-          </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2 p-2">
-            <CreditCardIcon className="size-4" />
-            결제 관리
-          </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2 p-2">
-            <BellIcon className="size-4" />
-            알림
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
         <DropdownMenuItem
           className="gap-2 p-2 text-red-500 focus:text-red-500"
           onClick={handleLogout}
