@@ -28,6 +28,8 @@ interface ParsedEventInfo {
   return_method?: string;
   order_number?: string;
   reservation_id?: string;
+  data_transmission?: boolean;
+  sd_option?: "대여" | "구매" | "구매+대여";
   event_datetime: Date;
   original_event: CalendarEvent;
 }
@@ -171,6 +173,33 @@ export function parseEventInfo(event: CalendarEvent): ParsedEventInfo {
   const reservationIdMatch = fullText.match(/RT\d{8}[A-Z0-9]{4}/);
   const reservation_id = reservationIdMatch ? reservationIdMatch[0] : undefined;
 
+  // SD 옵션 파싱 - SD 키워드가 포함된 경우
+  let sd_option: "대여" | "구매" | "구매+대여" | undefined;
+  if (fullText.toUpperCase().includes("SD") || fullText.includes("메모리") || fullText.includes("SD카드")) {
+    if (fullText.includes("구매+대여") || fullText.includes("구매 + 대여")) {
+      sd_option = "구매+대여";
+    } else if (fullText.includes("구매")) {
+      sd_option = "구매";
+    } else if (fullText.includes("대여")) {
+      sd_option = "대여";
+    } else {
+      // SD 키워드만 있고 구체적인 옵션이 없는 경우 기본값으로 "대여" 설정
+      sd_option = "대여";
+    }
+  }
+
+  // 데이터 전송 여부 파싱 - 데이터 키워드가 포함된 경우
+  const data_transmission = 
+    fullText.includes("데이터전송") ||
+    fullText.includes("데이터 전송") ||
+    fullText.includes("사진전송") ||
+    fullText.includes("사진 전송") ||
+    fullText.includes("데이터") || // "데이터" 텍스트만 있어도 true
+    fullText.includes("사진") ||   // "사진" 텍스트만 있어도 true
+    fullText.includes("동영상") ||
+    fullText.includes("영상") ||
+    fullText.includes("파일");
+
   // 이벤트 시간
   const event_datetime = new Date(
     event.start?.dateTime || event.start?.date || new Date()
@@ -187,6 +216,8 @@ export function parseEventInfo(event: CalendarEvent): ParsedEventInfo {
     return_method,
     order_number,
     reservation_id,
+    data_transmission,
+    sd_option,
     event_datetime,
     original_event: event,
   };
@@ -360,6 +391,9 @@ export function matchPickupAndReturn(
       renter_phone: match.pickup.renter_phone || "",
       renter_address: match.pickup.renter_address || match.return.renter_address || "",
       order_number: match.pickup.order_number,
+      // SD 옵션과 데이터 전송 - 수령과 반납 중 하나라도 있으면 true/값 설정
+      data_transmission: match.pickup.data_transmission || match.return.data_transmission || false,
+      sd_option: match.pickup.sd_option || match.return.sd_option,
       pickup_event: match.pickup.original_event,
       return_event: match.return.original_event,
       match_confidence: match.score,
@@ -388,6 +422,9 @@ export function matchPickupAndReturn(
         renter_phone: pickupEvent.renter_phone || "",
         renter_address: pickupEvent.renter_address || "",
         order_number: pickupEvent.order_number,
+        // 수령만 있는 경우의 옵션 정보
+        data_transmission: pickupEvent.data_transmission || false,
+        sd_option: pickupEvent.sd_option,
         pickup_event: pickupEvent.original_event,
         match_confidence: 0,
         match_reason: ["수령만"],

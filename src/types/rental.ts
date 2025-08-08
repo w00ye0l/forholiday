@@ -26,13 +26,16 @@ export type ReservationSite =
   | "hanatour";
 
 // 상태별 라벨 및 스타일 매핑 (DB 상태만 포함)
-export const STATUS_MAP: Record<ReservationStatus, {
-  label: string;
-  variant: "default" | "secondary" | "destructive" | "outline";
-  color: string;
-  badge: string;
-  button: string;
-}> = {
+export const STATUS_MAP: Record<
+  ReservationStatus,
+  {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+    color: string;
+    badge: string;
+    button: string;
+  }
+> = {
   pending: {
     label: "수령전",
     variant: "secondary" as const,
@@ -195,7 +198,7 @@ export interface CreateRentalReservationDto {
 }
 
 export type DataTransferStatus =
-  | "PENDING_UPLOAD"
+  | "PENDING"
   | "UPLOADED"
   | "EMAIL_SENT"
   | "ISSUE";

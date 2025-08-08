@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DataTransfer, DataTransferStatus } from "@/types/rental";
+import { RentalReservation, DataTransferStatus } from "@/types/rental";
 import { Card } from "@/components/ui/card";
 import {
   Select,
@@ -48,7 +48,7 @@ import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const statusOptions: { value: DataTransferStatus; label: string }[] = [
-  { value: "PENDING_UPLOAD", label: "업로드전" },
+  { value: "PENDING", label: "대기중" },
   { value: "UPLOADED", label: "업로드 완료" },
   { value: "EMAIL_SENT", label: "메일발송완료" },
   { value: "ISSUE", label: "문제있음" },
@@ -58,7 +58,20 @@ export default function DataTransferPage() {
   const [selectedStatus, setSelectedStatus] = useState<
     DataTransferStatus | "ALL"
   >("ALL");
-  const [transfers, setTransfers] = useState<DataTransfer[]>([]);
+  const [transfers, setTransfers] = useState<
+    (RentalReservation & {
+      data_transfer_status: DataTransferStatus;
+      uploaded_at?: string;
+      email_sent_at?: string;
+      issue?: string;
+      devices: {
+        id: string;
+        tag_name: string;
+        category: string;
+        status: string;
+      };
+    })[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabase = createClient();
@@ -110,29 +123,36 @@ export default function DataTransferPage() {
 
   const fetchTransfers = async () => {
     try {
-      let query = supabase.from("data_transfers").select(
-        `
+      // rental_reservations 테이블에서 data_transmission = true인 예약들을 조회
+      const { data, error } = await supabase
+        .from("rental_reservations")
+        .select(
+          `
           *,
-          rental:rental_reservations (
-            renter_name,
-            renter_phone,
-            renter_email,
-            device_category,
-            device_tag_name,
-            return_date,
-            description
+          devices (
+            id,
+            tag_name,
+            category,
+            status
           )
         `
-      );
-
-      // 날짜 필터는 클라이언트 사이드에서 처리
-
-      const { data, error } = await query.order("created_at", {
-        ascending: false,
-      });
+        )
+        .eq("data_transmission", true)
+        .is("cancelled_at", null)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setTransfers(data || []);
+
+      // 데이터 전송 상태를 기본값으로 설정 (추후 별도 컬럼 추가 시 여기서 조회)
+      const transfersWithStatus = (data || []).map((rental) => ({
+        ...rental,
+        data_transfer_status: "PENDING" as DataTransferStatus,
+        uploaded_at: undefined,
+        email_sent_at: undefined,
+        issue: undefined,
+      }));
+
+      setTransfers(transfersWithStatus);
     } catch (error) {
       console.error("Error fetching transfers:", error);
       toast.error("데이터 전송 목록을 불러오는데 실패했습니다.");
@@ -142,45 +162,28 @@ export default function DataTransferPage() {
   };
 
   const handleStatusChange = async (
-    transferId: string,
+    reservationId: string,
     newStatus: DataTransferStatus
   ) => {
     try {
-      const updateData: any = {
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (newStatus === "UPLOADED") {
-        updateData.uploaded_at = new Date().toISOString();
-      } else if (newStatus === "EMAIL_SENT") {
-        updateData.email_sent_at = new Date().toISOString();
-      }
-
-      const { data, error } = await supabase
-        .from("data_transfers")
-        .update(updateData)
-        .eq("id", transferId)
-        .select(
-          `
-          *,
-          rental:rental_reservations (
-            renter_name,
-            renter_phone,
-            renter_email,
-            device_category,
-            device_tag_name,
-            return_date,
-            description
-          )
-        `
-        )
-        .single();
-
-      if (error) throw error;
-
+      // 현재는 클라이언트 상태만 업데이트 (추후 별도 컬럼 추가 시 DB 업데이트)
       setTransfers((prev) =>
-        prev.map((transfer) => (transfer.id === transferId ? data : transfer))
+        prev.map((transfer) =>
+          transfer.reservation_id === reservationId
+            ? {
+                ...transfer,
+                data_transfer_status: newStatus,
+                uploaded_at:
+                  newStatus === "UPLOADED"
+                    ? new Date().toISOString()
+                    : transfer.uploaded_at,
+                email_sent_at:
+                  newStatus === "EMAIL_SENT"
+                    ? new Date().toISOString()
+                    : transfer.email_sent_at,
+              }
+            : transfer
+        )
       );
       toast.success("상태가 변경되었습니다.");
     } catch (error) {
@@ -193,43 +196,28 @@ export default function DataTransferPage() {
     if (!selectedTransferId) return;
 
     try {
-      // 먼저 data_transfer 레코드를 조회하여 rental_id 가져오기
-      const { data: transferData, error: transferError } = await supabase
-        .from("data_transfers")
-        .select("rental_id")
-        .eq("id", selectedTransferId)
-        .single();
-
-      if (transferError) throw transferError;
-
-      // 1. 예약 테이블의 data_transmission을 false로 변경
+      // rental_reservations 테이블의 data_transmission을 false로 변경
       const { error: rentalUpdateError } = await supabase
         .from("rental_reservations")
         .update({
           data_transmission: false,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", transferData.rental_id);
+        .eq("reservation_id", selectedTransferId);
 
       if (rentalUpdateError) throw rentalUpdateError;
 
-      // 2. data_transfers 테이블에서 해당 레코드 삭제
-      const { error: deleteError } = await supabase
-        .from("data_transfers")
-        .delete()
-        .eq("id", selectedTransferId);
-
-      if (deleteError) throw deleteError;
-
-      // 3. 로컬 상태에서 해당 데이터 제거
+      // 로컬 상태에서 해당 데이터 제거
       setTransfers((prev) =>
-        prev.filter((transfer) => transfer.id !== selectedTransferId)
+        prev.filter(
+          (transfer) => transfer.reservation_id !== selectedTransferId
+        )
       );
 
-      toast.success("구매가 취소되었습니다.");
+      toast.success("데이터 전송이 취소되었습니다.");
     } catch (error) {
-      console.error("Error cancelling purchase:", error);
-      toast.error("구매 취소에 실패했습니다.");
+      console.error("Error cancelling data transfer:", error);
+      toast.error("데이터 전송 취소에 실패했습니다.");
     } finally {
       setShowCancelDialog(false);
       setSelectedTransferId(null);
@@ -240,7 +228,7 @@ export default function DataTransferPage() {
     status: DataTransferStatus
   ): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
-      case "PENDING_UPLOAD":
+      case "PENDING":
         return "default";
       case "UPLOADED":
         return "secondary";
@@ -256,7 +244,10 @@ export default function DataTransferPage() {
   // 검색 필터링 로직
   const filteredTransfers = transfers.filter((transfer) => {
     // 상태 필터링
-    if (selectedStatus !== "ALL" && transfer.status !== selectedStatus) {
+    if (
+      selectedStatus !== "ALL" &&
+      transfer.data_transfer_status !== selectedStatus
+    ) {
       return false;
     }
 
@@ -264,23 +255,20 @@ export default function DataTransferPage() {
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
       const matchesSearch =
-        transfer.rental?.renter_name?.toLowerCase().includes(term) ||
-        transfer.rental?.renter_phone?.includes(term) ||
-        transfer.rental?.renter_email?.toLowerCase().includes(term) ||
-        transfer.rental?.device_tag_name?.toLowerCase().includes(term) ||
-        transfer.rental?.device_category?.toLowerCase().includes(term);
+        transfer.renter_name?.toLowerCase().includes(term) ||
+        transfer.renter_phone?.includes(term) ||
+        transfer.renter_email?.toLowerCase().includes(term) ||
+        transfer.device_tag_name?.toLowerCase().includes(term) ||
+        transfer.device_category?.toLowerCase().includes(term);
 
       if (!matchesSearch) return false;
     }
 
     // 날짜 필터링 (기간 설정)
-    if (dateRange?.from && dateRange?.to && transfer.rental?.return_date) {
+    if (dateRange?.from && dateRange?.to && transfer.return_date) {
       const fromStr = format(dateRange.from, "yyyy-MM-dd");
       const toStr = format(dateRange.to, "yyyy-MM-dd");
-      if (
-        transfer.rental.return_date < fromStr ||
-        transfer.rental.return_date > toStr
-      ) {
+      if (transfer.return_date < fromStr || transfer.return_date > toStr) {
         return false;
       }
     }
@@ -306,23 +294,20 @@ export default function DataTransferPage() {
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase().trim();
         const matchesSearch =
-          transfer.rental?.renter_name?.toLowerCase().includes(term) ||
-          transfer.rental?.renter_phone?.includes(term) ||
-          transfer.rental?.renter_email?.toLowerCase().includes(term) ||
-          transfer.rental?.device_tag_name?.toLowerCase().includes(term) ||
-          transfer.rental?.device_category?.toLowerCase().includes(term);
+          transfer.renter_name?.toLowerCase().includes(term) ||
+          transfer.renter_phone?.includes(term) ||
+          transfer.renter_email?.toLowerCase().includes(term) ||
+          transfer.device_tag_name?.toLowerCase().includes(term) ||
+          transfer.device_category?.toLowerCase().includes(term);
 
         if (!matchesSearch) return false;
       }
 
       // 날짜 필터링 (기간 설정)
-      if (dateRange?.from && dateRange?.to && transfer.rental?.return_date) {
+      if (dateRange?.from && dateRange?.to && transfer.return_date) {
         const fromStr = format(dateRange.from, "yyyy-MM-dd");
         const toStr = format(dateRange.to, "yyyy-MM-dd");
-        if (
-          transfer.rental.return_date < fromStr ||
-          transfer.rental.return_date > toStr
-        ) {
+        if (transfer.return_date < fromStr || transfer.return_date > toStr) {
           return false;
         }
       }
@@ -332,11 +317,16 @@ export default function DataTransferPage() {
 
     return {
       all: baseFiltered.length,
-      PENDING_UPLOAD: baseFiltered.filter((t) => t.status === "PENDING_UPLOAD")
+      PENDING: baseFiltered.filter((t) => t.data_transfer_status === "PENDING")
         .length,
-      UPLOADED: baseFiltered.filter((t) => t.status === "UPLOADED").length,
-      EMAIL_SENT: baseFiltered.filter((t) => t.status === "EMAIL_SENT").length,
-      ISSUE: baseFiltered.filter((t) => t.status === "ISSUE").length,
+      UPLOADED: baseFiltered.filter(
+        (t) => t.data_transfer_status === "UPLOADED"
+      ).length,
+      EMAIL_SENT: baseFiltered.filter(
+        (t) => t.data_transfer_status === "EMAIL_SENT"
+      ).length,
+      ISSUE: baseFiltered.filter((t) => t.data_transfer_status === "ISSUE")
+        .length,
     };
   };
 
@@ -348,19 +338,19 @@ export default function DataTransferPage() {
       setSelectedTransfers([]);
     } else {
       const uploadedTransfers = filteredTransfers
-        .filter((t) => t.status === "UPLOADED")
-        .map((t) => t.id);
+        .filter((t) => t.data_transfer_status === "UPLOADED")
+        .map((t) => t.reservation_id);
       setSelectedTransfers(uploadedTransfers);
     }
     setSelectAll(!selectAll);
   };
 
-  const handleSelectTransfer = (transferId: string) => {
+  const handleSelectTransfer = (reservationId: string) => {
     setSelectedTransfers((prev) => {
-      if (prev.includes(transferId)) {
-        return prev.filter((id) => id !== transferId);
+      if (prev.includes(reservationId)) {
+        return prev.filter((id) => id !== reservationId);
       } else {
-        return [...prev, transferId];
+        return [...prev, reservationId];
       }
     });
   };
@@ -373,13 +363,11 @@ export default function DataTransferPage() {
     }
 
     const selectedData = filteredTransfers.filter((t) =>
-      selectedTransfers.includes(t.id)
+      selectedTransfers.includes(t.reservation_id)
     );
 
     // 이메일 주소가 없는 항목 확인
-    const itemsWithoutEmail = selectedData.filter(
-      (t) => !t.rental?.renter_email
-    );
+    const itemsWithoutEmail = selectedData.filter((t) => !t.renter_email);
     if (itemsWithoutEmail.length > 0) {
       toast.error(
         `${itemsWithoutEmail.length}개 항목에 이메일 주소가 없습니다.`
@@ -400,18 +388,18 @@ export default function DataTransferPage() {
   }) => {
     try {
       const selectedData = filteredTransfers.filter((t) =>
-        currentTransferIds.includes(t.id)
+        currentTransferIds.includes(t.reservation_id)
       );
 
       const emailPromises = selectedData.map(async (transfer) => {
         try {
           const formData = new FormData();
-          formData.append("to", transfer.rental!.renter_email || "");
+          formData.append("to", transfer.renter_email || "");
           formData.append("subject", ""); // 템플릿에서 자동 생성
           formData.append("content", ""); // 템플릿에서 자동 생성
-          formData.append("transferId", transfer.id);
+          formData.append("transferId", transfer.reservation_id);
           formData.append("templateType", "data-transfer-completion");
-          formData.append("reservationId", transfer.rental_id);
+          formData.append("reservationId", transfer.reservation_id);
 
           // 드롭박스 정보 추가
           formData.append("dropboxUsername", credentials.username);
@@ -433,25 +421,18 @@ export default function DataTransferPage() {
             throw new Error(result.error || "Email sending failed");
           }
 
-          // 상태 업데이트
-          await supabase
-            .from("data_transfers")
-            .update({
-              status: "EMAIL_SENT",
-              email_sent_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", transfer.id);
+          // 상태 업데이트 - 현재는 클라이언트 상태만 업데이트 (추후 별도 테이블 필요시 DB 업데이트 추가)
+          // 현재 rental_reservations 테이블에는 data_transfer_status 컬럼이 없으므로 클라이언트 상태만 관리
 
-          return { success: true, transferId: transfer.id };
+          return { success: true, transferId: transfer.reservation_id };
         } catch (error) {
           console.error(
-            `Error sending email for transfer ${transfer.id}:`,
+            `Error sending email for transfer ${transfer.reservation_id}:`,
             error
           );
           return {
             success: false,
-            transferId: transfer.id,
+            transferId: transfer.reservation_id,
             error: error instanceof Error ? error.message : String(error),
           };
         }
@@ -575,14 +556,14 @@ export default function DataTransferPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setSelectedStatus("PENDING_UPLOAD")}
+            onClick={() => setSelectedStatus("PENDING")}
             className={`h-6 px-2 py-1 text-xs ${
-              selectedStatus === "PENDING_UPLOAD"
+              selectedStatus === "PENDING"
                 ? "bg-gray-200 text-gray-900 border-2 border-gray-400"
                 : "bg-gray-100 text-gray-800 hover:bg-gray-200"
             }`}
           >
-            업로드전: {statusCounts.PENDING_UPLOAD}건
+            대기중: {statusCounts.PENDING}건
           </Button>
           <Button
             variant="ghost"
@@ -685,9 +666,8 @@ export default function DataTransferPage() {
               <TableHead>상태</TableHead>
               <TableHead>업로드 일시</TableHead>
               <TableHead>메일 발송 일시</TableHead>
-              <TableHead>비고</TableHead>
               <TableHead>작업</TableHead>
-              <TableHead>구매 취소</TableHead>
+              <TableHead>데이터 전송 취소</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -699,38 +679,44 @@ export default function DataTransferPage() {
               </TableRow>
             ) : (
               filteredTransfers.map((transfer) => (
-                <TableRow key={transfer.id}>
+                <TableRow key={transfer.reservation_id}>
                   <TableCell className="w-8">
                     <input
                       type="checkbox"
                       className="accent-primary"
-                      checked={selectedTransfers.includes(transfer.id)}
-                      onChange={() => handleSelectTransfer(transfer.id)}
-                      disabled={transfer.status !== "UPLOADED"}
+                      checked={selectedTransfers.includes(
+                        transfer.reservation_id
+                      )}
+                      onChange={() =>
+                        handleSelectTransfer(transfer.reservation_id)
+                      }
+                      disabled={transfer.data_transfer_status !== "UPLOADED"}
                     />
                   </TableCell>
-                  <TableCell>{transfer.rental?.renter_name || "-"}</TableCell>
-                  <TableCell>{transfer.rental?.renter_phone || "-"}</TableCell>
-                  <TableCell>{transfer.rental?.renter_email || "-"}</TableCell>
+                  <TableCell>{transfer.renter_name || "-"}</TableCell>
+                  <TableCell>{transfer.renter_phone || "-"}</TableCell>
+                  <TableCell>{transfer.renter_email || "-"}</TableCell>
                   <TableCell>
-                    {transfer.rental?.device_tag_name ||
-                      transfer.rental?.device_category ||
+                    {transfer.device_tag_name ||
+                      transfer.device_category ||
                       "-"}
                   </TableCell>
                   <TableCell>
-                    {transfer.rental?.return_date
-                      ? format(
-                          new Date(transfer.rental.return_date),
-                          "yyyy-MM-dd",
-                          { locale: ko }
-                        )
+                    {transfer.return_date
+                      ? format(new Date(transfer.return_date), "yyyy-MM-dd", {
+                          locale: ko,
+                        })
                       : "-"}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getStatusBadgeVariant(transfer.status)}>
+                    <Badge
+                      variant={getStatusBadgeVariant(
+                        transfer.data_transfer_status
+                      )}
+                    >
                       {
                         statusOptions.find(
-                          (opt) => opt.value === transfer.status
+                          (opt) => opt.value === transfer.data_transfer_status
                         )?.label
                       }
                     </Badge>
@@ -754,14 +740,11 @@ export default function DataTransferPage() {
                       : "-"}
                   </TableCell>
                   <TableCell>
-                    {transfer.rental?.description || transfer.issue || "-"}
-                  </TableCell>
-                  <TableCell>
                     <Select
-                      value={transfer.status}
+                      value={transfer.data_transfer_status}
                       onValueChange={(value) =>
                         handleStatusChange(
-                          transfer.id,
+                          transfer.reservation_id,
                           value as DataTransferStatus
                         )
                       }
@@ -783,12 +766,12 @@ export default function DataTransferPage() {
                       variant="destructive"
                       size="sm"
                       onClick={() => {
-                        setSelectedTransferId(transfer.id);
+                        setSelectedTransferId(transfer.reservation_id);
                         setShowCancelDialog(true);
                       }}
                       className="h-8 px-3"
                     >
-                      구매 취소
+                      데이터 전송 취소
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -802,9 +785,9 @@ export default function DataTransferPage() {
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>구매 취소 확인</AlertDialogTitle>
+            <AlertDialogTitle>데이터 전송 취소 확인</AlertDialogTitle>
             <AlertDialogDescription>
-              정말로 데이터 구매를 취소하시겠습니까?
+              정말로 데이터 전송을 취소하시겠습니까?
               <br />이 작업은 되돌릴 수 없습니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -813,7 +796,7 @@ export default function DataTransferPage() {
               취소
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleCancelConfirm}>
-              구매 취소
+              데이터 전송 취소
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

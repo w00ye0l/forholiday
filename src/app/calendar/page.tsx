@@ -85,10 +85,15 @@ export default function CalendarPage() {
   );
   const [selectedMonth, setSelectedMonth] = useState<number>(5);
   const [showIncompleteOnly, setShowIncompleteOnly] = useState<boolean>(false);
+  const [showOptionsOnly, setShowOptionsOnly] = useState<boolean>(false);
   const [creatingReservation, setCreatingReservation] = useState<string | null>(
     null
   );
+  const [updatingReservation, setUpdatingReservation] = useState<string | null>(
+    null
+  );
   const [batchCreating, setBatchCreating] = useState(false);
+  const [batchUpdating, setBatchUpdating] = useState(false);
 
   const fetchMonthlyEvents = async (year: number, month: number) => {
     try {
@@ -546,24 +551,30 @@ export default function CalendarPage() {
       }
     }
 
-    // SD 옵션 파싱
+    // SD 옵션 파싱 - SD 키워드가 포함된 경우
     let sd_option: "대여" | "구매" | "구매+대여" | null = null;
-    if (fullText.includes("SD") || fullText.includes("메모리")) {
+    if (
+      fullText.toUpperCase().includes("SD") ||
+      fullText.includes("메모리") ||
+      fullText.includes("SD카드")
+    ) {
       if (fullText.includes("구매+대여") || fullText.includes("구매 + 대여")) {
         sd_option = "구매+대여";
       } else if (fullText.includes("구매")) {
         sd_option = "구매";
       } else if (fullText.includes("대여")) {
         sd_option = "대여";
+      } else {
+        // SD 키워드만 있고 구체적인 옵션이 없는 경우 기본값으로 "대여" 설정
+        sd_option = "대여";
       }
     }
 
-    // 데이터 전송 여부 파싱
+    // 데이터 전송 여부 파싱 - 데이터 키워드가 포함된 경우
     const data_transmission =
       fullText.includes("데이터전송") ||
       fullText.includes("데이터 전송") ||
-      fullText.includes("사진전송") ||
-      fullText.includes("사진 전송");
+      fullText.includes("데이터");
 
     const hasMatchedData = !!(
       pickup_method ||
@@ -623,7 +634,9 @@ export default function CalendarPage() {
     const renterAddress = matchedReservation.renter_address || ""; // 빈 문자열 기본값
 
     // 반납 날짜 기준으로 상태 결정
-    const returnDateTime = new Date(`${matchedReservation.return_date}T${matchedReservation.return_time}`);
+    const returnDateTime = new Date(
+      `${matchedReservation.return_date}T${matchedReservation.return_time}`
+    );
     const now = new Date();
     const status = returnDateTime < now ? "returned" : "pending";
 
@@ -698,6 +711,94 @@ export default function CalendarPage() {
       ...r,
       is_synced_to_db: false,
     }));
+  };
+
+  // 옵션 있는 예약 일괄 업데이트 핸들러
+  const handleBatchUpdateReservations = async () => {
+    const optionReservations = matchedReservations.filter(
+      (r) =>
+        r.is_synced_to_db &&
+        r.existing_reservation_id &&
+        (r.sd_option || r.data_transmission)
+    );
+
+    if (optionReservations.length === 0) {
+      alert("업데이트할 수 있는 옵션이 있는 예약이 없습니다.");
+      return;
+    }
+
+    const confirmed = confirm(
+      `${optionReservations.length}개의 예약에 옵션을 일괄 업데이트하시겠습니까?\n\n업데이트될 내용:\n${optionReservations
+        .map(
+          (r) =>
+            `• ${r.renter_name}: ${r.sd_option ? `SD ${r.sd_option}` : ""} ${
+              r.data_transmission ? "데이터전송" : ""
+            }`.trim()
+        )
+        .slice(0, 5)
+        .join("\n")}${
+        optionReservations.length > 5
+          ? `\n... 외 ${optionReservations.length - 5}개`
+          : ""
+      }`
+    );
+    if (!confirmed) return;
+
+    setBatchUpdating(true);
+    let successCount = 0;
+    let failCount = 0;
+    const errors: string[] = [];
+
+    try {
+      for (const reservation of optionReservations) {
+        try {
+          const updateData = {
+            data_transmission: reservation.data_transmission || false,
+            sd_option: reservation.sd_option || null,
+          };
+
+          const response = await fetch(
+            `/api/rentals/${reservation.existing_reservation_id}`,
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(updateData),
+            }
+          );
+
+          const result = await response.json();
+
+          if (response.ok && result.success) {
+            successCount++;
+          } else {
+            failCount++;
+            errors.push(
+              `${reservation.renter_name}: ${result.error || "알 수 없는 오류"}`
+            );
+          }
+        } catch (error) {
+          failCount++;
+          errors.push(`${reservation.renter_name}: 네트워크 오류`);
+        }
+      }
+
+      // 결과 메시지
+      let message = `옵션 일괄 업데이트 완료!\n\n✅ 성공: ${successCount}개\n❌ 실패: ${failCount}개`;
+      if (errors.length > 0) {
+        message += `\n\n실패 상세:\n${errors.slice(0, 5).join("\n")}`;
+        if (errors.length > 5) {
+          message += `\n... 외 ${errors.length - 5}개`;
+        }
+      }
+      alert(message);
+    } catch (error) {
+      console.error("일괄 업데이트 중 오류:", error);
+      alert("일괄 업데이트 중 오류가 발생했습니다.");
+    } finally {
+      setBatchUpdating(false);
+    }
   };
 
   // 100% 매칭 예약 일괄 생성 핸들러
@@ -777,6 +878,58 @@ export default function CalendarPage() {
     }
   };
 
+  // 기존 예약 업데이트 핸들러 (SD카드/데이터전송 옵션만)
+  const handleUpdateReservation = async (
+    matchedReservation: MatchedReservation
+  ) => {
+    if (!matchedReservation.existing_reservation_id) {
+      alert("업데이트할 예약 ID가 없습니다.");
+      return;
+    }
+
+    const reservationKey =
+      (matchedReservation.renter_name || "") +
+      (matchedReservation.pickup_date || "");
+    setUpdatingReservation(reservationKey);
+
+    try {
+      const updateData = {
+        data_transmission: matchedReservation.data_transmission || false,
+        sd_option: matchedReservation.sd_option || null,
+      };
+
+      const response = await fetch(
+        `/api/rentals/${matchedReservation.existing_reservation_id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updateData),
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        alert(
+          `예약 옵션이 성공적으로 업데이트되었습니다.\n예약번호: ${matchedReservation.existing_reservation_id}\n${matchedReservation.sd_option ? `SD 옵션: ${matchedReservation.sd_option}` : ""}\n${matchedReservation.data_transmission ? "데이터 전송: 활성화" : ""}`
+        );
+      } else {
+        alert(
+          `예약 옵션 업데이트에 실패했습니다.\n오류: ${
+            result.error || "알 수 없는 오류"
+          }`
+        );
+      }
+    } catch (error) {
+      console.error("예약 업데이트 에러:", error);
+      alert("예약 옵션 업데이트 중 오류가 발생했습니다.");
+    } finally {
+      setUpdatingReservation(null);
+    }
+  };
+
   // 예약 생성 핸들러
   const handleCreateReservation = async (
     matchedReservation: MatchedReservation
@@ -804,7 +957,9 @@ export default function CalendarPage() {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        const returnDateTime = new Date(`${reservationDto.return_date}T${reservationDto.return_time}`);
+        const returnDateTime = new Date(
+          `${reservationDto.return_date}T${reservationDto.return_time}`
+        );
         const now = new Date();
         const statusText = returnDateTime < now ? "반납완료" : "pending";
         alert(
@@ -995,6 +1150,18 @@ export default function CalendarPage() {
               {showIncompleteOnly ? "불완전 매칭만 보기" : "완전 매칭만 보기"} (
               {showIncompleteOnly ? "ON" : "ON"})
             </Button>
+            <Button
+              onClick={() => setShowOptionsOnly(!showOptionsOnly)}
+              variant={showOptionsOnly ? "default" : "outline"}
+              size="sm"
+              className={
+                showOptionsOnly
+                  ? "bg-purple-600 hover:bg-purple-700"
+                  : "hover:bg-purple-100 hover:text-purple-700"
+              }
+            >
+              옵션 있는 것만 ({showOptionsOnly ? "ON" : "OFF"})
+            </Button>
           </div>
         </div>
       </div>
@@ -1047,33 +1214,60 @@ export default function CalendarPage() {
               <Badge variant="outline" className="text-sm text-gray-500">
                 전체: {matchedReservations.length}개
               </Badge>
-              {!showIncompleteOnly && (
+              <div className="flex gap-2 ml-4">
+                {!showIncompleteOnly && (
+                  <Button
+                    onClick={handleBatchCreateReservations}
+                    disabled={
+                      batchCreating ||
+                      matchedReservations.filter(
+                        (r) =>
+                          (r.match_confidence || 0) >= 0.9999 &&
+                          !r.is_synced_to_db &&
+                          convertToReservationDto(r)
+                      ).length === 0
+                    }
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                  >
+                    {batchCreating
+                      ? "생성 중..."
+                      : `100% 매칭 예약 일괄 생성 (${
+                          matchedReservations.filter(
+                            (r) =>
+                              (r.match_confidence || 0) >= 0.9999 &&
+                              !r.is_synced_to_db &&
+                              convertToReservationDto(r)
+                          ).length
+                        }개)`}
+                  </Button>
+                )}
                 <Button
-                  onClick={handleBatchCreateReservations}
+                  onClick={handleBatchUpdateReservations}
                   disabled={
-                    batchCreating ||
+                    batchUpdating ||
                     matchedReservations.filter(
                       (r) =>
-                        (r.match_confidence || 0) >= 0.9999 &&
-                        !r.is_synced_to_db &&
-                        convertToReservationDto(r)
+                        r.is_synced_to_db &&
+                        r.existing_reservation_id &&
+                        (r.sd_option || r.data_transmission)
                     ).length === 0
                   }
-                  className="ml-4 bg-blue-600 hover:bg-blue-700 text-white"
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
                   size="sm"
                 >
-                  {batchCreating
-                    ? "생성 중..."
-                    : `100% 매칭 예약 일괄 생성 (${
+                  {batchUpdating
+                    ? "업데이트 중..."
+                    : `옵션 일괄 업데이트 (${
                         matchedReservations.filter(
                           (r) =>
-                            (r.match_confidence || 0) >= 0.9999 &&
-                            !r.is_synced_to_db &&
-                            convertToReservationDto(r)
+                            r.is_synced_to_db &&
+                            r.existing_reservation_id &&
+                            (r.sd_option || r.data_transmission)
                         ).length
                       }개)`}
                 </Button>
-              )}
+              </div>
             </div>
           </div>
 
@@ -1088,6 +1282,7 @@ export default function CalendarPage() {
                   <th className="text-left p-3 text-sm font-medium">수령</th>
                   <th className="text-left p-3 text-sm font-medium">반납</th>
                   <th className="text-left p-3 text-sm font-medium">주소</th>
+                  <th className="text-left p-3 text-sm font-medium">옵션</th>
                   <th className="text-left p-3 text-sm font-medium">매칭도</th>
                   <th className="text-left p-3 text-sm font-medium">
                     매칭 이유
@@ -1101,13 +1296,24 @@ export default function CalendarPage() {
                   .filter((reservation) => {
                     const confidence = reservation.match_confidence || 0;
 
+                    // 매칭도 필터
+                    let matchFilter = true;
                     if (showIncompleteOnly) {
                       // 불완전 매칭만 보기가 켜져있으면, 매칭도가 100% 미만인 것만 표시
-                      return confidence < 0.9999;
+                      matchFilter = confidence < 0.9999;
                     } else {
                       // 완전 매칭만 보기가 켜져있으면, 매칭도가 100%인 것만 표시
-                      return confidence >= 0.9999;
+                      matchFilter = confidence >= 0.9999;
                     }
+
+                    // 옵션 필터
+                    let optionFilter = true;
+                    if (showOptionsOnly) {
+                      // SD카드 옵션이나 데이터 전송이 있는 것만
+                      optionFilter = !!(reservation.sd_option || reservation.data_transmission);
+                    }
+
+                    return matchFilter && optionFilter;
                   })
                   .map((reservation, index) => (
                     <tr
@@ -1198,6 +1404,30 @@ export default function CalendarPage() {
                         )}
                       </td>
                       <td className="p-3 text-sm">
+                        <div className="space-y-1">
+                          {reservation.sd_option && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+                            >
+                              SD {reservation.sd_option}
+                            </Badge>
+                          )}
+                          {reservation.data_transmission && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-green-50 text-green-700 border-green-200"
+                            >
+                              데이터 전송
+                            </Badge>
+                          )}
+                          {!reservation.sd_option &&
+                            !reservation.data_transmission && (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
+                        </div>
+                      </td>
+                      <td className="p-3 text-sm">
                         <div className="flex items-center space-x-2">
                           <div
                             className={`w-2 h-2 rounded-full ${
@@ -1249,33 +1479,57 @@ export default function CalendarPage() {
                         )}
                       </td>
                       <td className="p-3 text-sm">
-                        {reservation.is_synced_to_db ? (
-                          <span className="text-xs text-gray-400">
-                            이미 생성됨
-                          </span>
-                        ) : convertToReservationDto(reservation) ? (
-                          <Button
-                            onClick={() => handleCreateReservation(reservation)}
-                            size="sm"
-                            variant="outline"
-                            className="text-xs"
-                            disabled={
-                              creatingReservation ===
+                        <div className="flex flex-col gap-1">
+                          {reservation.is_synced_to_db ? (
+                            <>
+                              <span className="text-xs text-gray-400">
+                                이미 생성됨
+                              </span>
+                              {/* SD카드/데이터전송 옵션이 있는 경우 업데이트 버튼 표시 */}
+                              {(reservation.sd_option || reservation.data_transmission) && (
+                                <Button
+                                  onClick={() => handleUpdateReservation(reservation)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300"
+                                  disabled={
+                                    updatingReservation ===
+                                    (reservation.renter_name || "") +
+                                      (reservation.pickup_date || "")
+                                  }
+                                >
+                                  {updatingReservation ===
+                                  (reservation.renter_name || "") +
+                                    (reservation.pickup_date || "")
+                                    ? "옵션 업데이트 중..."
+                                    : "옵션 업데이트"}
+                                </Button>
+                              )}
+                            </>
+                          ) : convertToReservationDto(reservation) ? (
+                            <Button
+                              onClick={() => handleCreateReservation(reservation)}
+                              size="sm"
+                              variant="outline"
+                              className="text-xs"
+                              disabled={
+                                creatingReservation ===
+                                (reservation.renter_name || "") +
+                                  (reservation.pickup_date || "")
+                              }
+                            >
+                              {creatingReservation ===
                               (reservation.renter_name || "") +
                                 (reservation.pickup_date || "")
-                            }
-                          >
-                            {creatingReservation ===
-                            (reservation.renter_name || "") +
-                              (reservation.pickup_date || "")
-                              ? "생성 중..."
-                              : "예약 생성"}
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-gray-400">
-                            데이터 부족
-                          </span>
-                        )}
+                                ? "생성 중..."
+                                : "예약 생성"}
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-gray-400">
+                              데이터 부족
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1284,12 +1538,32 @@ export default function CalendarPage() {
             {/* 필터링 결과가 비어있을 때 메시지 */}
             {matchedReservations.filter((r) => {
               const confidence = r.match_confidence || 0;
-              return showIncompleteOnly
-                ? confidence < 0.9999
-                : confidence >= 0.9999;
+              
+              // 매칭도 필터
+              let matchFilter = true;
+              if (showIncompleteOnly) {
+                matchFilter = confidence < 0.9999;
+              } else {
+                matchFilter = confidence >= 0.9999;
+              }
+
+              // 옵션 필터
+              let optionFilter = true;
+              if (showOptionsOnly) {
+                optionFilter = !!(r.sd_option || r.data_transmission);
+              }
+
+              return matchFilter && optionFilter;
             }).length === 0 && (
               <div className="text-center py-8 text-gray-500">
-                {showIncompleteOnly ? (
+                {showOptionsOnly ? (
+                  <>
+                    <p className="text-lg">📦 옵션이 있는 예약이 없습니다!</p>
+                    <p className="text-sm mt-2">
+                      SD카드 옵션이나 데이터 전송이 설정된 예약이 없습니다.
+                    </p>
+                  </>
+                ) : showIncompleteOnly ? (
                   <>
                     <p className="text-lg">
                       🎯 모든 예약이 완벽하게 매칭되었습니다!
