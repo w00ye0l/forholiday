@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
       .from("rental_reservations")
       .select("*")
       .is("cancelled_at", null)
-      .order("pickup_date", { ascending: true })
-      .order("pickup_time", { ascending: true })
+      .order("pickup_date", { ascending: false })
+      .order("pickup_time", { ascending: false })
       .order("reservation_id", { ascending: true })
       .range(offset, offset + limit - 1);
 

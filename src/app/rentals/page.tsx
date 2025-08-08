@@ -105,26 +105,6 @@ export default function RentalsPage() {
     router.push(`?${params.toString()}`, { scroll: false });
   };
 
-  // 출고 관리 정렬 로직
-  const sortRentalsForOutgoing = (rentals: RentalWithDevice[]) => {
-    return rentals.sort((a, b) => {
-      // 1차 정렬: 시간 오름차순 (오래된 예약이 먼저)
-      const dateTimeA = new Date(`${a.pickup_date} ${a.pickup_time}`);
-      const dateTimeB = new Date(`${b.pickup_date} ${b.pickup_time}`);
-
-      const timeDiff = dateTimeA.getTime() - dateTimeB.getTime();
-
-      if (timeDiff !== 0) {
-        return timeDiff;
-      }
-
-      // 2차 정렬: 수령 방법별 우선순위 (터미널1 → 터미널2 → 택배 → 사무실 → 호텔)
-      const priorityA = PICKUP_METHOD_PRIORITY[a.pickup_method];
-      const priorityB = PICKUP_METHOD_PRIORITY[b.pickup_method];
-
-      return priorityA - priorityB;
-    });
-  };
 
   // 서버 페이지네이션을 위한 API 호출
   const fetchRentals = async (page: number = 1) => {
@@ -179,12 +159,9 @@ export default function RentalsPage() {
           `필터링 API 응답: 페이지 ${result.pagination.page}, ${result.data.length}개 데이터, 필터링된 전체 ${result.pagination.total}개`
         );
 
-        // 클라이언트 사이드 정렬 적용
-        const sortedRentals = sortRentalsForOutgoing(result.data);
-
-        setRentals(sortedRentals);
+        setRentals(result.data);
         setTotalCount(result.pagination.total);
-        setFilteredRentals(sortedRentals); // 필터링된 결과도 설정
+        setFilteredRentals(result.data); // 필터링된 결과도 설정
       } else {
         // 필터가 없는 경우 기본 페이지네이션 API 사용
         const response = await fetch(
@@ -205,12 +182,9 @@ export default function RentalsPage() {
           `기본 API 응답: 페이지 ${result.pagination.page}, ${result.data.length}개 데이터, 전체 ${result.pagination.total}개`
         );
 
-        // 클라이언트 사이드 정렬 적용
-        const sortedRentals = sortRentalsForOutgoing(result.data);
-
-        setRentals(sortedRentals);
+        setRentals(result.data);
         setTotalCount(result.pagination.total);
-        setFilteredRentals(sortedRentals);
+        setFilteredRentals(result.data);
       }
     } catch (error) {
       console.error("예약 목록 조회 에러:", error);

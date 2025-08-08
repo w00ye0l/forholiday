@@ -80,8 +80,8 @@ export async function GET(request: NextRequest) {
 
     // 페이지네이션된 데이터 조회 (정렬 적용)
     const { data: rentals, error: rentalsError } = await dataQuery
-      .order("pickup_date", { ascending: true })
-      .order("pickup_time", { ascending: true })
+      .order("pickup_date", { ascending: false })
+      .order("pickup_time", { ascending: false })
       .order("reservation_id", { ascending: true })
       .range(offset, offset + limit - 1);
 
