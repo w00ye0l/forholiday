@@ -114,6 +114,7 @@ export async function GET(req: Request) {
           orderBy: 'startTime' as const,
           showDeleted: false,
           showHiddenInvitations: false
+          // fields 매개변수 제거하여 모든 필드 가져오기
         };
 
         // 디버깅: 날짜 범위 로그

@@ -43,6 +43,8 @@ interface MatchedReservation extends Partial<RentalReservation> {
   return_event?: CalendarEvent;
   match_confidence: number;
   match_reason: string[];
+  is_synced_to_db?: boolean;
+  existing_reservation_id?: string;
 }
 
 // 캘린더 데이터를 예약 생성용 DTO로 변환
@@ -64,6 +66,7 @@ interface CalendarToReservationDto {
   order_number?: string;
   contact_input_type: "text" | "image";
   description?: string;
+  status?: "pending" | "picked_up" | "not_picked_up" | "returned" | "problem";
 }
 
 export default function CalendarPage() {
@@ -82,7 +85,10 @@ export default function CalendarPage() {
   );
   const [selectedMonth, setSelectedMonth] = useState<number>(5);
   const [showIncompleteOnly, setShowIncompleteOnly] = useState<boolean>(false);
-  const [creatingReservation, setCreatingReservation] = useState<string | null>(null);
+  const [creatingReservation, setCreatingReservation] = useState<string | null>(
+    null
+  );
+  const [batchCreating, setBatchCreating] = useState(false);
 
   const fetchMonthlyEvents = async (year: number, month: number) => {
     try {
@@ -107,7 +113,11 @@ export default function CalendarPage() {
 
       // 수령/반납 이벤트 매칭 (수령 월 기준)
       const matched = matchPickupAndReturn(allEvents);
-      setMatchedReservations(matched);
+
+      // 기존 예약 데이터와 비교하여 이미 DB에 있는지 확인
+      const updatedMatched = await checkExistingReservations(matched);
+
+      setMatchedReservations(updatedMatched);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다."
@@ -518,26 +528,21 @@ export default function CalendarPage() {
       }
     }
 
-    // 주소 파싱 (호텔이나 배송인 경우)
+    // 주소 설정 (택배/호텔인 경우 description을 주소로 사용)
     let renter_address: string | null = null;
     if (
-      pickup_method === "hotel" ||
       pickup_method === "delivery" ||
-      return_method === "hotel" ||
-      return_method === "delivery"
+      pickup_method === "hotel" ||
+      return_method === "delivery" ||
+      return_method === "hotel"
     ) {
-      const addressPatterns = [
-        /주소\s*[:：]?\s*(.+?)(?:\n|$)/,
-        /배송지\s*[:：]?\s*(.+?)(?:\n|$)/,
-        /호텔\s*[:：]?\s*(.+?)(?:\n|$)/,
-      ];
-
-      for (const pattern of addressPatterns) {
-        const match = fullText.match(pattern);
-        if (match) {
-          renter_address = match[1].trim();
-          break;
-        }
+      // description이 있으면 엔터 제거하고 주소로 사용
+      if (description && description.trim().length > 0) {
+        renter_address = description
+          .trim()
+          .replace(/\n+/g, " ") // 개행문자를 공백으로 변경
+          .replace(/\s+/g, " ") // 연속된 공백을 하나로 통합
+          .trim(); // 앞뒤 공백 제거
       }
     }
 
@@ -594,17 +599,21 @@ export default function CalendarPage() {
     };
   };
 
-  // 캘린더 매칭 데이터를 예약 생성용 DTO로 변환
-  const convertToReservationDto = (matchedReservation: MatchedReservation): CalendarToReservationDto | null => {
+  // 캘린더 매칭 데이터를 예약 생성용 DTO로 변환 (반납 날짜 기준으로 상태 결정)
+  const convertToReservationDto = (
+    matchedReservation: MatchedReservation
+  ): CalendarToReservationDto | null => {
     // 필수 필드 검증
-    if (!matchedReservation.device_category ||
-        !matchedReservation.pickup_date ||
-        !matchedReservation.pickup_time ||
-        !matchedReservation.return_date ||
-        !matchedReservation.return_time ||
-        !matchedReservation.pickup_method ||
-        !matchedReservation.return_method ||
-        !matchedReservation.renter_name) {
+    if (
+      !matchedReservation.device_category ||
+      !matchedReservation.pickup_date ||
+      !matchedReservation.pickup_time ||
+      !matchedReservation.return_date ||
+      !matchedReservation.return_time ||
+      !matchedReservation.pickup_method ||
+      !matchedReservation.return_method ||
+      !matchedReservation.renter_name
+    ) {
       return null;
     }
 
@@ -612,6 +621,11 @@ export default function CalendarPage() {
     const reservationSite: ReservationSite = "forholiday"; // 기본값: 포할리데이 홈페이지
     const contactInputType: "text" | "image" = "text"; // 기본값: 텍스트 입력
     const renterAddress = matchedReservation.renter_address || ""; // 빈 문자열 기본값
+
+    // 반납 날짜 기준으로 상태 결정
+    const returnDateTime = new Date(`${matchedReservation.return_date}T${matchedReservation.return_time}`);
+    const now = new Date();
+    const status = returnDateTime < now ? "returned" : "pending";
 
     return {
       device_category: matchedReservation.device_category,
@@ -631,18 +645,151 @@ export default function CalendarPage() {
       order_number: matchedReservation.order_number,
       contact_input_type: contactInputType,
       description: matchedReservation.description,
+      status: status, // 반납 날짜가 지났으면 returned, 아니면 pending
     };
   };
 
+  // 기존 예약 데이터 확인 (불변성을 지키며 새로운 배열 반환)
+  const checkExistingReservations = async (
+    matchedReservations: MatchedReservation[]
+  ): Promise<MatchedReservation[]> => {
+    try {
+      const response = await fetch("/api/rentals/check-existing", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reservations: matchedReservations.map((r) => ({
+            renter_name: r.renter_name,
+            renter_phone: r.renter_phone,
+            pickup_date: r.pickup_date,
+            device_category: r.device_category,
+          })),
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const existingIds = result.existingReservations || [];
+
+        // 새로운 배열을 생성하여 DB 존재 여부 정보 추가
+        return matchedReservations.map((reservation) => {
+          const existingReservation = existingIds.find(
+            (existing: any) =>
+              existing.renter_name === reservation.renter_name &&
+              existing.pickup_date === reservation.pickup_date &&
+              existing.device_category === reservation.device_category
+          );
+
+          return {
+            ...reservation,
+            is_synced_to_db: !!existingReservation,
+            existing_reservation_id: existingReservation?.reservation_id,
+          };
+        });
+      }
+    } catch (error) {
+      console.error("기존 예약 확인 중 오류:", error);
+    }
+
+    // 에러 발생시 원본 데이터 반환
+    return matchedReservations.map((r) => ({
+      ...r,
+      is_synced_to_db: false,
+    }));
+  };
+
+  // 100% 매칭 예약 일괄 생성 핸들러
+  const handleBatchCreateReservations = async () => {
+    const perfectMatches = matchedReservations.filter(
+      (r) =>
+        (r.match_confidence || 0) >= 0.9999 &&
+        !r.is_synced_to_db &&
+        convertToReservationDto(r)
+    );
+
+    if (perfectMatches.length === 0) {
+      alert("생성할 수 있는 100% 매칭 예약이 없습니다.");
+      return;
+    }
+
+    const confirmed = confirm(
+      `${perfectMatches.length}개의 100% 매칭 예약을 일괄 생성하시겠습니까?\n\n※ 반납 날짜가 지난 예약은 '반납완료' 상태로, 아직 반납하지 않은 예약은 'pending' 상태로 생성됩니다.`
+    );
+    if (!confirmed) return;
+
+    setBatchCreating(true);
+    let successCount = 0;
+    let failCount = 0;
+    const errors: string[] = [];
+
+    try {
+      for (const reservation of perfectMatches) {
+        try {
+          const reservationDto = convertToReservationDto(reservation);
+          if (!reservationDto) continue;
+
+          const response = await fetch("/api/rentals", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(reservationDto),
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.success) {
+            successCount++;
+            // 성공한 예약은 객체에 직접 수정 (일괄 처리이므로 성능상 허용)
+            reservation.is_synced_to_db = true;
+            reservation.existing_reservation_id = result.data.reservation_id;
+          } else {
+            failCount++;
+            errors.push(
+              `${reservation.renter_name}: ${result.error || "알 수 없는 오류"}`
+            );
+          }
+        } catch (error) {
+          failCount++;
+          errors.push(`${reservation.renter_name}: 네트워크 오류`);
+        }
+      }
+
+      // 결과 메시지
+      let message = `캘린더 연동 완료!\n\n✅ 성공: ${successCount}개\n❌ 실패: ${failCount}개`;
+      if (errors.length > 0) {
+        message += `\n\n실패 상세:\n${errors.slice(0, 5).join("\n")}`;
+        if (errors.length > 5) {
+          message += `\n... 외 ${errors.length - 5}개`;
+        }
+      }
+      alert(message);
+
+      // 상태 업데이트 (새로운 배열로 리렌더링 트리거)
+      setMatchedReservations([...matchedReservations]);
+    } catch (error) {
+      console.error("일괄 생성 중 오류:", error);
+      alert("일괄 생성 중 오류가 발생했습니다.");
+    } finally {
+      setBatchCreating(false);
+    }
+  };
+
   // 예약 생성 핸들러
-  const handleCreateReservation = async (matchedReservation: MatchedReservation) => {
+  const handleCreateReservation = async (
+    matchedReservation: MatchedReservation
+  ) => {
     const reservationDto = convertToReservationDto(matchedReservation);
     if (!reservationDto) {
       alert("필수 데이터가 부족하여 예약을 생성할 수 없습니다.");
       return;
     }
 
-    const reservationKey = (matchedReservation.renter_name || "") + (matchedReservation.pickup_date || "");
+    const reservationKey =
+      (matchedReservation.renter_name || "") +
+      (matchedReservation.pickup_date || "");
     setCreatingReservation(reservationKey);
 
     try {
@@ -657,11 +804,29 @@ export default function CalendarPage() {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        alert(`예약이 성공적으로 생성되었습니다.\n예약번호: ${result.data.reservation_id}`);
-        // 성공 후 페이지 새로고침 또는 상태 업데이트
-        fetchMonthlyEvents(selectedYear, selectedMonth);
+        const returnDateTime = new Date(`${reservationDto.return_date}T${reservationDto.return_time}`);
+        const now = new Date();
+        const statusText = returnDateTime < now ? "반납완료" : "pending";
+        alert(
+          `캘린더 예약이 ${statusText} 상태로 성공 연동되었습니다.\n예약번호: ${result.data.reservation_id}`
+        );
+        // 성공한 예약은 DB 동기화 상태로 표시 (불변성 유지)
+        const updatedReservations = matchedReservations.map((r) =>
+          r === matchedReservation
+            ? {
+                ...r,
+                is_synced_to_db: true,
+                existing_reservation_id: result.data.reservation_id,
+              }
+            : r
+        );
+        setMatchedReservations(updatedReservations);
       } else {
-        alert(`예약 생성에 실패했습니다.\n오류: ${result.error || "알 수 없는 오류"}`);
+        alert(
+          `예약 생성에 실패했습니다.\n오류: ${
+            result.error || "알 수 없는 오류"
+          }`
+        );
       }
     } catch (error) {
       console.error("예약 생성 에러:", error);
@@ -802,12 +967,33 @@ export default function CalendarPage() {
             </Button>
             <div className="h-6 w-px bg-gray-300 mx-2" />
             <Button
-              onClick={() => setShowIncompleteOnly(!showIncompleteOnly)}
+              onClick={() => {
+                console.log("버튼 클릭 - 이전 상태:", showIncompleteOnly);
+                console.log(
+                  "전체 matchedReservations 개수:",
+                  matchedReservations.length
+                );
+                console.log(
+                  "현재 필터링된 개수:",
+                  matchedReservations.filter((r) => {
+                    const confidence = r.match_confidence || 0;
+                    return showIncompleteOnly
+                      ? confidence >= 0.9999
+                      : confidence < 0.9999;
+                  }).length
+                );
+                setShowIncompleteOnly(!showIncompleteOnly);
+              }}
               variant={showIncompleteOnly ? "default" : "outline"}
               size="sm"
-              className={showIncompleteOnly ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700 text-white"}
+              className={
+                showIncompleteOnly
+                  ? "bg-orange-600 hover:bg-orange-700"
+                  : "bg-green-600 hover:bg-green-700 text-white"
+              }
             >
-              {showIncompleteOnly ? "불완전 매칭만 보기" : "완전 매칭만 보기"} ({showIncompleteOnly ? "ON" : "ON"})
+              {showIncompleteOnly ? "불완전 매칭만 보기" : "완전 매칭만 보기"} (
+              {showIncompleteOnly ? "ON" : "ON"})
             </Button>
           </div>
         </div>
@@ -832,19 +1018,62 @@ export default function CalendarPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">
               매칭된 예약 데이터
-              <span className={`text-base ml-2 ${showIncompleteOnly ? 'text-orange-600' : 'text-green-600'}`}>
-                ({showIncompleteOnly ? '불완전 매칭만' : '완전 매칭만'})
+              <span
+                className={`text-base ml-2 ${
+                  showIncompleteOnly ? "text-orange-600" : "text-green-600"
+                }`}
+              >
+                ({showIncompleteOnly ? "불완전 매칭만" : "완전 매칭만"})
               </span>
             </h2>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-sm">
                 {showIncompleteOnly
-                  ? `표시: ${matchedReservations.filter(r => (r.match_confidence || 0) < 0.9999).length}개`
-                  : `표시: ${matchedReservations.filter(r => (r.match_confidence || 0) >= 0.9999).length}개`}
+                  ? `표시: ${
+                      matchedReservations.filter(
+                        (r) => (r.match_confidence || 0) < 0.9999
+                      ).length
+                    }개`
+                  : `표시: ${
+                      matchedReservations.filter(
+                        (r) => (r.match_confidence || 0) >= 0.9999
+                      ).length
+                    }개`}
+              </Badge>
+              {/* 디버깅: 현재 필터 상태 표시 */}
+              <Badge variant="outline" className="text-xs text-blue-600">
+                필터: {showIncompleteOnly ? "불완전만" : "완전만"}
               </Badge>
               <Badge variant="outline" className="text-sm text-gray-500">
                 전체: {matchedReservations.length}개
               </Badge>
+              {!showIncompleteOnly && (
+                <Button
+                  onClick={handleBatchCreateReservations}
+                  disabled={
+                    batchCreating ||
+                    matchedReservations.filter(
+                      (r) =>
+                        (r.match_confidence || 0) >= 0.9999 &&
+                        !r.is_synced_to_db &&
+                        convertToReservationDto(r)
+                    ).length === 0
+                  }
+                  className="ml-4 bg-blue-600 hover:bg-blue-700 text-white"
+                  size="sm"
+                >
+                  {batchCreating
+                    ? "생성 중..."
+                    : `100% 매칭 예약 일괄 생성 (${
+                        matchedReservations.filter(
+                          (r) =>
+                            (r.match_confidence || 0) >= 0.9999 &&
+                            !r.is_synced_to_db &&
+                            convertToReservationDto(r)
+                        ).length
+                      }개)`}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -858,20 +1087,20 @@ export default function CalendarPage() {
                   <th className="text-left p-3 text-sm font-medium">기기</th>
                   <th className="text-left p-3 text-sm font-medium">수령</th>
                   <th className="text-left p-3 text-sm font-medium">반납</th>
+                  <th className="text-left p-3 text-sm font-medium">주소</th>
                   <th className="text-left p-3 text-sm font-medium">매칭도</th>
                   <th className="text-left p-3 text-sm font-medium">
                     매칭 이유
                   </th>
-                  <th className="text-left p-3 text-sm font-medium">
-                    액션
-                  </th>
+                  <th className="text-left p-3 text-sm font-medium">DB 상태</th>
+                  <th className="text-left p-3 text-sm font-medium">액션</th>
                 </tr>
               </thead>
               <tbody>
                 {matchedReservations
                   .filter((reservation) => {
                     const confidence = reservation.match_confidence || 0;
-                    
+
                     if (showIncompleteOnly) {
                       // 불완전 매칭만 보기가 켜져있으면, 매칭도가 100% 미만인 것만 표시
                       return confidence < 0.9999;
@@ -881,131 +1110,200 @@ export default function CalendarPage() {
                     }
                   })
                   .map((reservation, index) => (
-                  <tr
-                    key={reservation.reservation_id || index}
-                    className="border-b hover:bg-gray-50"
-                  >
-                    <td className="p-3 text-sm font-mono">
-                      {reservation.reservation_id || "-"}
-                    </td>
-                    <td className="p-3 text-sm">
-                      {reservation.renter_name || "-"}
-                    </td>
-                    <td className="p-3 text-sm font-mono">
-                      {reservation.renter_phone || "-"}
-                    </td>
-                    <td className="p-3 text-sm">
-                      {reservation.device_category ? (
-                        <Badge variant="outline" className="text-xs">
-                          {reservation.device_category}
-                        </Badge>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td className="p-3 text-sm">
-                      <div className="space-y-1">
-                        {reservation.pickup_date && (
-                          <div className="text-xs">
-                            {format(new Date(reservation.pickup_date), "MM/dd")}{" "}
-                            {reservation.pickup_time}
+                    <tr
+                      key={`${reservation.reservation_id || "no-id"}-${index}-${
+                        reservation.renter_name
+                      }-${reservation.pickup_date}`}
+                      className="border-b hover:bg-gray-50"
+                    >
+                      <td className="p-3 text-sm font-mono">
+                        {reservation.reservation_id || "-"}
+                      </td>
+                      <td className="p-3 text-sm">
+                        {reservation.renter_name || "-"}
+                      </td>
+                      <td className="p-3 text-sm font-mono">
+                        {reservation.renter_phone || "-"}
+                      </td>
+                      <td className="p-3 text-sm">
+                        {reservation.device_category ? (
+                          <Badge variant="outline" className="text-xs">
+                            {reservation.device_category}
+                          </Badge>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td className="p-3 text-sm">
+                        <div className="space-y-1">
+                          {reservation.pickup_date && (
+                            <div className="text-xs">
+                              {format(
+                                new Date(reservation.pickup_date),
+                                "MM/dd"
+                              )}{" "}
+                              {reservation.pickup_time}
+                            </div>
+                          )}
+                          {reservation.pickup_method && (
+                            <Badge variant="default" className="text-xs">
+                              {
+                                PICKUP_METHOD_LABELS[
+                                  reservation.pickup_method as PickupMethod
+                                ]
+                              }
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3 text-sm">
+                        <div className="space-y-1">
+                          {reservation.return_date && (
+                            <div className="text-xs">
+                              {format(
+                                new Date(reservation.return_date),
+                                "MM/dd"
+                              )}{" "}
+                              {reservation.return_time}
+                            </div>
+                          )}
+                          {reservation.return_method && (
+                            <Badge variant="secondary" className="text-xs">
+                              {
+                                RETURN_METHOD_LABELS[
+                                  reservation.return_method as ReturnMethod
+                                ]
+                              }
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3 text-sm">
+                        {(reservation.pickup_method === "delivery" ||
+                          reservation.pickup_method === "hotel" ||
+                          reservation.return_method === "delivery" ||
+                          reservation.return_method === "hotel") &&
+                        reservation.renter_address ? (
+                          <div className="max-w-xs">
+                            <p
+                              className="text-xs text-gray-600 truncate"
+                              title={reservation.renter_address}
+                            >
+                              {reservation.renter_address.substring(0, 30)}
+                              {reservation.renter_address.length > 30 && "..."}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-sm">
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`w-2 h-2 rounded-full ${
+                              reservation.match_confidence >= 0.8
+                                ? "bg-green-500"
+                                : reservation.match_confidence >= 0.5
+                                ? "bg-yellow-500"
+                                : reservation.match_confidence > 0
+                                ? "bg-orange-500"
+                                : "bg-gray-400"
+                            }`}
+                          />
+                          <span className="text-xs">
+                            {reservation.match_confidence > 0
+                              ? `${Math.round(
+                                  reservation.match_confidence * 100
+                                )}%`
+                              : "없음"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-3 text-sm">
+                        <div className="text-xs text-gray-600 max-w-xs">
+                          {reservation.match_reason.join(", ")}
+                        </div>
+                      </td>
+                      <td className="p-3 text-sm">
+                        {reservation.is_synced_to_db ? (
+                          <div className="flex flex-col space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                              <span className="text-xs text-green-600 font-medium">
+                                DB 연동됨
+                              </span>
+                            </div>
+                            {reservation.existing_reservation_id && (
+                              <span className="text-xs text-gray-500 font-mono pl-4">
+                                {reservation.existing_reservation_id}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 rounded-full bg-orange-400"></div>
+                            <span className="text-xs text-orange-600 font-medium">
+                              미연동
+                            </span>
                           </div>
                         )}
-                        {reservation.pickup_method && (
-                          <Badge variant="default" className="text-xs">
-                            {
-                              PICKUP_METHOD_LABELS[
-                                reservation.pickup_method as PickupMethod
-                              ]
+                      </td>
+                      <td className="p-3 text-sm">
+                        {reservation.is_synced_to_db ? (
+                          <span className="text-xs text-gray-400">
+                            이미 생성됨
+                          </span>
+                        ) : convertToReservationDto(reservation) ? (
+                          <Button
+                            onClick={() => handleCreateReservation(reservation)}
+                            size="sm"
+                            variant="outline"
+                            className="text-xs"
+                            disabled={
+                              creatingReservation ===
+                              (reservation.renter_name || "") +
+                                (reservation.pickup_date || "")
                             }
-                          </Badge>
+                          >
+                            {creatingReservation ===
+                            (reservation.renter_name || "") +
+                              (reservation.pickup_date || "")
+                              ? "생성 중..."
+                              : "예약 생성"}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-gray-400">
+                            데이터 부족
+                          </span>
                         )}
-                      </div>
-                    </td>
-                    <td className="p-3 text-sm">
-                      <div className="space-y-1">
-                        {reservation.return_date && (
-                          <div className="text-xs">
-                            {format(new Date(reservation.return_date), "MM/dd")}{" "}
-                            {reservation.return_time}
-                          </div>
-                        )}
-                        {reservation.return_method && (
-                          <Badge variant="secondary" className="text-xs">
-                            {
-                              RETURN_METHOD_LABELS[
-                                reservation.return_method as ReturnMethod
-                              ]
-                            }
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-3 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            reservation.match_confidence >= 0.8
-                              ? "bg-green-500"
-                              : reservation.match_confidence >= 0.5
-                              ? "bg-yellow-500"
-                              : reservation.match_confidence > 0
-                              ? "bg-orange-500"
-                              : "bg-gray-400"
-                          }`}
-                        />
-                        <span className="text-xs">
-                          {reservation.match_confidence > 0
-                            ? `${Math.round(
-                                reservation.match_confidence * 100
-                              )}%`
-                            : "없음"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-3 text-sm">
-                      <div className="text-xs text-gray-600 max-w-xs">
-                        {reservation.match_reason.join(", ")}
-                      </div>
-                    </td>
-                    <td className="p-3 text-sm">
-                      {convertToReservationDto(reservation) ? (
-                        <Button
-                          onClick={() => handleCreateReservation(reservation)}
-                          size="sm"
-                          variant="outline"
-                          className="text-xs"
-                          disabled={creatingReservation === ((reservation.renter_name || "") + (reservation.pickup_date || ""))}
-                        >
-                          {creatingReservation === ((reservation.renter_name || "") + (reservation.pickup_date || "")) 
-                            ? "생성 중..." 
-                            : "예약 생성"}
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-gray-400">
-                          데이터 부족
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
             {/* 필터링 결과가 비어있을 때 메시지 */}
-            {matchedReservations.filter(r => {
+            {matchedReservations.filter((r) => {
               const confidence = r.match_confidence || 0;
-              return showIncompleteOnly ? confidence < 0.9999 : confidence >= 0.9999;
+              return showIncompleteOnly
+                ? confidence < 0.9999
+                : confidence >= 0.9999;
             }).length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 {showIncompleteOnly ? (
                   <>
-                    <p className="text-lg">🎯 모든 예약이 완벽하게 매칭되었습니다!</p>
-                    <p className="text-sm mt-2">100% 미만의 매칭 예약이 없습니다.</p>
+                    <p className="text-lg">
+                      🎯 모든 예약이 완벽하게 매칭되었습니다!
+                    </p>
+                    <p className="text-sm mt-2">
+                      100% 미만의 매칭 예약이 없습니다.
+                    </p>
                   </>
                 ) : (
                   <>
                     <p className="text-lg">⚠️ 완전 매칭된 예약이 없습니다!</p>
-                    <p className="text-sm mt-2">100%로 매칭된 예약이 없습니다. 데이터를 확인해보세요.</p>
+                    <p className="text-sm mt-2">
+                      100%로 매칭된 예약이 없습니다. 데이터를 확인해보세요.
+                    </p>
                   </>
                 )}
               </div>
@@ -1032,6 +1330,17 @@ export default function CalendarPage() {
                     : event.start?.date || "날짜 없음"}
                 </span>
               </div>
+              {/* Description 필드 별도 표시 */}
+              {event.description && (
+                <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                  <h4 className="text-xs font-medium text-yellow-800 mb-1">
+                    📝 Description (메모):
+                  </h4>
+                  <p className="text-xs text-yellow-700 whitespace-pre-wrap">
+                    {event.description}
+                  </p>
+                </div>
+              )}
               <pre className="text-xs whitespace-pre-wrap break-words overflow-auto max-h-40 bg-white p-2 rounded">
                 {JSON.stringify(event, null, 2)}
               </pre>
@@ -1053,6 +1362,7 @@ export default function CalendarPage() {
                 <th className="text-left p-2 text-xs font-medium">연락처</th>
                 <th className="text-left p-2 text-xs font-medium">기기</th>
                 <th className="text-left p-2 text-xs font-medium">수령/반납</th>
+                <th className="text-left p-2 text-xs font-medium">주소</th>
                 <th className="text-left p-2 text-xs font-medium">상태</th>
               </tr>
             </thead>
@@ -1133,6 +1443,19 @@ export default function CalendarPage() {
                       {!parsedInfo.pickup_method &&
                         !parsedInfo.return_method &&
                         "-"}
+                    </td>
+                    <td className="p-2 text-xs">
+                      {parsedInfo.renter_address ? (
+                        <span
+                          className="truncate max-w-xs block"
+                          title={parsedInfo.renter_address}
+                        >
+                          {parsedInfo.renter_address.substring(0, 20)}
+                          {parsedInfo.renter_address.length > 20 && "..."}
+                        </span>
+                      ) : (
+                        "-"
+                      )}
                     </td>
                     <td className="p-2 text-xs">
                       {parsedInfo.hasMatchedData ? (

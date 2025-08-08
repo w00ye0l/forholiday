@@ -209,6 +209,7 @@ async function fetchAllEvents(
       orderBy: 'startTime',
       showDeleted: false,
       showHiddenInvitations: false,
+      // fields 매개변수 제거하여 모든 필드 가져오기
       ...(nextPageToken && { pageToken: nextPageToken })
     };
     

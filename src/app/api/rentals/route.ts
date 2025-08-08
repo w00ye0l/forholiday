@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         reservation_id: reservationId,
         user_id: user.id,
         device_category: data.device_category,
-        status: "pending",
+        status: data.status || "pending",
         pickup_date: data.pickup_date,
         pickup_time: data.pickup_time,
         return_date: data.return_date,

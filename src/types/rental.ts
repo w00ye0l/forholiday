@@ -191,6 +191,7 @@ export interface CreateRentalReservationDto {
   contact_image_url?: string;
   contact_input_type: "text" | "image";
   description?: string;
+  status?: ReservationStatus; // 캘린더 연동시 상태 지정 가능
 }
 
 export type DataTransferStatus =

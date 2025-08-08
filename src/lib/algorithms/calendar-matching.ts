@@ -22,6 +22,7 @@ interface ParsedEventInfo {
   isReturn: boolean;
   renter_name?: string;
   renter_phone?: string;
+  renter_address?: string;
   device_category?: DeviceCategory;
   pickup_method?: string;
   return_method?: string;
@@ -139,6 +140,20 @@ export function parseEventInfo(event: CalendarEvent): ParsedEventInfo {
     }
   }
 
+  // 주소 파싱 - description에서 주소 정보 추출
+  let renter_address: string | undefined;
+  if (description && description.trim().length > 0) {
+    // 택배, 호텔 배송이 있는 경우 description을 주소로 사용
+    if (pickup_method === "delivery" || pickup_method === "hotel" || 
+        return_method === "delivery" || return_method === "hotel") {
+      renter_address = description
+        .trim()
+        .replace(/\n+/g, ' ') // 개행문자를 공백으로 변경
+        .replace(/\s+/g, ' ') // 연속된 공백을 하나로 통합
+        .trim(); // 앞뒤 공백 제거
+    }
+  }
+
   // 기기 카테고리 파싱
   let device_category: DeviceCategory | undefined;
   if (slashParts.length >= 4) {
@@ -166,6 +181,7 @@ export function parseEventInfo(event: CalendarEvent): ParsedEventInfo {
     isReturn,
     renter_name,
     renter_phone,
+    renter_address,
     device_category,
     pickup_method,
     return_method,
@@ -342,6 +358,7 @@ export function matchPickupAndReturn(
       return_method: match.return.return_method as any,
       renter_name: match.pickup.renter_name || "",
       renter_phone: match.pickup.renter_phone || "",
+      renter_address: match.pickup.renter_address || match.return.renter_address || "",
       order_number: match.pickup.order_number,
       pickup_event: match.pickup.original_event,
       return_event: match.return.original_event,
@@ -369,6 +386,7 @@ export function matchPickupAndReturn(
         pickup_method: pickupEvent.pickup_method as any,
         renter_name: pickupEvent.renter_name || "",
         renter_phone: pickupEvent.renter_phone || "",
+        renter_address: pickupEvent.renter_address || "",
         order_number: pickupEvent.order_number,
         pickup_event: pickupEvent.original_event,
         match_confidence: 0,
