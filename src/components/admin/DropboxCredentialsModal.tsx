@@ -44,24 +44,24 @@ export function DropboxCredentialsModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // 유효성 검사
     const newErrors: Record<string, string> = {};
-    
+
     if (!credentials.username.trim()) {
       newErrors.username = "아이디를 입력해주세요.";
     }
-    
+
     if (!credentials.password.trim()) {
       newErrors.password = "비밀번호를 입력해주세요.";
     }
-    
+
     setErrors(newErrors);
-    
+
     if (Object.keys(newErrors).length > 0) {
       return;
     }
-    
+
     try {
       await onSubmit(credentials);
       // 성공 시 폼 초기화
@@ -93,18 +93,18 @@ export function DropboxCredentialsModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyIcon className="h-5 w-5 text-blue-600" />
-            드롭박스 접속 정보 입력
+            데이터 접속 정보 입력
           </DialogTitle>
           <DialogDescription>
-            고객이 데이터 다운로드에 사용할 드롭박스 계정 정보를 입력해주세요.
+            고객이 데이터 다운로드에 사용할 계정 정보를 입력해주세요.
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="username" className="flex items-center gap-2">
               <UserIcon className="h-4 w-4" />
-              드롭박스 아이디
+              아이디
             </Label>
             <Input
               id="username"
@@ -113,7 +113,7 @@ export function DropboxCredentialsModal({
               onChange={(e) =>
                 setCredentials({ ...credentials, username: e.target.value })
               }
-              placeholder="dropbox@example.com"
+              placeholder="아이디를 입력하세요"
               className={errors.username ? "border-red-500" : ""}
               disabled={isLoading}
             />
@@ -125,7 +125,7 @@ export function DropboxCredentialsModal({
           <div className="space-y-2">
             <Label htmlFor="password" className="flex items-center gap-2">
               <KeyIcon className="h-4 w-4" />
-              드롭박스 비밀번호
+              비밀번호
             </Label>
             <div className="relative">
               <Input
@@ -158,34 +158,6 @@ export function DropboxCredentialsModal({
               <p className="text-sm text-red-600">{errors.password}</p>
             )}
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="accessInstructions">
-              추가 접속 안내 (선택사항)
-            </Label>
-            <Textarea
-              id="accessInstructions"
-              value={credentials.accessInstructions || ""}
-              onChange={(e) =>
-                setCredentials({
-                  ...credentials,
-                  accessInstructions: e.target.value,
-                })
-              }
-              placeholder="특별한 접속 방법이나 주의사항이 있다면 입력해주세요"
-              rows={3}
-              disabled={isLoading}
-            />
-          </div>
-
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">💡 안내사항</h4>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• 입력한 정보는 고객에게 이메일로 전송됩니다</li>
-              <li>• 임시 계정이나 제한된 액세스 계정 사용을 권장합니다</li>
-              <li>• 데이터 전송 완료 후 비밀번호를 변경해주세요</li>
-            </ul>
-          </div>
         </form>
 
         <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
@@ -200,7 +172,9 @@ export function DropboxCredentialsModal({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isLoading || !credentials.username || !credentials.password}
+            disabled={
+              isLoading || !credentials.username || !credentials.password
+            }
             className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
           >
             {isLoading ? (

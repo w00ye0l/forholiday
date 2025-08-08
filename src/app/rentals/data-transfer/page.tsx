@@ -28,16 +28,6 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { DropboxCredentialsModal } from "@/components/admin/DropboxCredentialsModal";
@@ -70,12 +60,6 @@ export default function DataTransferPage() {
     from: today,
     to: today,
   });
-
-  // 취소 확인 모달 상태
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [selectedTransferId, setSelectedTransferId] = useState<string | null>(
-    null
-  );
 
   // 체크박스 상태
   const [selectedTransfers, setSelectedTransfers] = useState<string[]>([]);
@@ -166,38 +150,6 @@ export default function DataTransferPage() {
     } catch (error) {
       console.error("Error updating status:", error);
       toast.error("상태 변경에 실패했습니다.");
-    }
-  };
-
-  const handleCancelConfirm = async () => {
-    if (!selectedTransferId) return;
-
-    try {
-      // rental_reservations 테이블의 data_transmission을 false로 변경
-      const { error: rentalUpdateError } = await supabase
-        .from("rental_reservations")
-        .update({
-          data_transmission: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("reservation_id", selectedTransferId);
-
-      if (rentalUpdateError) throw rentalUpdateError;
-
-      // 로컬 상태에서 해당 데이터 제거
-      setTransfers((prev) =>
-        prev.filter(
-          (transfer) => transfer.reservation_id !== selectedTransferId
-        )
-      );
-
-      toast.success("데이터 전송이 취소되었습니다.");
-    } catch (error) {
-      console.error("Error cancelling data transfer:", error);
-      toast.error("데이터 전송 취소에 실패했습니다.");
-    } finally {
-      setShowCancelDialog(false);
-      setSelectedTransferId(null);
     }
   };
 
@@ -359,12 +311,30 @@ export default function DataTransferPage() {
     setShowDropboxModal(true);
   };
 
+  // 개별 이메일 발송 핸들러
+  const handleSingleEmail = async (transfer: RentalReservation) => {
+    if (!transfer.renter_email) {
+      toast.error("이메일 주소가 없습니다.");
+      return;
+    }
+
+    if (transfer.data_transfer_process_status !== "UPLOADED") {
+      toast.error("업로드 완료 상태에서만 이메일을 발송할 수 있습니다.");
+      return;
+    }
+
+    // 개별 전송을 위해 배열 설정
+    setCurrentTransferIds([transfer.reservation_id]);
+    setShowDropboxModal(true);
+  };
+
   // 드롭박스 정보로 이메일 발송
   const handleEmailWithDropbox = async (credentials: {
     username: string;
     password: string;
     accessInstructions?: string;
   }) => {
+    setIsEmailSending(true);
     try {
       const selectedData = filteredTransfers.filter((t) =>
         currentTransferIds.includes(t.reservation_id)
@@ -399,6 +369,15 @@ export default function DataTransferPage() {
           if (!result.success) {
             throw new Error(result.error || "Email sending failed");
           }
+
+          // 성공적으로 이메일 발송된 경우 데이터베이스 상태 업데이트
+          await supabase
+            .from("rental_reservations")
+            .update({
+              data_transfer_email_sent_at: new Date().toISOString(),
+              data_transfer_process_status: "EMAIL_SENT",
+            })
+            .eq("reservation_id", transfer.reservation_id);
 
           return { success: true, transferId: transfer.reservation_id };
         } catch (error) {
@@ -643,13 +622,12 @@ export default function DataTransferPage() {
               <TableHead>업로드 일시</TableHead>
               <TableHead>메일 발송 일시</TableHead>
               <TableHead>작업</TableHead>
-              <TableHead>데이터 전송 취소</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredTransfers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-4">
+                <TableCell colSpan={10} className="text-center py-4">
                   데이터 전송 예약이 없습니다.
                 </TableCell>
               </TableRow>
@@ -717,42 +695,44 @@ export default function DataTransferPage() {
                       : "-"}
                   </TableCell>
                   <TableCell>
-                    <Select
-                      value={
-                        transfer.data_transfer_process_status ||
-                        "PENDING_UPLOAD"
-                      }
-                      onValueChange={(value) =>
-                        handleStatusChange(
-                          transfer.reservation_id,
-                          value as DataTransferProcessStatus
-                        )
-                      }
-                    >
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statusOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedTransferId(transfer.reservation_id);
-                        setShowCancelDialog(true);
-                      }}
-                      className="h-8 px-3"
-                    >
-                      데이터 전송 취소
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={
+                          transfer.data_transfer_process_status ||
+                          "PENDING_UPLOAD"
+                        }
+                        onValueChange={(value) =>
+                          handleStatusChange(
+                            transfer.reservation_id,
+                            value as DataTransferProcessStatus
+                          )
+                        }
+                      >
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statusOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleSingleEmail(transfer)}
+                        disabled={
+                          transfer.data_transfer_process_status !==
+                            "UPLOADED" || !transfer.renter_email
+                        }
+                        className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        메일 전송
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -760,27 +740,6 @@ export default function DataTransferPage() {
           </TableBody>
         </Table>
       </Card>
-
-      {/* 구매 취소 확인 모달 */}
-      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>데이터 전송 취소 확인</AlertDialogTitle>
-            <AlertDialogDescription>
-              정말로 데이터 전송을 취소하시겠습니까?
-              <br />이 작업은 되돌릴 수 없습니다.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowCancelDialog(false)}>
-              취소
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleCancelConfirm}>
-              데이터 전송 취소
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* 드롭박스 정보 입력 모달 */}
       <DropboxCredentialsModal
