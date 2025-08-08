@@ -277,7 +277,10 @@ export default function DataTransferPage() {
     if (dateRange?.from && dateRange?.to && transfer.rental?.return_date) {
       const fromStr = format(dateRange.from, "yyyy-MM-dd");
       const toStr = format(dateRange.to, "yyyy-MM-dd");
-      if (transfer.rental.return_date < fromStr || transfer.rental.return_date > toStr) {
+      if (
+        transfer.rental.return_date < fromStr ||
+        transfer.rental.return_date > toStr
+      ) {
         return false;
       }
     }
@@ -316,7 +319,10 @@ export default function DataTransferPage() {
       if (dateRange?.from && dateRange?.to && transfer.rental?.return_date) {
         const fromStr = format(dateRange.from, "yyyy-MM-dd");
         const toStr = format(dateRange.to, "yyyy-MM-dd");
-        if (transfer.rental.return_date < fromStr || transfer.rental.return_date > toStr) {
+        if (
+          transfer.rental.return_date < fromStr ||
+          transfer.rental.return_date > toStr
+        ) {
           return false;
         }
       }
@@ -342,17 +348,17 @@ export default function DataTransferPage() {
       setSelectedTransfers([]);
     } else {
       const uploadedTransfers = filteredTransfers
-        .filter(t => t.status === "UPLOADED")
-        .map(t => t.id);
+        .filter((t) => t.status === "UPLOADED")
+        .map((t) => t.id);
       setSelectedTransfers(uploadedTransfers);
     }
     setSelectAll(!selectAll);
   };
 
   const handleSelectTransfer = (transferId: string) => {
-    setSelectedTransfers(prev => {
+    setSelectedTransfers((prev) => {
       if (prev.includes(transferId)) {
-        return prev.filter(id => id !== transferId);
+        return prev.filter((id) => id !== transferId);
       } else {
         return [...prev, transferId];
       }
@@ -366,12 +372,18 @@ export default function DataTransferPage() {
       return;
     }
 
-    const selectedData = filteredTransfers.filter(t => selectedTransfers.includes(t.id));
-    
+    const selectedData = filteredTransfers.filter((t) =>
+      selectedTransfers.includes(t.id)
+    );
+
     // 이메일 주소가 없는 항목 확인
-    const itemsWithoutEmail = selectedData.filter(t => !t.rental?.renter_email);
+    const itemsWithoutEmail = selectedData.filter(
+      (t) => !t.rental?.renter_email
+    );
     if (itemsWithoutEmail.length > 0) {
-      toast.error(`${itemsWithoutEmail.length}개 항목에 이메일 주소가 없습니다.`);
+      toast.error(
+        `${itemsWithoutEmail.length}개 항목에 이메일 주소가 없습니다.`
+      );
       return;
     }
 
@@ -381,10 +393,16 @@ export default function DataTransferPage() {
   };
 
   // 드롭박스 정보로 이메일 발송
-  const handleEmailWithDropbox = async (credentials: { username: string; password: string; accessInstructions?: string }) => {
+  const handleEmailWithDropbox = async (credentials: {
+    username: string;
+    password: string;
+    accessInstructions?: string;
+  }) => {
     try {
-      const selectedData = filteredTransfers.filter(t => currentTransferIds.includes(t.id));
-      
+      const selectedData = filteredTransfers.filter((t) =>
+        currentTransferIds.includes(t.id)
+      );
+
       const emailPromises = selectedData.map(async (transfer) => {
         try {
           const formData = new FormData();
@@ -394,12 +412,15 @@ export default function DataTransferPage() {
           formData.append("transferId", transfer.id);
           formData.append("templateType", "data-transfer-completion");
           formData.append("reservationId", transfer.rental_id);
-          
+
           // 드롭박스 정보 추가
           formData.append("dropboxUsername", credentials.username);
           formData.append("dropboxPassword", credentials.password);
           if (credentials.accessInstructions) {
-            formData.append("accessInstructions", credentials.accessInstructions);
+            formData.append(
+              "accessInstructions",
+              credentials.accessInstructions
+            );
           }
 
           const response = await fetch("/api/send-email", {
@@ -424,7 +445,10 @@ export default function DataTransferPage() {
 
           return { success: true, transferId: transfer.id };
         } catch (error) {
-          console.error(`Error sending email for transfer ${transfer.id}:`, error);
+          console.error(
+            `Error sending email for transfer ${transfer.id}:`,
+            error
+          );
           return {
             success: false,
             transferId: transfer.id,
@@ -438,7 +462,9 @@ export default function DataTransferPage() {
       const failCount = results.filter((r) => !r.success).length;
 
       if (successCount > 0) {
-        toast.success(`${successCount}개의 이메일이 성공적으로 발송되었습니다.`);
+        toast.success(
+          `${successCount}개의 이메일이 성공적으로 발송되었습니다.`
+        );
       }
 
       if (failCount > 0) {
@@ -451,11 +477,10 @@ export default function DataTransferPage() {
         setSelectAll(false);
         fetchTransfers();
       }
-      
+
       // 모달 닫기
       setShowDropboxModal(false);
       setCurrentTransferIds([]);
-      
     } catch (error) {
       console.error("Error sending bulk emails:", error);
       toast.error("이메일 발송 중 오류가 발생했습니다.");
@@ -506,7 +531,9 @@ export default function DataTransferPage() {
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {dateRange?.from && dateRange?.to
-                  ? `${format(dateRange.from, "yyyy-MM-dd", { locale: ko })} ~ ${format(dateRange.to, "yyyy-MM-dd", { locale: ko })}`
+                  ? `${format(dateRange.from, "yyyy-MM-dd", {
+                      locale: ko,
+                    })} ~ ${format(dateRange.to, "yyyy-MM-dd", { locale: ko })}`
                   : "반납 기간 선택"}
               </Button>
             </PopoverTrigger>
@@ -600,7 +627,11 @@ export default function DataTransferPage() {
           <div>
             {dateRange?.from && dateRange?.to ? (
               <span className="font-medium text-blue-600">
-                {`${format(dateRange.from, "yyyy년 MM월 dd일", { locale: ko })} ~ ${format(dateRange.to, "yyyy년 MM월 dd일", { locale: ko })} 기간`}
+                {`${format(dateRange.from, "yyyy년 MM월 dd일", {
+                  locale: ko,
+                })} ~ ${format(dateRange.to, "yyyy년 MM월 dd일", {
+                  locale: ko,
+                })} 기간`}
               </span>
             ) : (
               <span className="font-medium text-blue-600">전체 기간</span>
@@ -624,7 +655,7 @@ export default function DataTransferPage() {
             <span className="text-sm text-blue-800">
               {selectedTransfers.length}개 항목이 선택되었습니다.
             </span>
-            <Button 
+            <Button
               onClick={handleBulkEmail}
               className="bg-blue-600 hover:bg-blue-700"
             >
@@ -639,9 +670,9 @@ export default function DataTransferPage() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-8">
-                <input 
-                  type="checkbox" 
-                  className="accent-primary" 
+                <input
+                  type="checkbox"
+                  className="accent-primary"
                   checked={selectAll}
                   onChange={handleSelectAll}
                 />
@@ -663,16 +694,16 @@ export default function DataTransferPage() {
             {filteredTransfers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={12} className="text-center py-4">
-                  데이터가 없습니다.
+                  데이터 전송 예약이 없습니다.
                 </TableCell>
               </TableRow>
             ) : (
               filteredTransfers.map((transfer) => (
                 <TableRow key={transfer.id}>
                   <TableCell className="w-8">
-                    <input 
-                      type="checkbox" 
-                      className="accent-primary" 
+                    <input
+                      type="checkbox"
+                      className="accent-primary"
                       checked={selectedTransfers.includes(transfer.id)}
                       onChange={() => handleSelectTransfer(transfer.id)}
                       disabled={transfer.status !== "UPLOADED"}
