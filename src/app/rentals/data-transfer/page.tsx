@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RentalReservation, DataTransferStatus } from "@/types/rental";
+import { RentalReservation, DataTransferProcessStatus } from "@/types/rental";
 import { Card } from "@/components/ui/card";
 import {
   Select,
@@ -47,31 +47,18 @@ import { ko } from "date-fns/locale";
 import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const statusOptions: { value: DataTransferStatus; label: string }[] = [
-  { value: "PENDING", label: "대기중" },
+const statusOptions: { value: DataTransferProcessStatus; label: string }[] = [
+  { value: "PENDING_UPLOAD", label: "업로드 대기" },
   { value: "UPLOADED", label: "업로드 완료" },
-  { value: "EMAIL_SENT", label: "메일발송완료" },
-  { value: "ISSUE", label: "문제있음" },
+  { value: "EMAIL_SENT", label: "이메일 발송 완료" },
+  { value: "ISSUE", label: "문제 발생" },
 ];
 
 export default function DataTransferPage() {
   const [selectedStatus, setSelectedStatus] = useState<
-    DataTransferStatus | "ALL"
+    DataTransferProcessStatus | "ALL"
   >("ALL");
-  const [transfers, setTransfers] = useState<
-    (RentalReservation & {
-      data_transfer_status: DataTransferStatus;
-      uploaded_at?: string;
-      email_sent_at?: string;
-      issue?: string;
-      devices: {
-        id: string;
-        tag_name: string;
-        category: string;
-        status: string;
-      };
-    })[]
-  >([]);
+  const [transfers, setTransfers] = useState<RentalReservation[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabase = createClient();
@@ -126,33 +113,14 @@ export default function DataTransferPage() {
       // rental_reservations 테이블에서 data_transmission = true인 예약들을 조회
       const { data, error } = await supabase
         .from("rental_reservations")
-        .select(
-          `
-          *,
-          devices (
-            id,
-            tag_name,
-            category,
-            status
-          )
-        `
-        )
+        .select("*")
         .eq("data_transmission", true)
         .is("cancelled_at", null)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
-      // 데이터 전송 상태를 기본값으로 설정 (추후 별도 컬럼 추가 시 여기서 조회)
-      const transfersWithStatus = (data || []).map((rental) => ({
-        ...rental,
-        data_transfer_status: "PENDING" as DataTransferStatus,
-        uploaded_at: undefined,
-        email_sent_at: undefined,
-        issue: undefined,
-      }));
-
-      setTransfers(transfersWithStatus);
+      setTransfers(data || []);
     } catch (error) {
       console.error("Error fetching transfers:", error);
       toast.error("데이터 전송 목록을 불러오는데 실패했습니다.");
@@ -163,25 +131,34 @@ export default function DataTransferPage() {
 
   const handleStatusChange = async (
     reservationId: string,
-    newStatus: DataTransferStatus
+    newStatus: DataTransferProcessStatus
   ) => {
     try {
-      // 현재는 클라이언트 상태만 업데이트 (추후 별도 컬럼 추가 시 DB 업데이트)
+      const now = new Date().toISOString();
+      const updateData: any = {
+        data_transfer_process_status: newStatus,
+        updated_at: now,
+      };
+
+      // 상태에 따른 추가 필드 업데이트
+      if (newStatus === "UPLOADED") {
+        updateData.data_transfer_uploaded_at = now;
+      } else if (newStatus === "EMAIL_SENT") {
+        updateData.data_transfer_email_sent_at = now;
+      }
+
+      const { error } = await supabase
+        .from("rental_reservations")
+        .update(updateData)
+        .eq("reservation_id", reservationId);
+
+      if (error) throw error;
+
+      // 로컬 상태 업데이트
       setTransfers((prev) =>
         prev.map((transfer) =>
           transfer.reservation_id === reservationId
-            ? {
-                ...transfer,
-                data_transfer_status: newStatus,
-                uploaded_at:
-                  newStatus === "UPLOADED"
-                    ? new Date().toISOString()
-                    : transfer.uploaded_at,
-                email_sent_at:
-                  newStatus === "EMAIL_SENT"
-                    ? new Date().toISOString()
-                    : transfer.email_sent_at,
-              }
+            ? { ...transfer, ...updateData }
             : transfer
         )
       );
@@ -225,10 +202,10 @@ export default function DataTransferPage() {
   };
 
   const getStatusBadgeVariant = (
-    status: DataTransferStatus
+    status: DataTransferProcessStatus | undefined
   ): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
-      case "PENDING":
+      case "PENDING_UPLOAD":
         return "default";
       case "UPLOADED":
         return "secondary";
@@ -246,7 +223,7 @@ export default function DataTransferPage() {
     // 상태 필터링
     if (
       selectedStatus !== "ALL" &&
-      transfer.data_transfer_status !== selectedStatus
+      transfer.data_transfer_process_status !== selectedStatus
     ) {
       return false;
     }
@@ -317,16 +294,18 @@ export default function DataTransferPage() {
 
     return {
       all: baseFiltered.length,
-      PENDING: baseFiltered.filter((t) => t.data_transfer_status === "PENDING")
-        .length,
+      PENDING_UPLOAD: baseFiltered.filter(
+        (t) => t.data_transfer_process_status === "PENDING_UPLOAD"
+      ).length,
       UPLOADED: baseFiltered.filter(
-        (t) => t.data_transfer_status === "UPLOADED"
+        (t) => t.data_transfer_process_status === "UPLOADED"
       ).length,
       EMAIL_SENT: baseFiltered.filter(
-        (t) => t.data_transfer_status === "EMAIL_SENT"
+        (t) => t.data_transfer_process_status === "EMAIL_SENT"
       ).length,
-      ISSUE: baseFiltered.filter((t) => t.data_transfer_status === "ISSUE")
-        .length,
+      ISSUE: baseFiltered.filter(
+        (t) => t.data_transfer_process_status === "ISSUE"
+      ).length,
     };
   };
 
@@ -338,7 +317,7 @@ export default function DataTransferPage() {
       setSelectedTransfers([]);
     } else {
       const uploadedTransfers = filteredTransfers
-        .filter((t) => t.data_transfer_status === "UPLOADED")
+        .filter((t) => t.data_transfer_process_status === "UPLOADED")
         .map((t) => t.reservation_id);
       setSelectedTransfers(uploadedTransfers);
     }
@@ -420,9 +399,6 @@ export default function DataTransferPage() {
           if (!result.success) {
             throw new Error(result.error || "Email sending failed");
           }
-
-          // 상태 업데이트 - 현재는 클라이언트 상태만 업데이트 (추후 별도 테이블 필요시 DB 업데이트 추가)
-          // 현재 rental_reservations 테이블에는 data_transfer_status 컬럼이 없으므로 클라이언트 상태만 관리
 
           return { success: true, transferId: transfer.reservation_id };
         } catch (error) {
@@ -556,14 +532,14 @@ export default function DataTransferPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setSelectedStatus("PENDING")}
+            onClick={() => setSelectedStatus("PENDING_UPLOAD")}
             className={`h-6 px-2 py-1 text-xs ${
-              selectedStatus === "PENDING"
+              selectedStatus === "PENDING_UPLOAD"
                 ? "bg-gray-200 text-gray-900 border-2 border-gray-400"
                 : "bg-gray-100 text-gray-800 hover:bg-gray-200"
             }`}
           >
-            대기중: {statusCounts.PENDING}건
+            업로드 대기: {statusCounts.PENDING_UPLOAD}건
           </Button>
           <Button
             variant="ghost"
@@ -587,7 +563,7 @@ export default function DataTransferPage() {
                 : "bg-green-100 text-green-800 hover:bg-green-200"
             }`}
           >
-            메일발송완료: {statusCounts.EMAIL_SENT}건
+            이메일 발송 완료: {statusCounts.EMAIL_SENT}건
           </Button>
           <Button
             variant="ghost"
@@ -599,7 +575,7 @@ export default function DataTransferPage() {
                 : "bg-red-100 text-red-800 hover:bg-red-200"
             }`}
           >
-            문제있음: {statusCounts.ISSUE}건
+            문제 발생: {statusCounts.ISSUE}건
           </Button>
         </div>
 
@@ -690,7 +666,9 @@ export default function DataTransferPage() {
                       onChange={() =>
                         handleSelectTransfer(transfer.reservation_id)
                       }
-                      disabled={transfer.data_transfer_status !== "UPLOADED"}
+                      disabled={
+                        transfer.data_transfer_process_status !== "UPLOADED"
+                      }
                     />
                   </TableCell>
                   <TableCell>{transfer.renter_name || "-"}</TableCell>
@@ -711,29 +689,28 @@ export default function DataTransferPage() {
                   <TableCell>
                     <Badge
                       variant={getStatusBadgeVariant(
-                        transfer.data_transfer_status
+                        transfer.data_transfer_process_status
                       )}
                     >
-                      {
-                        statusOptions.find(
-                          (opt) => opt.value === transfer.data_transfer_status
-                        )?.label
-                      }
+                      {statusOptions.find(
+                        (opt) =>
+                          opt.value === transfer.data_transfer_process_status
+                      )?.label || "업로드 대기"}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {transfer.uploaded_at
+                    {transfer.data_transfer_uploaded_at
                       ? format(
-                          new Date(transfer.uploaded_at),
+                          new Date(transfer.data_transfer_uploaded_at),
                           "yyyy-MM-dd HH:mm",
                           { locale: ko }
                         )
                       : "-"}
                   </TableCell>
                   <TableCell>
-                    {transfer.email_sent_at
+                    {transfer.data_transfer_email_sent_at
                       ? format(
-                          new Date(transfer.email_sent_at),
+                          new Date(transfer.data_transfer_email_sent_at),
                           "yyyy-MM-dd HH:mm",
                           { locale: ko }
                         )
@@ -741,11 +718,14 @@ export default function DataTransferPage() {
                   </TableCell>
                   <TableCell>
                     <Select
-                      value={transfer.data_transfer_status}
+                      value={
+                        transfer.data_transfer_process_status ||
+                        "PENDING_UPLOAD"
+                      }
                       onValueChange={(value) =>
                         handleStatusChange(
                           transfer.reservation_id,
-                          value as DataTransferStatus
+                          value as DataTransferProcessStatus
                         )
                       }
                     >

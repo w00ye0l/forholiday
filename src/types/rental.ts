@@ -173,6 +173,13 @@ export interface RentalReservation {
   updated_at: string;
   cancelled_at?: string;
   cancel_reason?: string;
+  // 데이터 전송 관련 필드 (rental_reservations 테이블에 통합됨)
+  data_transfer_status: DataTransferStatus;
+  data_transfer_purchased: boolean;
+  data_transfer_uploaded_at?: string;
+  data_transfer_email_sent_at?: string;
+  data_transfer_issue?: string;
+  data_transfer_process_status?: DataTransferProcessStatus;
 }
 
 export interface CreateRentalReservationDto {
@@ -197,22 +204,32 @@ export interface CreateRentalReservationDto {
   status?: ReservationStatus; // 캘린더 연동시 상태 지정 가능
 }
 
+// rental_reservations 테이블의 data_transfer_status 필드용 타입
 export type DataTransferStatus =
-  | "PENDING"
+  | "none"
+  | "purchased" 
+  | "not_purchased"
+  | "completed";
+
+// 실제 데이터 전송 처리 상태를 위한 세부 타입
+export type DataTransferProcessStatus =
+  | "PENDING_UPLOAD"
   | "UPLOADED"
-  | "EMAIL_SENT"
+  | "EMAIL_SENT" 
   | "ISSUE";
 
-export interface DataTransfer {
-  id: string;
-  rental_id: string;
-  status: DataTransferStatus;
-  uploaded_at?: string;
-  email_sent_at?: string;
-  issue?: string;
-  cancelled_at?: string;
-  cancel_reason?: string;
-  created_at: string;
-  updated_at: string;
-  rental?: RentalReservation;
-}
+// 상태별 라벨 매핑 (데이터 전송)
+export const DATA_TRANSFER_STATUS_LABELS: Record<DataTransferStatus, string> = {
+  none: "해당 없음",
+  purchased: "구매",
+  not_purchased: "미구매", 
+  completed: "완료",
+} as const;
+
+// 처리 상태별 라벨 매핑
+export const DATA_TRANSFER_PROCESS_STATUS_LABELS: Record<DataTransferProcessStatus, string> = {
+  PENDING_UPLOAD: "업로드 대기",
+  UPLOADED: "업로드 완료",
+  EMAIL_SENT: "이메일 발송 완료",
+  ISSUE: "문제 발생",
+} as const;
