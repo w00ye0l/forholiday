@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { RentalList } from "@/components/rental/RentalList";
 import { RentalStatistics } from "@/components/rental/RentalStatistics";
 import { createClient } from "@/lib/supabase/client";
@@ -22,6 +23,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
   SearchIcon,
   RefreshCwIcon,
   ListIcon,
@@ -36,15 +46,11 @@ import {
   DISPLAY_STATUS_MAP,
   PICKUP_METHOD_PRIORITY,
   PICKUP_METHOD_LABELS,
-  PickupMethod,
-  ReservationStatus,
-  DisplayStatus,
 } from "@/types/rental";
 import {
   exportToExcel,
   transformRentalDataForExcel,
   transformRentalStatsForExcel,
-  cn,
 } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -62,7 +68,12 @@ type RentalWithDevice = RentalReservation & {
 
 // statusMap은 이제 STATUS_MAP으로 대체됨
 
+const ITEMS_PER_PAGE = 50;
+
 export default function RentalsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [rentals, setRentals] = useState<RentalWithDevice[]>([]);
   const [filteredRentals, setFilteredRentals] = useState<RentalWithDevice[]>(
     []
@@ -76,20 +87,32 @@ export default function RentalsPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("list");
   const [exporting, setExporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(() => {
+    return parseInt(searchParams.get("page") || "1");
+  });
+  const [totalCount, setTotalCount] = useState(0);
 
   // 날짜 범위 필터 - 기본값 없음
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   const supabase = createClient();
 
+  // 페이지 변경 핸들러 - URL 업데이트
+  const updatePage = (page: number) => {
+    setCurrentPage(page);
+    const params = new URLSearchParams(searchParams);
+    params.set("page", page.toString());
+    router.push(`?${params.toString()}`, { scroll: false });
+  };
+
   // 출고 관리 정렬 로직
   const sortRentalsForOutgoing = (rentals: RentalWithDevice[]) => {
     return rentals.sort((a, b) => {
-      // 1차 정렬: 시간 내림차순 (최근 예약이 먼저)
+      // 1차 정렬: 시간 오름차순 (오래된 예약이 먼저)
       const dateTimeA = new Date(`${a.pickup_date} ${a.pickup_time}`);
       const dateTimeB = new Date(`${b.pickup_date} ${b.pickup_time}`);
 
-      const timeDiff = dateTimeB.getTime() - dateTimeA.getTime();
+      const timeDiff = dateTimeA.getTime() - dateTimeB.getTime();
 
       if (timeDiff !== 0) {
         return timeDiff;
@@ -103,143 +126,220 @@ export default function RentalsPage() {
     });
   };
 
-  const fetchRentals = async () => {
+  // 서버 페이지네이션을 위한 API 호출
+  const fetchRentals = async (page: number = 1) => {
     try {
       setLoading(true);
       setError(null);
 
-      // 예약 목록 조회 - 취소되지 않은 예약만, 수령 날짜/시간 기준으로 정렬
-      const { data: rentals, error: rentalsError } = await supabase
-        .from("rental_reservations")
-        .select("*")
-        .is("cancelled_at", null) // 취소되지 않은 예약만 조회
-        .order("pickup_date", { ascending: true })
-        .order("pickup_time", { ascending: true });
+      const hasFilters = hasActiveFilters();
 
-      if (rentalsError) {
-        throw rentalsError;
+      if (hasFilters) {
+        // 필터가 있는 경우 필터링 API 사용
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: ITEMS_PER_PAGE.toString(),
+        });
+
+        // 필터 조건들 추가
+        if (searchTerm.trim()) {
+          params.append("search", searchTerm.trim());
+        }
+        if (dateRange?.from && dateRange?.to) {
+          params.append("dateFrom", format(dateRange.from, "yyyy-MM-dd"));
+          params.append("dateTo", format(dateRange.to, "yyyy-MM-dd"));
+        }
+        if (selectedCategory !== "all") {
+          params.append("category", selectedCategory);
+        }
+        if (selectedStatus !== "all") {
+          params.append("status", selectedStatus);
+        }
+        if (selectedPickupMethod !== "all") {
+          params.append("pickupMethod", selectedPickupMethod);
+        }
+
+        const response = await fetch(
+          `/api/rentals/filtered?${params.toString()}`
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            "서버에서 필터링된 데이터를 가져오는데 실패했습니다."
+          );
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error || "알 수 없는 오류가 발생했습니다.");
+        }
+
+        console.log(
+          `필터링 API 응답: 페이지 ${result.pagination.page}, ${result.data.length}개 데이터, 필터링된 전체 ${result.pagination.total}개`
+        );
+
+        // 클라이언트 사이드 정렬 적용
+        const sortedRentals = sortRentalsForOutgoing(result.data);
+
+        setRentals(sortedRentals);
+        setTotalCount(result.pagination.total);
+        setFilteredRentals(sortedRentals); // 필터링된 결과도 설정
+      } else {
+        // 필터가 없는 경우 기본 페이지네이션 API 사용
+        const response = await fetch(
+          `/api/rentals/paginated?page=${page}&limit=${ITEMS_PER_PAGE}`
+        );
+
+        if (!response.ok) {
+          throw new Error("서버에서 데이터를 가져오는데 실패했습니다.");
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error || "알 수 없는 오류가 발생했습니다.");
+        }
+
+        console.log(
+          `기본 API 응답: 페이지 ${result.pagination.page}, ${result.data.length}개 데이터, 전체 ${result.pagination.total}개`
+        );
+
+        // 클라이언트 사이드 정렬 적용
+        const sortedRentals = sortRentalsForOutgoing(result.data);
+
+        setRentals(sortedRentals);
+        setTotalCount(result.pagination.total);
+        setFilteredRentals(sortedRentals);
       }
-
-      // 기기 목록 조회
-      const { data: devices, error: devicesError } = await supabase
-        .from("devices")
-        .select("id, tag_name, category, status");
-
-      if (devicesError) {
-        throw devicesError;
-      }
-
-      // 예약과 기기 정보를 매칭
-      const rentalsWithDevices =
-        rentals?.map((rental) => {
-          const device = rental.device_tag_name
-            ? devices?.find((d) => d.tag_name === rental.device_tag_name)
-            : null;
-          return {
-            ...rental,
-            devices: device || {
-              id: "",
-              tag_name: rental.device_tag_name || "",
-              category: rental.device_category,
-              status: "unknown",
-            },
-          };
-        }) || [];
-
-      // 정렬된 데이터 설정
-      const sortedRentals = sortRentalsForOutgoing(rentalsWithDevices);
-      setRentals(sortedRentals);
-      setFilteredRentals(sortedRentals);
     } catch (error) {
       console.error("예약 목록 조회 에러:", error);
-      setError("예약 목록을 불러오는데 실패했습니다.");
+      setError(
+        error instanceof Error
+          ? error.message
+          : "예약 목록을 불러오는데 실패했습니다."
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // 검색 및 필터링 로직
-  useEffect(() => {
-    let filtered = [...rentals];
+  // 페이지네이션 계산
+  const hasActiveFilters = () => {
+    return (
+      searchTerm.trim() !== "" ||
+      dateRange !== undefined ||
+      selectedCategory !== "all" ||
+      selectedStatus !== "all" ||
+      selectedPickupMethod !== "all"
+    );
+  };
 
-    // 텍스트 검색 필터링
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter((rental) => {
-        return (
-          rental.renter_name.toLowerCase().includes(term) ||
-          rental.renter_phone.includes(term) ||
-          rental.reservation_id.toLowerCase().includes(term) ||
-          (rental.device_tag_name &&
-            rental.device_tag_name.toLowerCase().includes(term))
-        );
-      });
-      
-      // 검색어가 있을 때 날짜 필터를 자동으로 제거
-      if (dateRange) {
-        setDateRange(undefined);
+  // 이제 모든 경우에서 서버 페이지네이션 사용
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+
+  // 서버에서 이미 페이지네이션된 데이터를 그대로 사용
+  const paginatedRentals = rentals;
+
+  // 페이지 번호 생성
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+
+    if (totalPages <= maxPagesToShow) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push("...");
+        for (let i = totalPages - 3; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        pages.push(1);
+        pages.push("...");
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(totalPages);
       }
     }
 
-    // 날짜 범위 필터링 (수령일 기준)
-    if (dateRange?.from && dateRange?.to) {
-      const fromStr = format(dateRange.from, "yyyy-MM-dd");
-      const toStr = format(dateRange.to, "yyyy-MM-dd");
-      filtered = filtered.filter((rental) => {
-        return rental.pickup_date >= fromStr && rental.pickup_date <= toStr;
-      });
-    }
+    return pages;
+  };
 
-    // 카테고리 필터링
-    if (selectedCategory !== "all") {
-      filtered = filtered.filter((rental) => {
-        return rental.devices.category === selectedCategory;
-      });
+  // 필터 변경 시 데이터 새로 가져오기
+  useEffect(() => {
+    if (!isInitialMount) {
+      // 필터가 변경되면 1페이지에서 데이터 새로 가져오기
+      fetchRentals(1);
     }
-
-    // 상태 필터링
-    if (selectedStatus !== "all") {
-      filtered = filtered.filter((rental) => {
-        return rental.status === selectedStatus;
-      });
-    }
-
-    // 수령 방법 필터링
-    if (selectedPickupMethod !== "all") {
-      filtered = filtered.filter((rental) => {
-        return rental.pickup_method === selectedPickupMethod;
-      });
-    }
-
-    // 정렬 적용
-    const sorted = sortRentalsForOutgoing(filtered);
-    setFilteredRentals(sorted);
   }, [
     searchTerm,
     dateRange,
     selectedCategory,
     selectedStatus,
     selectedPickupMethod,
-    rentals,
   ]);
 
+  // 초기 마운트 여부 추적
+  const [isInitialMount, setIsInitialMount] = useState(true);
+
+  // 필터 변경 시에만 첫 페이지로 이동 (초기 마운트 제외)
   useEffect(() => {
-    fetchRentals();
+    if (isInitialMount) {
+      setIsInitialMount(false);
+      return;
+    }
+
+    if (currentPage !== 1) {
+      updatePage(1);
+    }
+  }, [
+    searchTerm,
+    dateRange,
+    selectedCategory,
+    selectedStatus,
+    selectedPickupMethod,
+  ]);
+
+  // 페이지 변경 시 데이터 가져오기
+  useEffect(() => {
+    if (!isInitialMount) {
+      fetchRentals(currentPage);
+    }
+  }, [currentPage]);
+
+  // 초기 로드
+  useEffect(() => {
+    fetchRentals(currentPage);
   }, []);
 
   // 예약 취소 이벤트 리스너 추가
   useEffect(() => {
     const handleReservationCanceled = () => {
       // 예약이 취소되었을 때 데이터 새로고침
-      fetchRentals();
+      fetchRentals(currentPage);
     };
 
-    window.addEventListener('reservationCanceled', handleReservationCanceled);
-    
+    window.addEventListener("reservationCanceled", handleReservationCanceled);
+
     return () => {
-      window.removeEventListener('reservationCanceled', handleReservationCanceled);
+      window.removeEventListener(
+        "reservationCanceled",
+        handleReservationCanceled
+      );
     };
-  }, []);
+  }, [currentPage]);
 
   const handleReset = () => {
     setSearchTerm("");
@@ -288,7 +388,7 @@ export default function RentalsPage() {
       );
 
       // 엑셀 파일 생성 및 다운로드
-      const result = await exportToExcel(excelData, "예약목록", {
+      const result = exportToExcel(excelData, "예약목록", {
         sheetName: "예약 목록",
         includeStats: true,
         statsData: statsData,
@@ -315,16 +415,6 @@ export default function RentalsPage() {
       .filter((category, index, arr) => arr.indexOf(category) === index)
       .sort();
     return categories;
-  };
-
-  // 고유한 상태 목록 추출
-  const getUniqueStatuses = () => {
-    const statuses = rentals
-      .map((rental) => rental.status)
-      .filter((status) => status)
-      .filter((status, index, arr) => arr.indexOf(status) === index)
-      .sort();
-    return statuses;
   };
 
   // 상태별 개수 계산 (필터링된 결과 기준)
@@ -406,43 +496,6 @@ export default function RentalsPage() {
     return methods;
   };
 
-  // 필터 조건 표시 함수
-  const getFilterDescription = () => {
-    const conditions = [];
-
-    if (searchTerm.trim()) {
-      conditions.push(`검색: "${searchTerm}"`);
-    }
-
-    if (dateRange?.from && dateRange?.to) {
-      conditions.push(
-        `${format(dateRange.from, "yyyy-MM-dd", { locale: ko })} ~ ${format(
-          dateRange.to,
-          "yyyy-MM-dd",
-          { locale: ko }
-        )}`
-      );
-    }
-
-    if (selectedCategory !== "all") {
-      conditions.push(`카테고리-${selectedCategory}`);
-    }
-
-    if (selectedStatus !== "all") {
-      conditions.push(
-        `상태-${STATUS_MAP[selectedStatus as keyof typeof STATUS_MAP].label}`
-      );
-    }
-
-    if (selectedPickupMethod !== "all") {
-      conditions.push(
-        `수령방법-${PICKUP_METHOD_LABELS[selectedPickupMethod as PickupMethod]}`
-      );
-    }
-
-    return conditions.length > 0 ? conditions.join(" | ") : null;
-  };
-
   if (error) {
     return (
       <div className="container mx-auto py-8">
@@ -451,7 +504,7 @@ export default function RentalsPage() {
           <div className="text-red-500 p-4 border border-red-300 rounded">
             {error}
           </div>
-          <Button onClick={fetchRentals} className="mt-4">
+          <Button onClick={() => fetchRentals(currentPage)} className="mt-4">
             다시 시도
           </Button>
         </div>
@@ -521,7 +574,6 @@ export default function RentalsPage() {
                       selected={dateRange}
                       onSelect={setDateRange}
                       locale={ko}
-                      initialFocus
                     />
                   </PopoverContent>
                 </Popover>
@@ -689,17 +741,85 @@ export default function RentalsPage() {
                   ) : (
                     <span className="font-medium text-blue-600">전체 기간</span>
                   )}
-                  <span className="ml-2">총 {getFilteredCount()}개의 예약</span>
+                  <span className="ml-2">총 {totalCount}개의 예약</span>
                 </div>
               </div>
             </div>
 
             {/* 예약 목록 */}
             <RentalList
-              rentals={filteredRentals}
+              rentals={paginatedRentals}
               loading={loading}
               searchTerm={searchTerm}
             />
+
+            {/* 페이지네이션 */}
+            {!loading && totalCount > ITEMS_PER_PAGE && (
+              <div className="mt-6 flex justify-center">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => {
+                          const newPage = Math.max(1, currentPage - 1);
+                          console.log(
+                            "이전 페이지 클릭: 현재",
+                            currentPage,
+                            "-> ",
+                            newPage
+                          );
+                          updatePage(newPage);
+                        }}
+                        className={
+                          currentPage === 1
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+
+                    {getPageNumbers().map((page, index) => (
+                      <PaginationItem key={index}>
+                        {page === "..." ? (
+                          <PaginationEllipsis />
+                        ) : (
+                          <PaginationLink
+                            onClick={() => {
+                              console.log("페이지 번호 클릭:", page);
+                              updatePage(page as number);
+                            }}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        )}
+                      </PaginationItem>
+                    ))}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => {
+                          const newPage = Math.min(totalPages, currentPage + 1);
+                          console.log(
+                            "다음 페이지 클릭: 현재",
+                            currentPage,
+                            "-> ",
+                            newPage
+                          );
+                          updatePage(newPage);
+                        }}
+                        className={
+                          currentPage === totalPages
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </div>
         </TabsContent>
 
