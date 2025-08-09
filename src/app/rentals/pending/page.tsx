@@ -46,6 +46,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
 
@@ -68,20 +69,20 @@ const KOREAN_HEADERS = [
 ];
 
 const COLUMN_WIDTHS: Record<string, string> = {
-  타임스탬프: "w-28",
-  이름: "w-32",
-  픽업일시: "w-28", // 날짜 + 시간 통합으로 더 넓게
-  여권사진: "w-24",
-  반납일시: "w-28", // 날짜 + 시간 통합으로 더 넓게
-  예약사이트: "w-32",
-  예약번호: "w-36",
-  대여품목: "w-20",
-  이메일: "w-48",
-  메신저: "w-24",
-  메신저ID: "w-24",
-  동의: "w-20",
-  픽업터미널: "w-28",
-  반납터미널: "w-28",
+  타임스탬프: "w-28 min-w-[112px]",
+  이름: "w-32 min-w-[128px]",
+  픽업일시: "w-28 min-w-[112px]",
+  여권사진: "w-24 min-w-[96px]",
+  반납일시: "w-28 min-w-[112px]",
+  예약사이트: "w-32 min-w-[128px]",
+  예약번호: "w-36 min-w-[144px]",
+  대여품목: "w-24 min-w-[96px]",
+  이메일: "w-48 min-w-[192px]",
+  메신저: "w-24 min-w-[96px]",
+  메신저ID: "w-24 min-w-[96px]",
+  동의: "w-20 min-w-[80px]",
+  픽업터미널: "w-28 min-w-[112px]",
+  반납터미널: "w-28 min-w-[112px]",
 };
 
 export default function RentalsPendingPage() {
@@ -395,7 +396,9 @@ export default function RentalsPendingPage() {
 
         // 성공한 예약들의 ID 생성
         const confirmedReservationIds = selectedData
-          .filter((item) => successfulBookingNumbers.includes(String(item["예약번호"])))
+          .filter((item) =>
+            successfulBookingNumbers.includes(String(item["예약번호"]))
+          )
           .map((item) => generateReservationId(item));
 
         setCanceledReservationIds((prev) => {
@@ -500,7 +503,7 @@ export default function RentalsPendingPage() {
         header: () => (
           <input
             type="checkbox"
-            className="accent-primary"
+            className="accent-primary w-4 h-4"
             checked={
               selectedRows.size > 0 && selectedRows.size === filteredData.length
             }
@@ -512,19 +515,19 @@ export default function RentalsPendingPage() {
           return (
             <input
               type="checkbox"
-              className="accent-primary"
+              className="accent-primary w-4 h-4"
               checked={selectedRows.has(rowIndex)}
               onChange={(e) => handleRowSelect(rowIndex, e.target.checked)}
             />
           );
         },
-        customWidth: "w-8",
+        customWidth: "w-12 min-w-[48px]",
       },
       ...KOREAN_HEADERS.filter((header) => header !== "동의").map((header) => ({
         id: header,
         accessorKey: header,
         header,
-        customWidth: COLUMN_WIDTHS[header] || "w-24",
+        customWidth: COLUMN_WIDTHS[header] || "w-24 min-w-[96px]",
         cell: (info: any) => {
           const value = info.getValue();
           const rowData = info.row.original;
@@ -728,22 +731,28 @@ export default function RentalsPendingPage() {
     onPaginationChange: setPagination,
   });
 
-  // 사이드바 상태에 따른 테이블 너비 계산
-  const getTableWidth = () => {
+  // 사이드바 상태에 따른 컨테이너 너비 계산
+  const getContainerWidth = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      return "w-full"; // 모바일에서는 전체 너비
+    }
     if (state === "expanded") {
-      return "w-[calc(100vw-18rem)]"; // 사이드바가 열려있을 때
+      return "w-[calc(100vw-20rem)]"; // 사이드바가 열려있을 때
     } else {
-      return "w-[calc(100vw-3rem)]"; // 사이드바가 닫혀있을 때
+      return "w-[calc(100vw-5rem)]"; // 사이드바가 닫혀있을 때
     }
   };
 
   return (
-    <div className="w-full mx-auto py-8 overflow-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">예약 대기 목록</h1>
-        <div className="flex items-center gap-4">
+    <div
+      className={cn("h-full flex flex-col py-4 md:py-6", getContainerWidth())}
+    >
+      {/* 헤더와 액션 버튼 */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
+        <h1 className="text-xl md:text-2xl font-bold">예약 대기 목록</h1>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
           {selectedRows.size > 0 && (
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600 self-center">
               {selectedRows.size}개 선택됨
               {getSelectedConfirmedCount() > 0 && (
                 <span className="ml-2 text-green-600">
@@ -752,167 +761,179 @@ export default function RentalsPendingPage() {
               )}
             </span>
           )}
-          <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-            <DialogTrigger asChild>
-              <Button
-                onClick={handleCancelClick}
-                disabled={selectedRows.size === 0 || isCanceling}
-                variant="destructive"
-                className="mr-2"
-              >
-                {isCanceling ? "처리 중..." : "예약 취소"}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>예약 취소 확인</DialogTitle>
-                <DialogDescription>
-                  선택한 {selectedRows.size}개의 예약을 취소하시겠습니까?
-                  <br />
-                  {getSelectedConfirmedCount() > 0 && (
-                    <>
-                      확정된 예약 {getSelectedConfirmedCount()}개는 렌탈
-                      예약에서 제거되며,{" "}
-                    </>
-                  )}
-                  이 작업은 되돌릴 수 없습니다.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="max-h-60 overflow-y-auto">
-                <div className="space-y-2">
-                  {Array.from(selectedRows).map((index) => {
-                    const reservation = filteredData[index];
-                    const reservationId = generateReservationId(reservation);
-                    const isConfirmed =
-                      confirmedReservationIds.has(reservationId);
-                    return (
-                      <div
-                        key={index}
-                        className={`flex items-center justify-between p-2 rounded ${
-                          isConfirmed ? "bg-red-50" : "bg-gray-50"
-                        }`}
-                      >
-                        <div className="flex-1">
-                          <div className="font-medium">
-                            {reservation["이름"]}
-                            {isConfirmed && (
-                              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                                확정됨
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {reservation["대여품목"]} |{" "}
-                            {reservation["예약번호"]}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {reservation["픽업일"]} {reservation["픽업시간"]} ~{" "}
-                            {reservation["반납일"]} {reservation["반납시간"]}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <DialogFooter>
+          <div className="flex gap-2">
+            <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+              <DialogTrigger asChild>
                 <Button
-                  variant="outline"
-                  onClick={() => setShowCancelDialog(false)}
-                  disabled={isCanceling}
-                >
-                  취소
-                </Button>
-                <Button
-                  onClick={handleCancelReservations}
-                  disabled={isCanceling}
+                  onClick={handleCancelClick}
+                  disabled={selectedRows.size === 0 || isCanceling}
                   variant="destructive"
+                  size="sm"
+                  className="flex-1 sm:flex-initial"
                 >
-                  {isCanceling ? "처리 중..." : "취소 확정"}
+                  {isCanceling ? "처리 중..." : "예약 취소"}
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-            <DialogTrigger asChild>
-              <Button
-                onClick={handleConfirmClick}
-                disabled={selectedRows.size === 0 || isConfirming}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {isConfirming ? "처리 중..." : "예약 확정"}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>예약 확정 확인</DialogTitle>
-                <DialogDescription>
-                  선택한 {selectedRows.size}개의 예약을 확정하시겠습니까?
-                  <br />
-                  확정된 예약은 실제 렌탈 예약으로 등록되며, 이 작업은 되돌릴 수
-                  없습니다.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="max-h-60 overflow-y-auto">
-                <div className="space-y-2">
-                  {Array.from(selectedRows).map((index) => {
-                    const reservation = filteredData[index];
-                    return (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-2 bg-gray-50 rounded"
-                      >
-                        <div className="flex-1">
-                          <div className="font-medium">
-                            {reservation["이름"]}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {reservation["대여품목"]} |{" "}
-                            {reservation["예약번호"]}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {reservation["픽업일"]} {reservation["픽업시간"]} ~{" "}
-                            {reservation["반납일"]} {reservation["반납시간"]}
+              </DialogTrigger>
+              <DialogContent className="max-w-[95vw] sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>예약 취소 확인</DialogTitle>
+                  <DialogDescription>
+                    선택한 {selectedRows.size}개의 예약을 취소하시겠습니까?
+                    <br />
+                    {getSelectedConfirmedCount() > 0 && (
+                      <>
+                        확정된 예약 {getSelectedConfirmedCount()}개는 렌탈
+                        예약에서 제거되며,{" "}
+                      </>
+                    )}
+                    이 작업은 되돌릴 수 없습니다.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="max-h-60 overflow-y-auto">
+                  <div className="space-y-2">
+                    {Array.from(selectedRows).map((index) => {
+                      const reservation = filteredData[index];
+                      const reservationId = generateReservationId(reservation);
+                      const isConfirmed =
+                        confirmedReservationIds.has(reservationId);
+                      return (
+                        <div
+                          key={index}
+                          className={`flex items-center justify-between p-2 rounded ${
+                            isConfirmed ? "bg-red-50" : "bg-gray-50"
+                          }`}
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium">
+                              {reservation["이름"]}
+                              {isConfirmed && (
+                                <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                  확정됨
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {reservation["대여품목"]} |{" "}
+                              {reservation["예약번호"]}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {reservation["픽업일"]} {reservation["픽업시간"]}{" "}
+                              ~ {reservation["반납일"]}{" "}
+                              {reservation["반납시간"]}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-              <DialogFooter>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCancelDialog(false)}
+                    disabled={isCanceling}
+                    className="w-full sm:w-auto"
+                  >
+                    취소
+                  </Button>
+                  <Button
+                    onClick={handleCancelReservations}
+                    disabled={isCanceling}
+                    variant="destructive"
+                    className="w-full sm:w-auto"
+                  >
+                    {isCanceling ? "처리 중..." : "취소 확정"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Dialog
+              open={showConfirmDialog}
+              onOpenChange={setShowConfirmDialog}
+            >
+              <DialogTrigger asChild>
                 <Button
-                  variant="outline"
-                  onClick={() => setShowConfirmDialog(false)}
-                  disabled={isConfirming}
+                  onClick={handleConfirmClick}
+                  disabled={selectedRows.size === 0 || isConfirming}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white flex-1 sm:flex-initial"
                 >
-                  취소
+                  {isConfirming ? "처리 중..." : "예약 확정"}
                 </Button>
-                <Button
-                  onClick={handleConfirmReservations}
-                  disabled={isConfirming}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  {isConfirming ? "처리 중..." : "확정"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="max-w-[95vw] sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>예약 확정 확인</DialogTitle>
+                  <DialogDescription>
+                    선택한 {selectedRows.size}개의 예약을 확정하시겠습니까?
+                    <br />
+                    확정된 예약은 실제 렌탈 예약으로 등록되며, 이 작업은 되돌릴
+                    수 없습니다.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="max-h-60 overflow-y-auto">
+                  <div className="space-y-2">
+                    {Array.from(selectedRows).map((index) => {
+                      const reservation = filteredData[index];
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium">
+                              {reservation["이름"]}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {reservation["대여품목"]} |{" "}
+                              {reservation["예약번호"]}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {reservation["픽업일"]} {reservation["픽업시간"]}{" "}
+                              ~ {reservation["반납일"]}{" "}
+                              {reservation["반납시간"]}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowConfirmDialog(false)}
+                    disabled={isConfirming}
+                    className="w-full sm:w-auto"
+                  >
+                    취소
+                  </Button>
+                  <Button
+                    onClick={handleConfirmReservations}
+                    disabled={isConfirming}
+                    className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
+                  >
+                    {isConfirming ? "처리 중..." : "확정"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
       {/* 검색 및 필터 UI */}
-      <div className="mb-6 bg-white p-2 rounded-lg border border-gray-200 space-y-2">
-        {/* 첫 번째 줄: 검색, 날짜, 버튼 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="mb-4 bg-white p-3 rounded-lg border border-gray-200 space-y-3">
+        {/* 첫 번째 줄: 검색과 날짜 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {/* 검색 */}
-          <div className="relative">
+          <div className="relative sm:col-span-2 lg:col-span-1">
             <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
             <Input
-              placeholder="이름, 예약번호, 이메일로 검색..."
+              placeholder="이름, 예약번호, 이메일..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-9 text-sm"
             />
           </div>
 
@@ -922,16 +943,19 @@ export default function RentalsPendingPage() {
               <Button
                 variant="outline"
                 className={cn(
-                  "justify-start text-left font-normal",
+                  "justify-start text-left font-normal h-9",
                   !dateRange && "text-muted-foreground"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateRange?.from && dateRange?.to
-                  ? `${format(dateRange.from, "yyyy-MM-dd", {
-                      locale: ko,
-                    })} ~ ${format(dateRange.to, "yyyy-MM-dd", { locale: ko })}`
-                  : "픽업 기간 선택"}
+                <span className="truncate">
+                  {dateRange?.from && dateRange?.to
+                    ? `${format(dateRange.from, "MM/dd")} ~ ${format(
+                        dateRange.to,
+                        "MM/dd"
+                      )}`
+                    : "픽업 기간"}
+                </span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -948,19 +972,19 @@ export default function RentalsPendingPage() {
           <Button
             variant="outline"
             onClick={handleResetFilters}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 h-9"
           >
             <RefreshCwIcon className="w-4 h-4" />
-            초기화
+            <span className="hidden sm:inline">초기화</span>
           </Button>
         </div>
 
         {/* 두 번째 줄: 선택 필터 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-2">
           {/* 예약 사이트 필터 */}
           <Select value={selectedSite} onValueChange={setSelectedSite}>
-            <SelectTrigger>
-              <SelectValue placeholder="예약 사이트 선택" />
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="예약 사이트" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">전체 사이트</SelectItem>
@@ -974,8 +998,8 @@ export default function RentalsPendingPage() {
 
           {/* 대여품목 필터 */}
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger>
-              <SelectValue placeholder="대여품목 선택" />
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="대여품목" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">전체 품목</SelectItem>
@@ -989,20 +1013,19 @@ export default function RentalsPendingPage() {
         </div>
 
         {/* 필터 결과 표시 */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-gray-600">
           <div>
-            {dateRange?.from && dateRange?.to ? (
-              <span className="font-medium text-blue-600">
-                {format(dateRange.from, "yyyy.MM.dd", { locale: ko })} ~{" "}
-                {format(dateRange.to, "yyyy.MM.dd", { locale: ko })}
-              </span>
-            ) : (
-              <span className="font-medium text-blue-600">전체 기간</span>
-            )}
-            <span className="ml-2">
-              총 {filteredData.length}개의 예약 ({data.length}개 중)
+            <span className="font-medium text-blue-600">
+              {dateRange?.from && dateRange?.to
+                ? `${format(dateRange.from, "MM.dd")} ~ ${format(
+                    dateRange.to,
+                    "MM.dd"
+                  )}`
+                : "전체 기간"}
             </span>
-            {loading && <span className="ml-2 text-blue-600">로딩 중...</span>}
+            <span className="ml-2">
+              총 {filteredData.length}개 ({data.length}개 중)
+            </span>
           </div>
 
           {/* 적용된 필터 표시 */}
@@ -1010,22 +1033,22 @@ export default function RentalsPendingPage() {
             dateRange?.from ||
             selectedSite !== "all" ||
             selectedCategory !== "all") && (
-            <div className="flex items-center gap-2">
-              <span className="text-blue-600 text-xs">필터 적용됨:</span>
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-blue-600 text-xs">필터:</span>
               {searchTerm && (
-                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                <Badge variant="secondary" className="text-xs px-1.5 py-0">
                   검색: {searchTerm}
-                </span>
+                </Badge>
               )}
               {selectedSite !== "all" && (
-                <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                  사이트: {selectedSite}
-                </span>
+                <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                  {selectedSite}
+                </Badge>
               )}
               {selectedCategory !== "all" && (
-                <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">
-                  품목: {selectedCategory}
-                </span>
+                <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                  {selectedCategory}
+                </Badge>
               )}
             </div>
           )}
@@ -1040,84 +1063,93 @@ export default function RentalsPendingPage() {
           </span>
         </div>
       ) : (
-        <div
-          className={cn(
-            "rounded-lg border bg-background max-h-[calc(100vh-23rem)] overflow-auto",
-            getTableWidth()
-          )}
-        >
-          <Table className="text-xs w-full table-fixed">
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHead
-                      key={header.id}
-                      className={(header.column.columnDef as any).customWidth}
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className={
-                      canceledReservationIds.has(
-                        generateReservationId(row.original)
-                      )
-                        ? "bg-red-50 border-red-200 hover:bg-red-100"
-                        : confirmedReservationIds.has(
-                            generateReservationId(row.original)
-                          )
-                        ? "bg-green-50 border-green-200 hover:bg-green-100"
-                        : "hover:bg-gray-50"
-                    }
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell
-                        key={cell.id}
-                        className={
-                          (cell.column.columnDef as any).customWidth +
-                          " text-ellipsis overflow-hidden" +
-                          (canceledReservationIds.has(
-                            generateReservationId(row.original)
-                          )
-                            ? " text-red-800"
-                            : confirmedReservationIds.has(
-                                generateReservationId(row.original)
-                              )
-                            ? " text-green-800"
-                            : "")
-                        }
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </TableCell>
+        <>
+          {/* 테이블 컨테이너 - PC에서는 딱 맞게, 모바일에서는 가로 스크롤 */}
+          <div className="flex-1 rounded-lg border bg-background flex flex-col">
+            <div className="flex-1 overflow-auto">
+              <div className="min-w-fit md:w-full">
+                <Table className="text-xs">
+                  <TableHeader className="sticky top-0 bg-white z-10">
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead
+                            key={header.id}
+                            className={cn(
+                              (header.column.columnDef as any).customWidth,
+                              "sticky top-0 bg-white"
+                            )}
+                          >
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext()
+                                )}
+                          </TableHead>
+                        ))}
+                      </TableRow>
                     ))}
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="text-center">
-                    데이터가 없습니다.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-2 p-4">
+                  </TableHeader>
+                  <TableBody>
+                    {table.getRowModel().rows.length ? (
+                      table.getRowModel().rows.map((row) => (
+                        <TableRow
+                          key={row.id}
+                          className={
+                            canceledReservationIds.has(
+                              generateReservationId(row.original)
+                            )
+                              ? "bg-red-50 border-red-200 hover:bg-red-100"
+                              : confirmedReservationIds.has(
+                                  generateReservationId(row.original)
+                                )
+                              ? "bg-green-50 border-green-200 hover:bg-green-100"
+                              : "hover:bg-gray-50"
+                          }
+                        >
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell
+                              key={cell.id}
+                              className={cn(
+                                (cell.column.columnDef as any).customWidth,
+                                canceledReservationIds.has(
+                                  generateReservationId(row.original)
+                                )
+                                  ? "text-red-800"
+                                  : confirmedReservationIds.has(
+                                      generateReservationId(row.original)
+                                    )
+                                  ? "text-green-800"
+                                  : ""
+                              )}
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={columns.length}
+                          className="text-center"
+                        >
+                          데이터가 없습니다.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+
+          {/* 페이지네이션 - 테이블 밖으로 분리 */}
+          <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-2 bg-white p-3 rounded-lg border">
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -1137,7 +1169,7 @@ export default function RentalsPendingPage() {
               >
                 {"<"}
               </Button>
-              <span className="px-2">
+              <span className="px-2 text-sm">
                 {table.getState().pagination.pageIndex + 1} /{" "}
                 {table.getPageCount()}
               </span>
@@ -1161,9 +1193,9 @@ export default function RentalsPendingPage() {
               </Button>
             </div>
             <div className="flex items-center gap-2">
-              <span>페이지 크기:</span>
+              <span className="text-sm">페이지 크기:</span>
               <select
-                className="border rounded px-2 py-1"
+                className="border rounded px-2 py-1 text-sm"
                 value={table.getState().pagination.pageSize}
                 onChange={(e) => table.setPageSize(Number(e.target.value))}
                 aria-label="페이지 크기 선택"
@@ -1176,7 +1208,7 @@ export default function RentalsPendingPage() {
               </select>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -11,19 +10,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import {
-  MenuIcon,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   ShieldIcon,
   RefreshCwIcon,
   SaveIcon,
-  AlertTriangleIcon,
   LayoutDashboard,
-  Users,
   Wrench,
   Package,
-  Boxes,
   Settings,
+  UserCheck,
 } from "lucide-react";
 import { Profile, ROLE_LABELS, ROLE_COLORS } from "@/types/profile";
 import { toast } from "sonner";
@@ -45,35 +48,36 @@ interface MenuPermissionModalProps {
 // 메뉴 카테고리별 그룹핑
 const MENU_CATEGORIES = {
   dashboard: {
-    label: '대시보드',
+    label: "대시보드",
     icon: LayoutDashboard,
-    menus: ['dashboard']
-  },
-  users: {
-    label: '사용자 관리',
-    icon: Users,
-    menus: ['users']
+    menus: ["dashboard"],
   },
   rentals: {
-    label: '렌탈 관리',
+    label: "렌탈 관리",
     icon: Wrench,
-    menus: ['rentals', 'rentals_pending', 'rentals_pickup', 'rentals_return']
+    menus: [
+      "rentals",
+      "rentals_pending",
+      "rentals_pickup",
+      "rentals_return",
+      "rentals_data",
+    ],
   },
   storage: {
-    label: '보관 관리',
+    label: "짐 보관",
     icon: Package,
-    menus: ['storage', 'storage_pending', 'storage_stored', 'storage_pickup']
+    menus: ["storage", "storage_pending", "storage_stored", "storage_pickup"],
   },
-  devices: {
-    label: '재고 관리',
-    icon: Boxes,
-    menus: ['devices']
+  customer: {
+    label: "고객",
+    icon: UserCheck,
+    menus: ["customer_check_reservation", "customer_arrival_checkin"],
   },
-  admin: {
-    label: '관리자 설정',
+  system: {
+    label: "시스템",
     icon: Settings,
-    menus: ['arrival_checkin_admin']
-  }
+    menus: ["users", "devices", "arrival_checkin_admin", "data_management"],
+  },
 };
 
 export default function MenuPermissionModal({
@@ -193,10 +197,7 @@ export default function MenuPermissionModal({
   };
 
   // 개별 권한 변경
-  const handlePermissionChange = (
-    menuKey: string,
-    value: boolean
-  ) => {
+  const handlePermissionChange = (menuKey: string, value: boolean) => {
     setPermissions((prev) =>
       prev.map((p) => {
         if (p.menu_key === menuKey) {
@@ -218,15 +219,15 @@ export default function MenuPermissionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-5xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShieldIcon className="w-5 h-5" />
             메뉴 권한 관리
           </DialogTitle>
           <div className="flex items-center gap-2 mt-2">
-            <span className="text-sm text-gray-600">사용자:</span>
-            <span className="font-medium">
+            <span className="text-xs sm:text-sm text-gray-600">사용자:</span>
+            <span className="text-xs sm:text-sm font-medium">
               {profile.full_name} ({profile.username})
             </span>
             <Badge variant="outline" className={ROLE_COLORS[profile.role]}>
@@ -236,31 +237,13 @@ export default function MenuPermissionModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* 안내 메시지 */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start gap-2">
-              <AlertTriangleIcon className="w-4 h-4 text-blue-600 mt-0.5" />
-              <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">권한 설정 안내</p>
-                <ul className="text-xs space-y-1">
-                  <li>
-                    • <strong>접근 권한</strong>: 해당 메뉴에 접근하고 모든 기능을 사용할 수 있습니다
-                  </li>
-                  <li>
-                    • 권한이 없는 메뉴는 네비게이션에서 숨겨집니다
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
           {/* 액션 버튼 */}
           <div className="flex justify-between items-center">
             <Button
               variant="outline"
               onClick={handleReset}
               disabled={loading || saving || resetting}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 text-xs sm:text-sm"
             >
               <RefreshCwIcon className="w-4 h-4" />
               {resetting ? "초기화 중..." : "기본값으로 초기화"}
@@ -271,13 +254,14 @@ export default function MenuPermissionModal({
                 variant="outline"
                 onClick={onClose}
                 disabled={loading || saving || resetting}
+                className=" text-xs sm:text-sm"
               >
                 취소
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={loading || saving || resetting}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 text-xs sm:text-sm"
               >
                 <SaveIcon className="w-4 h-4" />
                 {saving ? "저장 중..." : "저장"}
@@ -285,76 +269,79 @@ export default function MenuPermissionModal({
             </div>
           </div>
 
-          {/* 메뉴 권한 목록 - 그룹화 */}
+          {/* 메뉴 권한 목록 - 테이블 형태 */}
           {loading ? (
             <div className="text-center py-8 text-gray-500">
               권한 정보를 불러오는 중...
             </div>
           ) : (
-            <div className="space-y-6">
-              {Object.entries(MENU_CATEGORIES).map(([categoryKey, category]) => {
-                const categoryPermissions = permissions.filter(permission => 
-                  category.menus.includes(permission.menu_key)
-                );
-                
-                // 권한이 없는 카테고리는 표시하지 않음
-                if (categoryPermissions.length === 0) return null;
-                
-                const IconComponent = category.icon;
-                
-                return (
-                  <div key={categoryKey} className="space-y-3">
-                    {/* 카테고리 헤더 */}
-                    <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
-                      <IconComponent className="w-5 h-5 text-gray-600" />
-                      <h3 className="text-lg font-semibold text-gray-800">
-                        {category.label}
-                      </h3>
-                      <div className="flex-1" />
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                        {categoryPermissions.length}개 메뉴
-                      </span>
-                    </div>
-                    
-                    {/* 카테고리별 메뉴 목록 */}
-                    <div className="space-y-2">
-                      {categoryPermissions.map((permission) => (
-                        <Card key={permission.menu_key} className="h-20 hover:shadow-md transition-shadow">
-                          <CardContent className="p-4 h-full flex items-center justify-between">
-                            {/* 왼쪽: 메뉴 정보 */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <MenuIcon className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                                <h4 className="text-sm font-medium truncate">
+            <div className="space-y-4">
+              {Object.entries(MENU_CATEGORIES).map(
+                ([categoryKey, category]) => {
+                  const categoryPermissions = permissions.filter((permission) =>
+                    category.menus.includes(permission.menu_key)
+                  );
+
+                  // 권한이 없는 카테고리는 표시하지 않음
+                  if (categoryPermissions.length === 0) return null;
+
+                  const IconComponent = category.icon;
+
+                  return (
+                    <div key={categoryKey} className="space-y-2">
+                      {/* 카테고리 헤더 */}
+                      <div className="flex items-center gap-2 pb-1">
+                        <IconComponent className="w-4 h-4 text-gray-600" />
+                        <h3 className="text-sm font-semibold text-gray-800">
+                          {category.label}
+                        </h3>
+                        <span className="text-xs text-gray-500">
+                          ({categoryPermissions.length})
+                        </span>
+                      </div>
+
+                      {/* 카테고리별 메뉴 테이블 */}
+                      <div className="border rounded-lg overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-gray-50">
+                              <TableHead className="text-xs">메뉴명</TableHead>
+                              <TableHead className="w-[80px] sm:w-[100px] text-center text-xs">
+                                권한
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {categoryPermissions.map((permission) => (
+                              <TableRow
+                                key={permission.menu_key}
+                                className="h-10"
+                              >
+                                <TableCell className="font-medium text-xs sm:text-sm py-2">
                                   {permission.menu_label}
-                                </h4>
-                              </div>
-                              <p className="text-xs text-gray-500 truncate">
-                                {permission.menu_description}
-                              </p>
-                            </div>
-                            
-                            {/* 오른쪽: 스위치 */}
-                            <div className="flex items-center gap-3 ml-4">
-                              <Label className="text-sm text-gray-600">접근 권한</Label>
-                              <Switch
-                                checked={permission.has_access}
-                                onCheckedChange={(checked) =>
-                                  handlePermissionChange(
-                                    permission.menu_key,
-                                    checked
-                                  )
-                                }
-                                disabled={loading || saving || resetting}
-                              />
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                                </TableCell>
+                                <TableCell className="text-center py-2 px-2">
+                                  <Switch
+                                    checked={permission.has_access}
+                                    onCheckedChange={(checked) =>
+                                      handlePermissionChange(
+                                        permission.menu_key,
+                                        checked
+                                      )
+                                    }
+                                    disabled={loading || saving || resetting}
+                                    className="mx-auto"
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                }
+              )}
             </div>
           )}
         </div>

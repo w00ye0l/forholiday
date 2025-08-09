@@ -757,8 +757,17 @@ export default function StorageLogisticsList({
               ) : (
                 <Button
                   onClick={() => handleStatusUpdate(storage)}
-                  disabled={updatingIds.has(storage.id)}
-                  className={`w-full py-2 md:py-3 text-white font-semibold ${getActionButtonColor()}`}
+                  disabled={
+                    updatingIds.has(storage.id) ||
+                    (type === "drop-off" && storage.status === "stored") ||
+                    (type === "pick-up" && storage.status === "retrieved")
+                  }
+                  className={`w-full py-2 md:py-3 font-semibold ${
+                    (type === "drop-off" && storage.status === "stored") ||
+                    (type === "pick-up" && storage.status === "retrieved")
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : `text-white ${getActionButtonColor()}`
+                  }`}
                   size="sm"
                 >
                   {updatingIds.has(storage.id) ? (
@@ -768,7 +777,12 @@ export default function StorageLogisticsList({
                     </div>
                   ) : (
                     <span className="text-xs md:text-sm">
-                      {getActionButtonText()}
+                      {(type === "drop-off" && storage.status === "stored") 
+                        ? "보관 완료됨"
+                        : (type === "pick-up" && storage.status === "retrieved")
+                        ? "픽업 완료됨"
+                        : getActionButtonText()
+                      }
                     </span>
                   )}
                 </Button>
