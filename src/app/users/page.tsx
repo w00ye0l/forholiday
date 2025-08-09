@@ -428,7 +428,7 @@ export default function UsersPage() {
                   <TableRow>
                     <TableHead>사용자명</TableHead>
                     <TableHead>이름</TableHead>
-                    <TableHead>이메일</TableHead>
+                    <TableHead className="whitespace-nowrap">이메일</TableHead>
                     <TableHead>역할</TableHead>
                     <TableHead>가입일</TableHead>
                     <TableHead>최근 수정</TableHead>
@@ -438,14 +438,16 @@ export default function UsersPage() {
                 <TableBody>
                   {filteredProfiles.map((profile) => (
                     <TableRow key={profile.id}>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium whitespace-nowrap">
                         {profile.username}
                       </TableCell>
-                      <TableCell>{profile.full_name}</TableCell>
-                      <TableCell className="text-gray-600">
+                      <TableCell className="whitespace-nowrap">
+                        {profile.full_name}
+                      </TableCell>
+                      <TableCell className="text-gray-600 whitespace-nowrap">
                         {profile.email || "-"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <Badge
                           variant="outline"
                           className={ROLE_COLORS[profile.role]}
@@ -453,7 +455,7 @@ export default function UsersPage() {
                           {ROLE_LABELS[profile.role]}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {profile.created_at
                           ? format(
                               new Date(profile.created_at),
@@ -464,7 +466,7 @@ export default function UsersPage() {
                             )
                           : "-"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {profile.updated_at
                           ? format(
                               new Date(profile.updated_at),
@@ -476,7 +478,7 @@ export default function UsersPage() {
                           : "-"}
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="flex items-center gap-1 justify-center flex-wrap">
+                        <div className="flex items-center gap-1 justify-center">
                           <Button
                             variant="outline"
                             size="sm"

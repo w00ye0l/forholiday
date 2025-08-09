@@ -104,14 +104,14 @@ export default function StorageList({
             <TableHead>찾아가는 곳</TableHead>
             <TableHead>상태</TableHead>
             <TableHead>메일전송</TableHead>
-            <TableHead className="text-right">작업</TableHead>
+            <TableHead className="text-center">작업</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {storages.map((storage) => (
             <React.Fragment key={storage.id}>
               <TableRow>
-                <TableCell className="font-medium">
+                <TableCell className="font-medium whitespace-nowrap">
                   <Link
                     href={`/storage/${storage.id}`}
                     className="text-blue-600 hover:text-blue-800 hover:underline"
@@ -119,36 +119,40 @@ export default function StorageList({
                     {highlightText(storage.reservation_id, searchTerm)}
                   </Link>
                 </TableCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
                   {highlightText(storage.customer_name, searchTerm)}
                 </TableCell>
-                <TableCell className="max-w-32 truncate">
+                <TableCell className="max-w-32 truncate whitespace-nowrap">
                   {highlightText(storage.items_description, searchTerm)}
                 </TableCell>
-                <TableCell>{storage.quantity}개</TableCell>
-                <TableCell>{storage.tag_number || "-"}</TableCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {storage.quantity}개
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {storage.tag_number || "-"}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
                   {storage.drop_off_date} {storage.drop_off_time.slice(0, 5)}
                 </TableCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
                   {storage.drop_off_location
                     ? STORAGE_LOCATION_LABELS[storage.drop_off_location]
                     : "-"}
                 </TableCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
                   {storage.pickup_date} {storage.pickup_time.slice(0, 5)}
                 </TableCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
                   {storage.pickup_location
                     ? STORAGE_LOCATION_LABELS[storage.pickup_location]
                     : "-"}
                 </TableCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
                   <Badge variant={getStatusBadgeVariant(storage.status)}>
                     {STORAGE_STATUS_LABELS[storage.status]}
                   </Badge>
                 </TableCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
                   {storage.email_sent ? (
                     <div className="flex items-center gap-1 text-green-600">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>

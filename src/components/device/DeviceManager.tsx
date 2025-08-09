@@ -103,8 +103,8 @@ export default function DeviceManager({
       <TableBody>
         {devices.map((device) => (
           <TableRow key={device.id}>
-            <TableCell className="font-medium">{device.tag_name}</TableCell>
-            <TableCell>
+            <TableCell className="font-medium whitespace-nowrap">{device.tag_name}</TableCell>
+            <TableCell className="whitespace-nowrap">
               {DEVICE_CATEGORY_LABELS[device.category as DeviceCategory] ?? "-"}
             </TableCell>
             <TableCell>
@@ -123,7 +123,7 @@ export default function DeviceManager({
                 </SelectContent>
               </Select>
             </TableCell>
-            <TableCell>{device.created_at.slice(0, 10)}</TableCell>
+            <TableCell className="whitespace-nowrap">{device.created_at.slice(0, 10)}</TableCell>
             <TableCell className="text-right">
               <div className="flex justify-end gap-2">
                 <Button

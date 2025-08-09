@@ -609,15 +609,19 @@ export default function DataTransferPage() {
                   onChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead>대여자</TableHead>
-              <TableHead>연락처</TableHead>
-              <TableHead>이메일</TableHead>
-              <TableHead>기기</TableHead>
-              <TableHead>반납일자</TableHead>
-              <TableHead>상태</TableHead>
-              <TableHead>업로드 일시</TableHead>
-              <TableHead>메일 발송 일시</TableHead>
-              <TableHead>작업</TableHead>
+              <TableHead className="whitespace-nowrap">대여자</TableHead>
+              <TableHead className="whitespace-nowrap">연락처</TableHead>
+              <TableHead className="whitespace-nowrap">이메일</TableHead>
+              <TableHead className="whitespace-nowrap">기기</TableHead>
+              <TableHead className="whitespace-nowrap">반납일자</TableHead>
+              <TableHead className="whitespace-nowrap">상태</TableHead>
+              <TableHead className="whitespace-nowrap">업로드 일시</TableHead>
+              <TableHead className="whitespace-nowrap">
+                메일 발송 일시
+              </TableHead>
+              <TableHead className="text-center whitespace-nowrap">
+                작업
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -645,22 +649,28 @@ export default function DataTransferPage() {
                       }
                     />
                   </TableCell>
-                  <TableCell>{transfer.renter_name || "-"}</TableCell>
-                  <TableCell>{transfer.renter_phone || "-"}</TableCell>
-                  <TableCell>{transfer.renter_email || "-"}</TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {transfer.renter_name || "-"}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {transfer.renter_phone || "-"}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {transfer.renter_email || "-"}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
                     {transfer.device_tag_name ||
                       transfer.device_category ||
                       "-"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     {transfer.return_date
                       ? format(new Date(transfer.return_date), "yyyy-MM-dd", {
                           locale: ko,
                         })
                       : "-"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <Badge
                       variant={getStatusBadgeVariant(
                         transfer.data_transfer_process_status
@@ -672,7 +682,7 @@ export default function DataTransferPage() {
                       )?.label || "업로드 대기"}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     {transfer.data_transfer_uploaded_at
                       ? format(
                           new Date(transfer.data_transfer_uploaded_at),
@@ -681,7 +691,7 @@ export default function DataTransferPage() {
                         )
                       : "-"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     {transfer.data_transfer_email_sent_at
                       ? format(
                           new Date(transfer.data_transfer_email_sent_at),
@@ -690,8 +700,8 @@ export default function DataTransferPage() {
                         )
                       : "-"}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
+                  <TableCell className="whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-2">
                       <Select
                         value={
                           transfer.data_transfer_process_status ||
