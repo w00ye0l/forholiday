@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const transferId = formData.get("transferId") as string;
     const templateType = formData.get("templateType") as string;
     const reservationId = formData.get("reservationId") as string;
-    
+
     // 드롭박스 정보 (데이터 전송 완료 메일용)
     const dropboxUsername = formData.get("dropboxUsername") as string;
     const dropboxPassword = formData.get("dropboxPassword") as string;
@@ -32,26 +32,10 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!fetchError && reservation) {
-        // 데이터베이스에서 템플릿 조회
-        const { data: template, error: templateError } = await supabase
-          .from("email_templates")
-          .select("*")
-          .eq("template_key", "storage-confirmation")
-          .eq("is_active", true)
-          .single();
-
-        if (!templateError && template) {
-          // 데이터베이스 템플릿 사용
-          const emailContent = processEmailTemplate(template, reservation);
-          finalSubject = emailContent.subject;
-          finalContent = emailContent.html;
-        } else {
-          // 폴백: 기본 템플릿 사용
-          console.warn("Database template not found, using fallback template");
-          const emailTemplate = generateStorageConfirmationTemplate(reservation);
-          finalSubject = emailTemplate.subject;
-          finalContent = emailTemplate.html;
-        }
+        // 데이터베이스 템플릿을 사용하지 않고 직접 템플릿 생성
+        const emailTemplate = generateStorageConfirmationTemplate(reservation);
+        finalSubject = emailTemplate.subject;
+        finalContent = emailTemplate.html;
 
         // 이메일 발송 기록 저장
         await supabase
@@ -77,7 +61,10 @@ export async function POST(request: NextRequest) {
       if (!templateError && template) {
         // 일반 템플릿에 내용 적용
         finalSubject = subject || template.subject_template;
-        finalContent = template.html_template.replace(/\{\{content\}\}/g, content);
+        finalContent = template.html_template.replace(
+          /\{\{content\}\}/g,
+          content
+        );
       }
     } else if (templateType === "data-transfer-completion" && reservationId) {
       const supabase = await createClient();
@@ -91,21 +78,27 @@ export async function POST(request: NextRequest) {
 
       if (!rentalError && rental) {
         // 데이터베이스 템플릿을 사용하지 않고 직접 HTML 생성
-        const dropboxCredentials = dropboxUsername && dropboxPassword ? {
-          username: dropboxUsername,
-          password: dropboxPassword,
-          accessInstructions: accessInstructions || ""
-        } : undefined;
-        
+        const dropboxCredentials =
+          dropboxUsername && dropboxPassword
+            ? {
+                username: dropboxUsername,
+                password: dropboxPassword,
+                accessInstructions: accessInstructions || "",
+              }
+            : undefined;
+
         console.log("Data transfer email generation:", {
           rentalId: rental.reservation_id,
           hasDropboxCredentials: !!dropboxCredentials,
           dropboxUsername: dropboxUsername ? "provided" : "missing",
-          dropboxPassword: dropboxPassword ? "provided" : "missing"
+          dropboxPassword: dropboxPassword ? "provided" : "missing",
         });
-        
+
         finalSubject = "포할리데이 - 데이터 전송 완료 안내";
-        finalContent = generateDefaultDataTransferTemplate(rental, dropboxCredentials);
+        finalContent = generateDefaultDataTransferTemplate(
+          rental,
+          dropboxCredentials
+        );
       }
     }
 
@@ -154,7 +147,8 @@ export async function POST(request: NextRequest) {
       subject: finalSubject,
       text: finalContent.replace(/<[^>]*>/g, ""), // HTML 태그 제거하여 text 버전 생성
       html:
-        templateType === "storage-confirmation" || templateType === "data-transfer-completion"
+        templateType === "storage-confirmation" ||
+        templateType === "data-transfer-completion"
           ? finalContent
           : finalContent.replace(/\n/g, "<br>"),
       attachments: attachments.map((attachment) => ({
@@ -236,15 +230,27 @@ function processEmailTemplate(template: any, reservation: any) {
 
   // 조건부 블록 처리 ({{#if tag_number}} ... {{/if}})
   if (reservation.tag_number) {
-    processedHtml = processedHtml.replace(/\{\{#if tag_number\}\}([\s\S]*?)\{\{\/if\}\}/g, '$1');
+    processedHtml = processedHtml.replace(
+      /\{\{#if tag_number\}\}([\s\S]*?)\{\{\/if\}\}/g,
+      "$1"
+    );
   } else {
-    processedHtml = processedHtml.replace(/\{\{#if tag_number\}\}([\s\S]*?)\{\{\/if\}\}/g, '');
+    processedHtml = processedHtml.replace(
+      /\{\{#if tag_number\}\}([\s\S]*?)\{\{\/if\}\}/g,
+      ""
+    );
   }
 
   if (reservation.notes) {
-    processedHtml = processedHtml.replace(/\{\{#if notes\}\}([\s\S]*?)\{\{\/if\}\}/g, '$1');
+    processedHtml = processedHtml.replace(
+      /\{\{#if notes\}\}([\s\S]*?)\{\{\/if\}\}/g,
+      "$1"
+    );
   } else {
-    processedHtml = processedHtml.replace(/\{\{#if notes\}\}([\s\S]*?)\{\{\/if\}\}/g, '');
+    processedHtml = processedHtml.replace(
+      /\{\{#if notes\}\}([\s\S]*?)\{\{\/if\}\}/g,
+      ""
+    );
   }
 
   return {
@@ -253,20 +259,27 @@ function processEmailTemplate(template: any, reservation: any) {
   };
 }
 
-
 // 데이터 전송 완료 이메일 템플릿 생성 (직접 HTML 생성)
-function generateDefaultDataTransferTemplate(rental: any, dropboxCredentials?: { username: string; password: string; accessInstructions?: string }) {
-  const deviceInfo = rental.device_tag_name || rental.device_category || "기기 정보 없음";
+function generateDefaultDataTransferTemplate(
+  rental: any,
+  dropboxCredentials?: {
+    username: string;
+    password: string;
+    accessInstructions?: string;
+  }
+) {
+  const deviceInfo =
+    rental.device_tag_name || rental.device_category || "기기 정보 없음";
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
     return date.toLocaleDateString("ko-KR", {
       year: "numeric",
-      month: "long", 
+      month: "long",
       day: "numeric",
     });
   };
-  
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -442,7 +455,7 @@ function generateDefaultDataTransferTemplate(rental: any, dropboxCredentials?: {
       <h1>📱 데이터 전송 완료</h1>
     </div>
     <div class="content">
-      <p>안녕하세요, <strong>${rental.renter_name || '고객'}</strong>님</p>
+      <p>안녕하세요, <strong>${rental.renter_name || "고객"}</strong>님</p>
       <p>포할리데이를 이용해주셔서 감사합니다.</p>
       <p>요청하신 <strong>데이터 전송이 완료</strong>되어 안내드립니다.</p>
       
@@ -450,25 +463,31 @@ function generateDefaultDataTransferTemplate(rental: any, dropboxCredentials?: {
         <h3>📋 예약 정보</h3>
         <div class="info-row">
           <div class="info-label">대여자명</div>
-          <div class="info-value"><strong>${rental.renter_name || '-'}</strong></div>
+          <div class="info-value"><strong>${
+            rental.renter_name || "-"
+          }</strong></div>
         </div>
         <div class="info-row">
           <div class="info-label">연락처</div>
-          <div class="info-value">${rental.renter_phone || '-'}</div>
+          <div class="info-value">${rental.renter_phone || "-"}</div>
         </div>
         <div class="info-row">
           <div class="info-label">이메일</div>
-          <div class="info-value">${rental.renter_email || '-'}</div>
+          <div class="info-value">${rental.renter_email || "-"}</div>
         </div>
         <div class="info-row">
           <div class="info-label">기기</div>
           <div class="info-value"><strong>${deviceInfo}</strong></div>
         </div>
-        ${rental.return_date ? `
+        ${
+          rental.return_date
+            ? `
         <div class="info-row">
           <div class="info-label">반납일</div>
           <div class="info-value">${formatDate(rental.return_date)}</div>
-        </div>` : ''}
+        </div>`
+            : ""
+        }
       </div>
 
       <div class="download-section">
@@ -476,31 +495,41 @@ function generateDefaultDataTransferTemplate(rental: any, dropboxCredentials?: {
         <p><strong>아래 드롭박스 계정으로 로그인하여 데이터를 다운로드</strong> 받으실 수 있습니다.</p>
       </div>
 
-      ${dropboxCredentials ? `
+      ${
+        dropboxCredentials
+          ? `
       <div class="login-section">
         <h3>🔐 드롭박스 로그인 정보</h3>
         
         <div class="login-info">
           <div class="info-row">
             <div class="info-label">아이디:</div>
-            <div class="info-value credentials">${dropboxCredentials.username}</div>
+            <div class="info-value credentials">${
+              dropboxCredentials.username
+            }</div>
           </div>
         </div>
         
         <div class="login-info">
           <div class="info-row">
             <div class="info-label">비밀번호:</div>
-            <div class="info-value credentials">${dropboxCredentials.password}</div>
+            <div class="info-value credentials">${
+              dropboxCredentials.password
+            }</div>
           </div>
         </div>
 
-        ${dropboxCredentials.accessInstructions ? `
+        ${
+          dropboxCredentials.accessInstructions
+            ? `
         <div class="login-info">
           <div class="info-row">
             <div class="info-label">접속 안내:</div>
             <div class="info-value">${dropboxCredentials.accessInstructions}</div>
           </div>
-        </div>` : ''}
+        </div>`
+            : ""
+        }
 
         <p style="text-align: center; margin-top: 20px;">
           <a href="https://www.dropbox.com/login" class="download-button" target="_blank">
@@ -514,10 +543,12 @@ function generateDefaultDataTransferTemplate(rental: any, dropboxCredentials?: {
           2. 제공된 아이디와 비밀번호로 로그인<br>
           3. 업로드된 파일을 다운로드</p>
         </div>
-      </div>` : `
+      </div>`
+          : `
       <div class="highlight">
         <p><strong>드롭박스 로그인 정보는 별도로 안내됩니다.</strong></p>
-      </div>`}
+      </div>`
+      }
 
       <div class="highlight">
         <p><strong>⚠️ 중요 안내사항:</strong></p>
@@ -531,11 +562,15 @@ function generateDefaultDataTransferTemplate(rental: any, dropboxCredentials?: {
         </ul>
       </div>
 
-      ${rental.description ? `
+      ${
+        rental.description
+          ? `
       <div class="info-box">
         <h3>💡 추가 안내사항</h3>
         <p>${rental.description}</p>
-      </div>` : ''}
+      </div>`
+          : ""
+      }
 
       <p style="margin-top: 30px;">문의사항이 있으시면 언제든 연락주세요.</p>
       <p><strong>감사합니다.</strong></p>
@@ -553,156 +588,34 @@ function generateDefaultDataTransferTemplate(rental: any, dropboxCredentials?: {
 </html>`;
 }
 
-// 폴백용 기본 템플릿 생성 함수
+// 짐보관 확정 메일 템플릿 생성 함수
 function generateStorageConfirmationTemplate(reservation: any) {
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  const locationLabels: Record<string, string> = {
-    T1: "제1터미널",
-    T2: "제2터미널",
-    office: "사무실",
-  };
-
   return {
-    subject: `[ForHoliday] 짐보관 예약이 확정되었습니다 - ${reservation.reservation_id}`,
+    subject: `[FORHOLIDAY] Your reservation has been confirmed - ${reservation.reservation_id}`,
     html: `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="UTF-8">
         <style>
-          body { font-family: 'Malgun Gothic', sans-serif; line-height: 1.6; color: #333; }
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #00af9f; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-          .content { background-color: #f8f9fa; padding: 30px; border-radius: 0 0 5px 5px; }
-          .info-box { background-color: white; padding: 20px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #00af9f; }
-          .info-row { display: flex; padding: 10px 0; border-bottom: 1px solid #eee; }
-          .info-label { font-weight: bold; width: 120px; color: #666; }
-          .info-value { flex: 1; color: #333; }
-          .footer { text-align: center; margin-top: 30px; padding: 20px; color: #666; font-size: 14px; }
-          .highlight { background-color: #FFF3CD; padding: 15px; border-radius: 5px; margin: 20px 0; border: 1px solid #FFC107; }
         </style>
       </head>
       <body>
         <div class="container">
-          <div class="header">
-            <h1>짐보관 예약 확정</h1>
-          </div>
-          <div class="content">
-            <p>안녕하세요, ${reservation.customer_name}님</p>
-            <p>ForHoliday 짐보관 서비스를 이용해 주셔서 감사합니다.</p>
-            <p>고객님의 짐보관 예약이 확정되었습니다.</p>
-            
-            <div class="info-box">
-              <h3 style="color: #00af9f; margin-top: 0;">예약 정보</h3>
-              <div class="info-row">
-                <div class="info-label">예약번호</div>
-                <div class="info-value"><strong>${
-                  reservation.reservation_id
-                }</strong></div>
-              </div>
-              <div class="info-row">
-                <div class="info-label">고객명</div>
-                <div class="info-value">${reservation.customer_name}</div>
-              </div>
-              <div class="info-row">
-                <div class="info-label">연락처</div>
-                <div class="info-value">${reservation.phone_number}</div>
-              </div>
-              <div class="info-row">
-                <div class="info-label">물품</div>
-                <div class="info-value">${reservation.items_description} (${
-      reservation.quantity
-    }개)</div>
-              </div>
-              ${
-                reservation.tag_number
-                  ? `
-              <div class="info-row">
-                <div class="info-label">태그번호</div>
-                <div class="info-value">${reservation.tag_number}</div>
-              </div>
-              `
-                  : ""
-              }
-            </div>
-
-            <div class="info-box">
-              <h3 style="color: #00af9f; margin-top: 0;">맡기기 정보</h3>
-              <div class="info-row">
-                <div class="info-label">날짜</div>
-                <div class="info-value">${formatDate(
-                  reservation.drop_off_date
-                )}</div>
-              </div>
-              <div class="info-row">
-                <div class="info-label">시간</div>
-                <div class="info-value">${reservation.drop_off_time}</div>
-              </div>
-              <div class="info-row">
-                <div class="info-label">장소</div>
-                <div class="info-value">${
-                  locationLabels[reservation.drop_off_location]
-                }</div>
-              </div>
-            </div>
-
-            <div class="info-box">
-              <h3 style="color: #00af9f; margin-top: 0;">찾기 정보</h3>
-              <div class="info-row">
-                <div class="info-label">날짜</div>
-                <div class="info-value">${formatDate(
-                  reservation.pickup_date
-                )}</div>
-              </div>
-              <div class="info-row">
-                <div class="info-label">시간</div>
-                <div class="info-value">${reservation.pickup_time}</div>
-              </div>
-              <div class="info-row">
-                <div class="info-label">장소</div>
-                <div class="info-value">${
-                  locationLabels[reservation.pickup_location]
-                }</div>
-              </div>
-            </div>
-
-            ${
-              reservation.notes
-                ? `
-            <div class="highlight">
-              <strong>참고사항:</strong><br>
-              ${reservation.notes}
-            </div>
-            `
-                : ""
-            }
-
-            <div class="highlight">
-              <strong>중요 안내사항:</strong>
-              <ul style="margin: 10px 0; padding-left: 20px;">
-                <li>예약번호와 신분증을 지참해 주세요.</li>
-                <li>보관 시간을 준수해 주시기 바랍니다.</li>
-                <li>귀중품은 별도로 보관해 주세요.</li>
-                <li>변경 사항이 있으시면 미리 연락 주세요.</li>
-              </ul>
-            </div>
-          </div>
-          
-          <div class="footer">
-            <p>문의사항이 있으시면 언제든지 연락 주세요.</p>
-            <p>ForHoliday | 인천공항 짐보관 서비스</p>
-            <p style="font-size: 12px; color: #999;">
-              이 메일은 발신 전용입니다. 회신은 처리되지 않습니다.
-            </p>
-          </div>
+          <p><strong>Hello. This is FORHOLIDAY in Incheon Airport.</strong></p>
+          <p><strong>Thank you for booking our service.</strong></p>
+          <p>Your reservation has been confirmed. Thank you.</p>
+          <br>
+          <p>Please refer to the link below for information on pickup, return procedures, and usage instructions.</p>
+          <p><a href="https://www.notion.so/USER-GUIDE-feff9a5d2cae4f5a8bfd2119bdc94a90?pvs=21" target="_blank"><strong>FORHOLIDAY USER GUIDE (notion.site)</strong></a></p>
+          <br>
+          <p>You can contact us via the messengers below :</p>
+          <p>Kakao : forholiday</p>
+          <p>WhatsApp: +82 10 5241 5257</p>
+          <p>LINE <strong>official: @558hovam</strong></p>
+          <p>LINE: ukuk101</p>
         </div>
       </body>
       </html>

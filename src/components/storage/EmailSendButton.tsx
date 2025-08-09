@@ -45,12 +45,12 @@ export default function EmailSendButton({
 
     try {
       const formData = new FormData();
-      formData.append('to', email);
-      formData.append('subject', ''); // 템플릿에서 자동 생성됨
-      formData.append('content', ''); // 템플릿에서 자동 생성됨
-      formData.append('transferId', reservationId);
-      formData.append('templateType', 'storage-confirmation');
-      formData.append('reservationId', reservationId);
+      formData.append("to", email);
+      formData.append("subject", ""); // 템플릿에서 자동 생성됨
+      formData.append("content", ""); // 템플릿에서 자동 생성됨
+      formData.append("transferId", reservationId);
+      formData.append("templateType", "storage-confirmation");
+      formData.append("reservationId", reservationId);
 
       const response = await fetch("/api/send-email", {
         method: "POST",
@@ -77,13 +77,9 @@ export default function EmailSendButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant={emailSent ? "secondary" : "outline"} 
-          size="sm"
-          disabled={emailSent}
-        >
+        <Button variant="outline" size="sm">
           <Mail className="h-4 w-4 mr-2" />
-          {emailSent ? "메일 전송완료" : "확정 메일 발송"}
+          {emailSent ? "메일 재전송" : "확정 메일 발송"}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">

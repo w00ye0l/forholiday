@@ -12,7 +12,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
-import { StorageReservation, STORAGE_STATUS_LABELS, STORAGE_LOCATION_LABELS } from "@/types/storage";
+import {
+  StorageReservation,
+  STORAGE_STATUS_LABELS,
+  STORAGE_LOCATION_LABELS,
+} from "@/types/storage";
 import React from "react";
 import EmailSendButton from "./EmailSendButton";
 
@@ -71,7 +75,6 @@ export default function StorageList({
     }
   };
 
-
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "pending":
@@ -128,13 +131,17 @@ export default function StorageList({
                   {storage.drop_off_date} {storage.drop_off_time.slice(0, 5)}
                 </TableCell>
                 <TableCell>
-                  {storage.drop_off_location ? STORAGE_LOCATION_LABELS[storage.drop_off_location] : "-"}
+                  {storage.drop_off_location
+                    ? STORAGE_LOCATION_LABELS[storage.drop_off_location]
+                    : "-"}
                 </TableCell>
                 <TableCell>
                   {storage.pickup_date} {storage.pickup_time.slice(0, 5)}
                 </TableCell>
                 <TableCell>
-                  {storage.pickup_location ? STORAGE_LOCATION_LABELS[storage.pickup_location] : "-"}
+                  {storage.pickup_location
+                    ? STORAGE_LOCATION_LABELS[storage.pickup_location]
+                    : "-"}
                 </TableCell>
                 <TableCell>
                   <Badge variant={getStatusBadgeVariant(storage.status)}>
@@ -163,7 +170,7 @@ export default function StorageList({
                       emailSent={storage.email_sent || false}
                       onEmailSent={() => onStorageUpdated?.()}
                     />
-                    <Link href={`/storage/${storage.id}/edit`}>
+                    <Link href={`/storage/edit/${storage.id}`}>
                       <Button variant="outline" size="sm">
                         수정
                       </Button>
@@ -182,7 +189,10 @@ export default function StorageList({
           ))}
           {storages.length === 0 && (
             <TableRow>
-              <TableCell colSpan={12} className="text-center py-8 text-gray-500">
+              <TableCell
+                colSpan={12}
+                className="text-center py-8 text-gray-500"
+              >
                 {searchTerm
                   ? "검색 결과가 없습니다."
                   : "등록된 보관 예약이 없습니다."}
