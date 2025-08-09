@@ -42,11 +42,9 @@ export async function POST(req: Request) {
     const mapDeviceCategory = (category: string): DeviceCategory => {
       const categoryMap: { [key: string]: DeviceCategory } = {
         "Baby Stroller / ベビーカー / 嬰兒車": "STROLLER",
-        "Wagon / ワゴン / 手推車": "WAGON",
         "GoPro 13": "GP13",
         "GoPro 12": "GP12",
         "GoPro 11": "GP11",
-        "GoPro 8": "GP8",
         "DJI Pocket 3": "POCKET3",
         "DJI Action 5": "ACTION5",
         "Galaxy S23 Ultra": "S23",
@@ -55,9 +53,9 @@ export async function POST(req: Request) {
         PS5: "PS5",
         Glampam: "GLAMPAM",
         "Dyson Airwrap / ダイソン·エアラップ / 戴森航空實驗室": "AIRWRAP",
-        Airstraight: "AIRSTRAIGHT",
         Insta360: "INSTA360",
         Minievo: "MINIEVO",
+        Ojm360: "OJM360",
       };
       return categoryMap[category] || "ETC";
     };
@@ -124,7 +122,9 @@ export async function POST(req: Request) {
     for (const reservation of reservations) {
       try {
         console.log("처리 중인 예약:", reservation);
-        const rentalReservationId = getReservationIdFromOrderNumber(reservation["예약번호"]);
+        const rentalReservationId = getReservationIdFromOrderNumber(
+          reservation["예약번호"]
+        );
         console.log("생성된 예약 ID:", rentalReservationId);
 
         // 1. 기존 예약이 있는지 확인
@@ -179,7 +179,11 @@ export async function POST(req: Request) {
           .eq("reservation_key", reservationKey)
           .single();
 
-        console.log("기존 예약 상태 조회:", { existingReservation, selectError, reservationKey });
+        console.log("기존 예약 상태 조회:", {
+          existingReservation,
+          selectError,
+          reservationKey,
+        });
 
         if (existingReservation) {
           // 이미 확정된 예약인 경우
@@ -195,7 +199,7 @@ export async function POST(req: Request) {
           // 취소된 예약인 경우 - 상태를 confirmed로 업데이트하고 취소 관련 필드 제거
           else if (existingReservation.status === "canceled") {
             console.log("취소된 예약을 다시 확정 처리:", reservationKey);
-            
+
             const { error: updateError } = await supabase
               .from("pending_reservations_status")
               .update({
@@ -207,7 +211,10 @@ export async function POST(req: Request) {
               .eq("reservation_key", reservationKey);
 
             if (updateError) {
-              console.error("pending_reservations_status 업데이트 오류:", updateError);
+              console.error(
+                "pending_reservations_status 업데이트 오류:",
+                updateError
+              );
               throw updateError;
             }
             console.log("pending_reservations_status 업데이트 성공");
@@ -225,7 +232,10 @@ export async function POST(req: Request) {
                 .eq("reservation_id", rentalReservationId);
 
               if (rentalUpdateError) {
-                console.warn("rental_reservations 취소 필드 정리 실패:", rentalUpdateError);
+                console.warn(
+                  "rental_reservations 취소 필드 정리 실패:",
+                  rentalUpdateError
+                );
               } else {
                 console.log("rental_reservations 업데이트 성공");
               }

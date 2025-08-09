@@ -148,19 +148,21 @@ export function RentalList({
               onClick={() => handleRowClick(rental.id)}
               className={getRowStyle(rental.status)}
             >
-              <TableCell className="font-medium text-blue-600">
+              <TableCell className="font-medium text-blue-600 whitespace-nowrap">
                 {highlightText(rental.reservation_id || rental.id, searchTerm)}
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 {highlightText(rental.renter_name, searchTerm)}
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 {highlightText(rental.renter_phone, searchTerm)}
               </TableCell>
-              <TableCell>
-                {rental.renter_email ? highlightText(rental.renter_email, searchTerm) : "-"}
+              <TableCell className="whitespace-nowrap">
+                {rental.renter_email
+                  ? highlightText(rental.renter_email, searchTerm)
+                  : "-"}
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <div>
                   <div className="font-medium">
                     {DEVICE_CATEGORY_LABELS[rental.device_category] ||
@@ -173,7 +175,7 @@ export function RentalList({
                   </div>
                 </div>
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <div>
                   <div>{rental.pickup_date}</div>
                   <div className="text-sm text-gray-500">
@@ -181,7 +183,7 @@ export function RentalList({
                   </div>
                 </div>
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <div>
                   <div>{rental.return_date}</div>
                   <div className="text-sm text-gray-500">
@@ -189,17 +191,17 @@ export function RentalList({
                   </div>
                 </div>
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <div className="text-sm">
                   {PICKUP_METHOD_LABELS[rental.pickup_method]}
                 </div>
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <div className="text-sm">
                   {RETURN_METHOD_LABELS[rental.return_method]}
                 </div>
               </TableCell>
-              <TableCell className="text-center">
+              <TableCell className="text-center whitespace-nowrap">
                 <Badge variant={STATUS_MAP[rental.status].variant as any}>
                   {STATUS_MAP[rental.status].label}
                 </Badge>

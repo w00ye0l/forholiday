@@ -130,7 +130,6 @@ export default function RentalsPendingPage() {
       if (categoryUpper.includes("GP12")) return DEVICE_CATEGORY_LABELS.GP12;
       if (categoryUpper.includes("GP11")) return DEVICE_CATEGORY_LABELS.GP11;
       if (categoryUpper.includes("GP10")) return DEVICE_CATEGORY_LABELS.GP10;
-      if (categoryUpper.includes("GP8")) return DEVICE_CATEGORY_LABELS.GP8;
       if (categoryUpper.includes("POCKET") || categoryUpper.includes("포켓"))
         return DEVICE_CATEGORY_LABELS.POCKET3;
       if (categoryUpper.includes("ACTION") || categoryUpper.includes("액션"))
@@ -144,11 +143,6 @@ export default function RentalsPendingPage() {
       if (categoryUpper.includes("AIRWRAP") || categoryUpper.includes("에어랩"))
         return DEVICE_CATEGORY_LABELS.AIRWRAP;
       if (
-        categoryUpper.includes("AIRSTRAIGHT") ||
-        categoryUpper.includes("에어스트레이트")
-      )
-        return DEVICE_CATEGORY_LABELS.AIRSTRAIGHT;
-      if (
         categoryUpper.includes("INSTA360") ||
         categoryUpper.includes("인스타")
       )
@@ -158,14 +152,16 @@ export default function RentalsPendingPage() {
         categoryUpper.includes("유모차")
       )
         return DEVICE_CATEGORY_LABELS.STROLLER;
-      if (categoryUpper.includes("WAGON") || categoryUpper.includes("웨건"))
-        return DEVICE_CATEGORY_LABELS.WAGON;
       if (
         categoryUpper.includes("MINIEVO") ||
         categoryUpper.includes("미니에보")
       )
         return DEVICE_CATEGORY_LABELS.MINIEVO;
-
+      if (
+        categoryUpper.includes("OJM360") ||
+        categoryUpper.includes("오즈모360")
+      )
+        return DEVICE_CATEGORY_LABELS.OJM360;
       // 매칭되지 않으면 기타로 분류
       return DEVICE_CATEGORY_LABELS.ETC;
     },
