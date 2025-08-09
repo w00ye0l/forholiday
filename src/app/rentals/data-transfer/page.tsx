@@ -69,6 +69,7 @@ export default function DataTransferPage() {
   const [showDropboxModal, setShowDropboxModal] = useState(false);
   const [currentTransferIds, setCurrentTransferIds] = useState<string[]>([]);
   const [isEmailSending, setIsEmailSending] = useState(false);
+  const [modalDefaultEmail, setModalDefaultEmail] = useState("");
 
   useEffect(() => {
     checkUser();
@@ -297,27 +298,16 @@ export default function DataTransferPage() {
       selectedTransfers.includes(t.reservation_id)
     );
 
-    // 이메일 주소가 없는 항목 확인
-    const itemsWithoutEmail = selectedData.filter((t) => !t.renter_email);
-    if (itemsWithoutEmail.length > 0) {
-      toast.error(
-        `${itemsWithoutEmail.length}개 항목에 이메일 주소가 없습니다.`
-      );
-      return;
-    }
-
     // 드롭박스 모달 열기
     setCurrentTransferIds(selectedTransfers);
+    // 첫 번째 선택된 항목의 이메일을 기본값으로 설정 (있는 경우)
+    const firstSelectedTransfer = selectedData[0];
+    setModalDefaultEmail(firstSelectedTransfer?.renter_email || "");
     setShowDropboxModal(true);
   };
 
   // 개별 이메일 발송 핸들러
   const handleSingleEmail = async (transfer: RentalReservation) => {
-    if (!transfer.renter_email) {
-      toast.error("이메일 주소가 없습니다.");
-      return;
-    }
-
     if (transfer.data_transfer_process_status !== "UPLOADED") {
       toast.error("업로드 완료 상태에서만 이메일을 발송할 수 있습니다.");
       return;
@@ -325,6 +315,8 @@ export default function DataTransferPage() {
 
     // 개별 전송을 위해 배열 설정
     setCurrentTransferIds([transfer.reservation_id]);
+    // 해당 고객의 이메일을 기본값으로 설정
+    setModalDefaultEmail(transfer.renter_email || "");
     setShowDropboxModal(true);
   };
 
@@ -333,6 +325,8 @@ export default function DataTransferPage() {
     username: string;
     password: string;
     accessInstructions?: string;
+    language?: string;
+    email: string;
   }) => {
     setIsEmailSending(true);
     try {
@@ -343,7 +337,7 @@ export default function DataTransferPage() {
       const emailPromises = selectedData.map(async (transfer) => {
         try {
           const formData = new FormData();
-          formData.append("to", transfer.renter_email || "");
+          formData.append("to", credentials.email); // 모달에서 입력받은 이메일 사용
           formData.append("subject", ""); // 템플릿에서 자동 생성
           formData.append("content", ""); // 템플릿에서 자동 생성
           formData.append("transferId", transfer.reservation_id);
@@ -359,6 +353,8 @@ export default function DataTransferPage() {
               credentials.accessInstructions
             );
           }
+          // 언어 정보 추가
+          formData.append("language", credentials.language || "en");
 
           const response = await fetch("/api/send-email", {
             method: "POST",
@@ -725,8 +721,7 @@ export default function DataTransferPage() {
                         size="sm"
                         onClick={() => handleSingleEmail(transfer)}
                         disabled={
-                          transfer.data_transfer_process_status !==
-                            "UPLOADED" || !transfer.renter_email
+                          transfer.data_transfer_process_status !== "UPLOADED"
                         }
                         className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white"
                       >
@@ -752,6 +747,7 @@ export default function DataTransferPage() {
         }}
         onSubmit={handleEmailWithDropbox}
         isLoading={isEmailSending}
+        defaultEmail={modalDefaultEmail}
       />
     </div>
   );

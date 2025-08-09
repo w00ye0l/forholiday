@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
       }
     } else if (templateType === "data-transfer-completion" && reservationId) {
       const supabase = await createClient();
+      const language = (formData.get("language") as string) || "en"; // 기본값: 영어
 
       // 렌탈 예약 정보 조회 (reservation_id 필드로 조회)
       const { data: rental, error: rentalError } = await supabase
@@ -77,28 +78,20 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!rentalError && rental) {
-        // 데이터베이스 템플릿을 사용하지 않고 직접 HTML 생성
-        const dropboxCredentials =
-          dropboxUsername && dropboxPassword
-            ? {
-                username: dropboxUsername,
-                password: dropboxPassword,
-                accessInstructions: accessInstructions || "",
-              }
-            : undefined;
-
         console.log("Data transfer email generation:", {
           rentalId: rental.reservation_id,
-          hasDropboxCredentials: !!dropboxCredentials,
+          language: language,
           dropboxUsername: dropboxUsername ? "provided" : "missing",
           dropboxPassword: dropboxPassword ? "provided" : "missing",
         });
 
-        finalSubject = "포할리데이 - 데이터 전송 완료 안내";
-        finalContent = generateDefaultDataTransferTemplate(
-          rental,
-          dropboxCredentials
+        const emailTemplate = generateDataTransferTemplate(
+          language,
+          dropboxUsername,
+          dropboxPassword
         );
+        finalSubject = emailTemplate.subject;
+        finalContent = emailTemplate.html;
       }
     }
 
@@ -106,6 +99,7 @@ export async function POST(request: NextRequest) {
     const attachments: { filename: string; content: Buffer }[] = [];
     const entries = Array.from(formData.entries());
 
+    // 일반 첨부파일 처리
     for (const [key, value] of entries) {
       if (key.startsWith("attachment_") && value instanceof File) {
         const buffer = Buffer.from(await value.arrayBuffer());
@@ -113,6 +107,32 @@ export async function POST(request: NextRequest) {
           filename: value.name,
           content: buffer,
         });
+      }
+    }
+
+    // 데이터 전송 완료 메일의 경우 PDF 가이드 파일 자동 첨부
+    if (templateType === "data-transfer-completion") {
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        const pdfPath = path.join(
+          process.cwd(),
+          "public",
+          "files",
+          "Guide(iOS, PC, Android).pdf"
+        );
+
+        if (fs.existsSync(pdfPath)) {
+          const pdfBuffer = fs.readFileSync(pdfPath);
+          attachments.push({
+            filename: "Guide(iOS, PC, Android).pdf",
+            content: pdfBuffer,
+          });
+        } else {
+          console.warn("PDF guide file not found:", pdfPath);
+        }
+      } catch (error) {
+        console.error("Error attaching PDF guide:", error);
       }
     }
 
@@ -259,339 +279,98 @@ function processEmailTemplate(template: any, reservation: any) {
   };
 }
 
-// 데이터 전송 완료 이메일 템플릿 생성 (직접 HTML 생성)
-function generateDefaultDataTransferTemplate(
-  rental: any,
-  dropboxCredentials?: {
-    username: string;
-    password: string;
-    accessInstructions?: string;
-  }
+// 데이터 전송 완료 이메일 템플릿 생성 함수 (언어별)
+function generateDataTransferTemplate(
+  language: string,
+  username?: string,
+  password?: string
 ) {
-  const deviceInfo =
-    rental.device_tag_name || rental.device_category || "기기 정보 없음";
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "-";
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { 
-      font-family: 'Malgun Gothic', '맑은 고딕', Arial, sans-serif; 
-      line-height: 1.6; 
-      color: #333; 
-      margin: 0; 
-      padding: 20px; 
-      background-color: #f5f5f5;
-    }
-    .container { 
-      max-width: 600px; 
-      margin: 0 auto; 
-      background-color: #fff;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .header { 
-      background: linear-gradient(135deg, #00af9f 0%, #00c4aa 100%);
-      color: white; 
-      padding: 30px 20px; 
-      text-align: center;
-    }
-    .header h1 {
-      margin: 0;
-      font-size: 24px;
-      font-weight: bold;
-    }
-    .content { 
-      background-color: #fff; 
-      padding: 30px;
-    }
-    .info-box { 
-      background-color: #f8f9fa; 
-      padding: 20px; 
-      margin: 20px 0; 
-      border-radius: 8px; 
-      border-left: 4px solid #00af9f;
-    }
-    .info-box h3 {
-      color: #00af9f; 
-      margin-top: 0;
-      margin-bottom: 15px;
-      font-size: 18px;
-    }
-    .info-row { 
-      display: flex; 
-      padding: 8px 0; 
-      border-bottom: 1px solid #eee;
-      align-items: center;
-    }
-    .info-row:last-child {
-      border-bottom: none;
-    }
-    .info-label { 
-      font-weight: bold; 
-      width: 120px; 
-      color: #666;
-      flex-shrink: 0;
-    }
-    .info-value { 
-      flex: 1; 
-      color: #333;
-    }
-    .footer { 
-      text-align: center; 
-      padding: 30px 20px; 
-      color: #666; 
-      font-size: 14px;
-      background-color: #f8f9fa;
-      border-top: 1px solid #eee;
-    }
-    .highlight { 
-      background-color: #e3f2fd; 
-      padding: 20px; 
-      border-radius: 8px; 
-      margin: 20px 0; 
-      border: 1px solid #2196f3;
-    }
-    .download-section { 
-      background-color: #e8f5e8; 
-      padding: 25px; 
-      border-radius: 8px; 
-      margin: 25px 0; 
-      border: 2px solid #4caf50; 
-      text-align: center;
-    }
-    .download-section h3 {
-      color: #2e7d32; 
-      margin-top: 0;
-      margin-bottom: 10px;
-      font-size: 20px;
-    }
-    .download-button { 
-      display: inline-block; 
-      padding: 15px 30px; 
-      background-color: #4caf50; 
-      color: white; 
-      text-decoration: none; 
-      border-radius: 6px; 
-      margin: 15px 0; 
-      font-weight: bold;
-      font-size: 16px;
-    }
-    .download-button:hover {
-      background-color: #45a049;
-    }
-    .login-section { 
-      background-color: #fff3e0; 
-      padding: 25px; 
-      border-radius: 8px; 
-      margin: 25px 0; 
-      border: 2px solid #ff9800;
-    }
-    .login-section h3 {
-      color: #e65100; 
-      margin-top: 0; 
-      text-align: center;
-      margin-bottom: 20px;
-      font-size: 20px;
-    }
-    .login-info { 
-      background-color: white; 
-      padding: 15px; 
-      border-radius: 6px; 
-      margin: 15px 0; 
-      border: 1px solid #ff9800;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    .credentials { 
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace; 
-      font-weight: bold; 
-      color: #1976d2; 
-      font-size: 16px;
-      background-color: #f5f5f5;
-      padding: 5px 8px;
-      border-radius: 4px;
-      border: 1px solid #ddd;
-    }
-    .usage-guide {
-      background-color: #e3f2fd; 
-      padding: 15px; 
-      border-radius: 6px; 
-      margin-top: 15px;
-      border-left: 4px solid #2196f3;
-    }
-    .usage-guide p {
-      margin: 0; 
-      font-size: 14px; 
-      color: #1976d2;
-      line-height: 1.5;
-    }
-    ul {
-      margin: 10px 0; 
-      padding-left: 20px;
-    }
-    li {
-      margin: 5px 0;
-    }
-    .warning {
-      color: #d32f2f;
-      font-weight: bold;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>📱 데이터 전송 완료</h1>
-    </div>
-    <div class="content">
-      <p>안녕하세요, <strong>${rental.renter_name || "고객"}</strong>님</p>
-      <p>포할리데이를 이용해주셔서 감사합니다.</p>
-      <p>요청하신 <strong>데이터 전송이 완료</strong>되어 안내드립니다.</p>
-      
-      <div class="info-box">
-        <h3>📋 예약 정보</h3>
-        <div class="info-row">
-          <div class="info-label">대여자명</div>
-          <div class="info-value"><strong>${
-            rental.renter_name || "-"
-          }</strong></div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">연락처</div>
-          <div class="info-value">${rental.renter_phone || "-"}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">이메일</div>
-          <div class="info-value">${rental.renter_email || "-"}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">기기</div>
-          <div class="info-value"><strong>${deviceInfo}</strong></div>
-        </div>
-        ${
-          rental.return_date
-            ? `
-        <div class="info-row">
-          <div class="info-label">반납일</div>
-          <div class="info-value">${formatDate(rental.return_date)}</div>
-        </div>`
-            : ""
-        }
-      </div>
-
-      <div class="download-section">
-        <h3>📥 데이터 다운로드</h3>
-        <p><strong>아래 드롭박스 계정으로 로그인하여 데이터를 다운로드</strong> 받으실 수 있습니다.</p>
-      </div>
-
-      ${
-        dropboxCredentials
-          ? `
-      <div class="login-section">
-        <h3>🔐 드롭박스 로그인 정보</h3>
-        
-        <div class="login-info">
-          <div class="info-row">
-            <div class="info-label">아이디:</div>
-            <div class="info-value credentials">${
-              dropboxCredentials.username
-            }</div>
+  if (language === "ja") {
+    return {
+      subject: "【FORHOLIDAY】 データダウンロードのご案内",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <p>こんにちは、FORHOLIDAYです。</p>
+            <p>この度はデータ転送サービスをご利用いただき、誠にありがとうございます。</p>
+            <p>データのダウンロード方法についてご案内いたします。</p>
+            <br>
+            <p>添付のPDFファイルをご確認の上、記載された手順に従ってダウンロードを進めてください。</p>
+            <br>
+            <p>📌 ダウンロード可能期間は、<strong>本メール送信日から7日間</strong>です。</p>
+            <p>期間を過ぎるとファイルは自動的に削除されますので、お早めに保存をお願いいたします。</p>
+            <br>
+            <p>今後ともFORHOLIDAYをよろしくお願いいたします。</p>
+            <br>
+            ${
+              username
+                ? `<p>🆔 <strong>ID：</strong> ${username}</p>`
+                : "<p>🆔 <strong>ID：</strong></p>"
+            }
+            <p>🔐 <strong>パスワード：</strong> ${password || "Data1!"}</p>
+            <br>
+            <p>👉 <strong>IDとパスワードは、スペース（空白）を入れずに入力してください。</strong></p>
           </div>
-        </div>
-        
-        <div class="login-info">
-          <div class="info-row">
-            <div class="info-label">비밀번호:</div>
-            <div class="info-value credentials">${
-              dropboxCredentials.password
-            }</div>
+        </body>
+        </html>
+      `,
+    };
+  } else {
+    // 영어 (기본값)
+    return {
+      subject: "【FORHOLIDAY】 Data Download Instructions",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <p>Hello, this is FORHOLIDAY.</p>
+            <p>Thank you very much for using our data transfer service.</p>
+            <p>We are providing you with instructions on how to download your data.</p>
+            <br>
+            <p>Please refer to the attached PDF file and follow the steps to proceed with the download.</p>
+            <br>
+            <p>📌 The download will be available for <strong>7 days</strong> from the date this email was sent.</p>
+            <p>After that period, the files will be automatically deleted, so please save them as soon as possible.</p>
+            <br>
+            <p>We truly appreciate your continued support for FORHOLIDAY.</p>
+            <br>
+            ${
+              username
+                ? `<p>🆔 <strong>ID:</strong> ${username}</p>`
+                : "<p>🆔 <strong>ID:</strong></p>"
+            }
+            <p>🔐 <strong>Password:</strong> ${password || "Data1!"}</p>
+            <br>
+            <p>👉 Please make sure to <strong>enter the ID and password without any spaces.</strong></p>
           </div>
-        </div>
-
-        ${
-          dropboxCredentials.accessInstructions
-            ? `
-        <div class="login-info">
-          <div class="info-row">
-            <div class="info-label">접속 안내:</div>
-            <div class="info-value">${dropboxCredentials.accessInstructions}</div>
-          </div>
-        </div>`
-            : ""
-        }
-
-        <p style="text-align: center; margin-top: 20px;">
-          <a href="https://www.dropbox.com/login" class="download-button" target="_blank">
-            🔗 드롭박스 로그인 페이지로 이동
-          </a>
-        </p>
-
-        <div class="usage-guide">
-          <p><strong>📌 이용 방법:</strong><br>
-          1. 위 버튼을 클릭하여 드롭박스 로그인 페이지로 이동<br>
-          2. 제공된 아이디와 비밀번호로 로그인<br>
-          3. 업로드된 파일을 다운로드</p>
-        </div>
-      </div>`
-          : `
-      <div class="highlight">
-        <p><strong>드롭박스 로그인 정보는 별도로 안내됩니다.</strong></p>
-      </div>`
-      }
-
-      <div class="highlight">
-        <p><strong>⚠️ 중요 안내사항:</strong></p>
-        <ul>
-          <li>데이터는 <span class="warning">7일간만</span> 다운로드 가능합니다.</li>
-          <li>7일 이후 데이터는 <strong>자동으로 삭제</strong>됩니다.</li>
-          <li>로그인 정보는 <strong>보안을 위해 안전하게 보관</strong>해 주세요.</li>
-          <li>다운로드 완료 후 <strong>반드시 로그아웃</strong> 해주세요.</li>
-          <li>다운로드 중 문제가 발생하시면 <strong>즉시 연락</strong> 주세요.</li>
-          <li>개인정보가 포함된 데이터이므로 <strong>타인과 공유하지 마세요</strong>.</li>
-        </ul>
-      </div>
-
-      ${
-        rental.description
-          ? `
-      <div class="info-box">
-        <h3>💡 추가 안내사항</h3>
-        <p>${rental.description}</p>
-      </div>`
-          : ""
-      }
-
-      <p style="margin-top: 30px;">문의사항이 있으시면 언제든 연락주세요.</p>
-      <p><strong>감사합니다.</strong></p>
-    </div>
-    
-    <div class="footer">
-      <p><strong>포할리데이 팀</strong></p>
-      <p>ForHoliday | 인천공항 장비대여 서비스</p>
-      <p style="font-size: 12px; color: #999; margin-top: 15px;">
-        이 메일은 발신 전용입니다. 회신은 처리되지 않습니다.
-      </p>
-    </div>
-  </div>
-</body>
-</html>`;
+        </body>
+        </html>
+      `,
+    };
+  }
 }
 
 // 짐보관 확정 메일 템플릿 생성 함수
 function generateStorageConfirmationTemplate(reservation: any) {
   return {
-    subject: `[FORHOLIDAY] Your reservation has been confirmed - ${reservation.reservation_id}`,
+    subject: `【FORHOLIDAY】 Your reservation has been confirmed - ${reservation.reservation_id}`,
     html: `
       <!DOCTYPE html>
       <html>
