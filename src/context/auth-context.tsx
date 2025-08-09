@@ -49,7 +49,7 @@ export function AuthProvider({
     return () => {
       subscription.unsubscribe();
     };
-  }, [initialUser]); // initialUser가 변경될 때 useEffect 다시 실행
+  }, []); // 빈 배열로 변경하여 마운트 시에만 실행
 
   const signOut = async () => {
     await supabase.auth.signOut();

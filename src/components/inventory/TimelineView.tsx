@@ -182,7 +182,7 @@ export const TimelineView = function TimelineView({
       {/* 고정 헤더 */}
       <div className="sticky top-0 z-30 flex bg-gray-50">
         {/* 날짜 레이블 헤더 - 완전 고정 */}
-        <div className="w-20 shrink-0 border-r border-gray-200 bg-gray-50">
+        <div className="w-24 shrink-0 border-r border-gray-200 bg-gray-50">
           <div className="h-6 border-b border-gray-200 flex items-center justify-center font-medium text-xs">
             날짜
           </div>
@@ -216,7 +216,7 @@ export const TimelineView = function TimelineView({
       >
         <div className="flex min-w-fit">
           {/* 날짜 레이블 열 - 절대 고정 */}
-          <div className="w-20 shrink-0 border-r border-gray-200 bg-white sticky left-0 z-20">
+          <div className="w-24 shrink-0 border-r border-gray-200 bg-white sticky left-0 z-20">
             {/* 이전 데이터 로드 버튼 */}
             <Button
               variant="ghost"
@@ -235,14 +235,34 @@ export const TimelineView = function TimelineView({
             </Button>
 
             {/* 날짜 목록 */}
-            {timeSlots.map((slot) => (
-              <div
-                key={slot.date}
-                className="h-6 border-b border-gray-200 flex items-center justify-center text-xs font-medium bg-gray-50"
-              >
-                {format(new Date(slot.date), "MM/dd", { locale: ko })}
-              </div>
-            ))}
+            {timeSlots.map((slot) => {
+              const date = new Date(slot.date);
+              const dayOfWeek = date.getDay();
+              const isSaturday = dayOfWeek === 6;
+              const isSunday = dayOfWeek === 0;
+              
+              return (
+                <div
+                  key={slot.date}
+                  className="h-6 border-b border-gray-200 flex items-center justify-center text-xs font-medium bg-gray-50"
+                >
+                  <span className={
+                    isSaturday ? "text-blue-600" : 
+                    isSunday ? "text-red-600" : 
+                    "text-gray-900"
+                  }>
+                    {format(date, "MM/dd", { locale: ko })}
+                  </span>
+                  <span className={`ml-1 ${
+                    isSaturday ? "text-blue-600" : 
+                    isSunday ? "text-red-600" : 
+                    "text-gray-600"
+                  }`}>
+                    ({format(date, "EEE", { locale: ko })})
+                  </span>
+                </div>
+              );
+            })}
 
             {/* 다음 데이터 로드 버튼 */}
             <Button

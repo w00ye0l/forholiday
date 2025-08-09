@@ -49,6 +49,7 @@ export default function LoginPage() {
             <Input
               id="password"
               name="password"
+              placeholder="비밀번호를 입력하세요"
               type="password"
               required
               autoComplete="current-password"

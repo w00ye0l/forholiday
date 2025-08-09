@@ -39,7 +39,7 @@ export default function DevicesPage() {
     const { data } = await supabase
       .from("devices")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("tag_name", { ascending: true });
     setDevices(data || []);
     setFilteredDevices(data || []);
   };

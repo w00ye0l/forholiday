@@ -67,14 +67,61 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: '최고관리자는 삭제할 수 없습니다' }, { status: 403 })
     }
 
-    // 사용자 프로필 삭제 (auth.users는 cascade로 삭제됨)
-    const { error: deleteError } = await serviceSupabase
+    // 삭제할 사용자 정보를 백업 (롤백용)
+    const { data: backupProfile } = await serviceSupabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    // 1. 먼저 profiles 테이블과 관련 데이터 삭제 (CASCADE 때문에)
+    console.log('프로필 및 관련 데이터 삭제 시작...')
+    
+    // 1-1. 메뉴 권한 먼저 삭제
+    const { error: menuError } = await serviceSupabase
+      .from('menu_permissions')
+      .delete()
+      .eq('user_id', userId)
+    
+    if (menuError) {
+      console.error('메뉴 권한 삭제 오류:', menuError)
+    }
+
+    // 1-2. 프로필 삭제
+    const { error: profileDeleteError } = await serviceSupabase
       .from('profiles')
       .delete()
       .eq('id', userId)
     
-    if (deleteError) {
-      return NextResponse.json({ error: '사용자 삭제 중 오류가 발생했습니다' }, { status: 500 })
+    if (profileDeleteError) {
+      console.error('프로필 삭제 오류:', profileDeleteError)
+      return NextResponse.json({ 
+        error: '사용자 프로필 삭제 중 오류가 발생했습니다: ' + profileDeleteError.message 
+      }, { status: 500 })
+    }
+
+    // 2. Supabase Authentication에서 사용자 삭제 (마지막에 실행)
+    console.log('Authentication 사용자 삭제 시작...')
+    const { error: authDeleteError } = await serviceSupabase.auth.admin.deleteUser(userId)
+    
+    if (authDeleteError) {
+      console.error('Authentication 사용자 삭제 오류:', authDeleteError)
+      
+      // Authentication 삭제 실패 시 프로필 복구 시도
+      if (backupProfile) {
+        console.log('Authentication 삭제 실패로 인한 프로필 복구 시도...')
+        const { error: restoreError } = await serviceSupabase
+          .from('profiles')
+          .insert(backupProfile)
+        
+        if (restoreError) {
+          console.error('프로필 복구 실패:', restoreError)
+        }
+      }
+      
+      return NextResponse.json({ 
+        error: 'Authentication 사용자 삭제 중 오류가 발생했습니다: ' + authDeleteError.message 
+      }, { status: 500 })
     }
 
     return NextResponse.json({ message: '사용자가 성공적으로 삭제되었습니다' })

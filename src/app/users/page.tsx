@@ -27,8 +27,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { UserIcon, SearchIcon, RefreshCwIcon, EditIcon, UserPlusIcon, Trash2Icon } from "lucide-react";
+import {
+  UserIcon,
+  SearchIcon,
+  RefreshCwIcon,
+  EditIcon,
+  UserPlusIcon,
+  Trash2Icon,
+  ShieldIcon,
+} from "lucide-react";
 import { Profile, ROLE_LABELS, ROLE_COLORS, UserRole } from "@/types/profile";
+import MenuPermissionModal from "@/components/users/MenuPermissionModal";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -39,12 +48,14 @@ interface ProfileWithAuth extends Profile {
 
 export default function UsersPage() {
   const [profiles, setProfiles] = useState<ProfileWithAuth[]>([]);
-  const [filteredProfiles, setFilteredProfiles] = useState<ProfileWithAuth[]>([]);
+  const [filteredProfiles, setFilteredProfiles] = useState<ProfileWithAuth[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState<string>("all");
   const [error, setError] = useState<string | null>(null);
-  
+
   // 수정 모달 상태
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [editForm, setEditForm] = useState({
@@ -53,7 +64,7 @@ export default function UsersPage() {
     role: "user" as UserRole,
   });
   const [updating, setUpdating] = useState(false);
-  
+
   // 신규 등록 모달 상태
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [registerForm, setRegisterForm] = useState({
@@ -64,12 +75,16 @@ export default function UsersPage() {
     role: "user" as UserRole,
   });
   const [registering, setRegistering] = useState(false);
-  
+
   // 삭제 모달 상태
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingProfile, setDeletingProfile] = useState<Profile | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // 메뉴 권한 모달 상태
+  const [showMenuPermissionModal, setShowMenuPermissionModal] = useState(false);
+  const [menuPermissionProfile, setMenuPermissionProfile] =
+    useState<Profile | null>(null);
 
   const fetchProfiles = async () => {
     try {
@@ -77,18 +92,18 @@ export default function UsersPage() {
       setError(null);
 
       // API를 통해 프로필 목록 조회 (이메일 정보 포함)
-      const response = await fetch('/api/users');
+      const response = await fetch("/api/users");
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || '사용자 목록 조회 실패');
+        throw new Error(result.error || "사용자 목록 조회 실패");
       }
 
       if (result.success && result.data) {
         setProfiles(result.data);
         setFilteredProfiles(result.data);
       } else {
-        throw new Error('잘못된 응답 형식');
+        throw new Error("잘못된 응답 형식");
       }
     } catch (error) {
       console.error("사용자 목록 조회 에러:", error);
@@ -153,16 +168,16 @@ export default function UsersPage() {
       role: editForm.role,
     };
 
-    console.log('수정 요청 전송 데이터:', requestData);
-    console.log('수정 대상 프로필:', editingProfile);
+    console.log("수정 요청 전송 데이터:", requestData);
+    console.log("수정 대상 프로필:", editingProfile);
 
     try {
       setUpdating(true);
 
-      const response = await fetch('/api/users/update', {
-        method: 'PUT',
+      const response = await fetch("/api/users/update", {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(requestData),
       });
@@ -171,7 +186,7 @@ export default function UsersPage() {
 
       if (!response.ok) {
         console.error("API 응답 에러:", result);
-        throw new Error(result.error || '사용자 정보 수정 실패');
+        throw new Error(result.error || "사용자 정보 수정 실패");
       }
 
       console.log("수정 성공:", result);
@@ -200,10 +215,10 @@ export default function UsersPage() {
     try {
       setRegistering(true);
 
-      const response = await fetch('/api/users/register', {
-        method: 'POST',
+      const response = await fetch("/api/users/register", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           username: registerForm.username,
@@ -216,7 +231,18 @@ export default function UsersPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || '사용자 등록 실패');
+        // 상태 코드별 에러 메시지 처리
+        if (response.status === 409) {
+          throw new Error(result.error || "이미 존재하는 사용자명입니다.");
+        } else if (response.status === 400) {
+          throw new Error(result.error || "입력 정보를 확인해주세요.");
+        } else if (response.status === 401) {
+          throw new Error("인증이 필요합니다.");
+        } else if (response.status === 403) {
+          throw new Error("관리자 권한이 필요합니다.");
+        } else {
+          throw new Error(result.error || "사용자 등록에 실패했습니다.");
+        }
       }
 
       toast.success("사용자가 성공적으로 등록되었습니다.");
@@ -253,10 +279,10 @@ export default function UsersPage() {
     try {
       setDeleting(true);
 
-      const response = await fetch('/api/users/delete', {
-        method: 'DELETE',
+      const response = await fetch("/api/users/delete", {
+        method: "DELETE",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           userId: deletingProfile.id,
@@ -266,7 +292,7 @@ export default function UsersPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || '사용자 삭제 실패');
+        throw new Error(result.error || "사용자 삭제 실패");
       }
 
       toast.success("사용자가 성공적으로 삭제되었습니다.");
@@ -285,6 +311,12 @@ export default function UsersPage() {
     }
   };
 
+  // 메뉴 권한 관리 클릭
+  const handleMenuPermissionClick = (profile: Profile) => {
+    setMenuPermissionProfile(profile);
+    setShowMenuPermissionModal(true);
+  };
+
   // 통계 계산
   const getRoleStats = () => {
     return {
@@ -292,6 +324,7 @@ export default function UsersPage() {
       admin: profiles.filter((p) => p.role === "admin").length,
       user: profiles.filter((p) => p.role === "user").length,
       super_admin: profiles.filter((p) => p.role === "super_admin").length,
+      staff: profiles.filter((p) => p.role === "staff").length,
     };
   };
 
@@ -314,7 +347,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-2">사용자 관리</h1>
         <p className="text-sm text-gray-500 mb-4">
@@ -323,7 +356,7 @@ export default function UsersPage() {
       </div>
 
       {/* 통계 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
@@ -334,7 +367,7 @@ export default function UsersPage() {
             <div className="text-2xl font-bold">{stats.total}명</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-purple-600">
@@ -342,10 +375,12 @@ export default function UsersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{stats.super_admin}명</div>
+            <div className="text-2xl font-bold text-purple-600">
+              {stats.super_admin}명
+            </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-red-600">
@@ -353,10 +388,25 @@ export default function UsersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.admin}명</div>
+            <div className="text-2xl font-bold text-red-600">
+              {stats.admin}명
+            </div>
           </CardContent>
         </Card>
-        
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-blue-600">
+              스태프
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {stats.staff}명
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-green-600">
@@ -364,7 +414,9 @@ export default function UsersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.user}명</div>
+            <div className="text-2xl font-bold text-green-600">
+              {stats.user}명
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -391,6 +443,7 @@ export default function UsersPage() {
                 <SelectItem value="all">전체 역할</SelectItem>
                 <SelectItem value="super_admin">최고관리자</SelectItem>
                 <SelectItem value="admin">관리자</SelectItem>
+                <SelectItem value="staff">스태프</SelectItem>
                 <SelectItem value="user">일반 사용자</SelectItem>
               </SelectContent>
             </Select>
@@ -468,20 +521,28 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell>
                         {profile.created_at
-                          ? format(new Date(profile.created_at), "yyyy-MM-dd HH:mm", {
-                              locale: ko,
-                            })
+                          ? format(
+                              new Date(profile.created_at),
+                              "yyyy-MM-dd HH:mm",
+                              {
+                                locale: ko,
+                              }
+                            )
                           : "-"}
                       </TableCell>
                       <TableCell>
                         {profile.updated_at
-                          ? format(new Date(profile.updated_at), "yyyy-MM-dd HH:mm", {
-                              locale: ko,
-                            })
+                          ? format(
+                              new Date(profile.updated_at),
+                              "yyyy-MM-dd HH:mm",
+                              {
+                                locale: ko,
+                              }
+                            )
                           : "-"}
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="flex items-center gap-2 justify-center">
+                        <div className="flex items-center gap-1 justify-center flex-wrap">
                           <Button
                             variant="outline"
                             size="sm"
@@ -490,6 +551,15 @@ export default function UsersPage() {
                           >
                             <EditIcon className="w-3 h-3" />
                             수정
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleMenuPermissionClick(profile)}
+                            className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:border-blue-300"
+                          >
+                            <ShieldIcon className="w-3 h-3" />
+                            권한
                           </Button>
                           <Button
                             variant="outline"
@@ -532,7 +602,7 @@ export default function UsersPage() {
                 placeholder="사용자명 입력"
               />
             </div>
-            
+
             <div>
               <Label htmlFor="edit-fullname">이름</Label>
               <Input
@@ -544,7 +614,7 @@ export default function UsersPage() {
                 placeholder="이름 입력"
               />
             </div>
-            
+
             <div>
               <Label htmlFor="edit-role">역할</Label>
               <Select
@@ -558,6 +628,7 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="user">일반 사용자</SelectItem>
+                  <SelectItem value="staff">스태프</SelectItem>
                   <SelectItem value="admin">관리자</SelectItem>
                   <SelectItem value="super_admin">최고관리자</SelectItem>
                 </SelectContent>
@@ -574,7 +645,11 @@ export default function UsersPage() {
               </Button>
               <Button
                 onClick={handleUpdateProfile}
-                disabled={updating || !editForm.username.trim() || !editForm.full_name.trim()}
+                disabled={
+                  updating ||
+                  !editForm.username.trim() ||
+                  !editForm.full_name.trim()
+                }
               >
                 {updating ? "수정 중..." : "저장"}
               </Button>
@@ -607,7 +682,7 @@ export default function UsersPage() {
                 로그인 시 사용할 아이디입니다
               </p>
             </div>
-            
+
             <div>
               <Label htmlFor="register-password">비밀번호</Label>
               <Input
@@ -631,30 +706,37 @@ export default function UsersPage() {
                 type="password"
                 value={registerForm.passwordConfirm}
                 onChange={(e) =>
-                  setRegisterForm({ ...registerForm, passwordConfirm: e.target.value })
+                  setRegisterForm({
+                    ...registerForm,
+                    passwordConfirm: e.target.value,
+                  })
                 }
                 placeholder="비밀번호 다시 입력"
               />
-              {registerForm.password && registerForm.passwordConfirm && 
-               registerForm.password !== registerForm.passwordConfirm && (
-                <p className="text-xs text-red-500 mt-1">
-                  비밀번호가 일치하지 않습니다
-                </p>
-              )}
+              {registerForm.password &&
+                registerForm.passwordConfirm &&
+                registerForm.password !== registerForm.passwordConfirm && (
+                  <p className="text-xs text-red-500 mt-1">
+                    비밀번호가 일치하지 않습니다
+                  </p>
+                )}
             </div>
-            
+
             <div>
               <Label htmlFor="register-fullname">이름</Label>
               <Input
                 id="register-fullname"
                 value={registerForm.full_name}
                 onChange={(e) =>
-                  setRegisterForm({ ...registerForm, full_name: e.target.value })
+                  setRegisterForm({
+                    ...registerForm,
+                    full_name: e.target.value,
+                  })
                 }
                 placeholder="이름 입력"
               />
             </div>
-            
+
             <div>
               <Label htmlFor="register-role">역할</Label>
               <Select
@@ -668,6 +750,7 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="user">일반 사용자</SelectItem>
+                  <SelectItem value="staff">스태프</SelectItem>
                   <SelectItem value="admin">관리자</SelectItem>
                   <SelectItem value="super_admin">최고관리자</SelectItem>
                 </SelectContent>
@@ -694,9 +777,9 @@ export default function UsersPage() {
               <Button
                 onClick={handleRegisterUser}
                 disabled={
-                  registering || 
-                  !registerForm.username.trim() || 
-                  !registerForm.password.trim() || 
+                  registering ||
+                  !registerForm.username.trim() ||
+                  !registerForm.password.trim() ||
                   !registerForm.passwordConfirm.trim() ||
                   !registerForm.full_name.trim() ||
                   registerForm.password.length < 6 ||
@@ -733,13 +816,20 @@ export default function UsersPage() {
                 </p>
                 <div className="mt-2 p-3 bg-white rounded border">
                   <div className="text-sm">
-                    <div><strong>사용자명:</strong> {deletingProfile.username}</div>
-                    <div><strong>이름:</strong> {deletingProfile.full_name}</div>
-                    <div><strong>역할:</strong> {ROLE_LABELS[deletingProfile.role]}</div>
+                    <div>
+                      <strong>사용자명:</strong> {deletingProfile.username}
+                    </div>
+                    <div>
+                      <strong>이름:</strong> {deletingProfile.full_name}
+                    </div>
+                    <div>
+                      <strong>역할:</strong> {ROLE_LABELS[deletingProfile.role]}
+                    </div>
                   </div>
                 </div>
                 <p className="text-xs text-red-600 mt-2">
-                  이 작업은 되돌릴 수 없습니다. 사용자의 모든 데이터가 영구적으로 삭제됩니다.
+                  이 작업은 되돌릴 수 없습니다. 사용자의 모든 데이터가
+                  영구적으로 삭제됩니다.
                 </p>
               </div>
 
@@ -766,6 +856,17 @@ export default function UsersPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 메뉴 권한 관리 모달 */}
+      <MenuPermissionModal
+        profile={menuPermissionProfile}
+        isOpen={showMenuPermissionModal}
+        onClose={() => {
+          setShowMenuPermissionModal(false);
+          setMenuPermissionProfile(null);
+        }}
+        onUpdate={fetchProfiles}
+      />
     </div>
   );
 }

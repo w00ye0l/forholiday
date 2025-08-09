@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useInventoryStore } from "@/lib/inventory-state";
-import { TimeSlot } from "@/lib/inventory-state";
 import { format, startOfDay, endOfDay, addDays, subDays } from "date-fns";
 import {
   RentalReservation,
@@ -15,7 +14,6 @@ import {
 import { Database } from "@/lib/supabase/database.types";
 import {
   DeviceCategory,
-  DeviceStatus,
   Device,
   DEVICE_CATEGORY_LABELS,
 } from "@/types/device";
@@ -23,14 +21,6 @@ import { findOptimalDevice } from "@/lib/algorithms/auto-assign";
 
 type DatabaseReservation =
   Database["public"]["Tables"]["rental_reservations"]["Row"];
-
-const AVAILABLE_DEVICE_STATUSES: DeviceStatus[] = [
-  "available",
-  "reserved",
-  "in_use",
-  "rented",
-  "pending_return",
-];
 
 interface UseInventoryDataProps {
   daysToShow: number;
@@ -175,6 +165,13 @@ export const useInventoryData = ({
         updated_at: dbReservation.updated_at,
         cancelled_at: dbReservation.cancelled_at || undefined,
         cancel_reason: dbReservation.cancel_reason || undefined,
+        // 데이터 전송 관련 필드 기본값 추가
+        data_transfer_status: "none",
+        data_transfer_purchased: false,
+        data_transfer_uploaded_at: undefined,
+        data_transfer_email_sent_at: undefined,
+        data_transfer_issue: undefined,
+        data_transfer_process_status: undefined,
       };
     },
     []

@@ -48,22 +48,43 @@ export default function RentalReturnPage() {
     const supabase = createClient();
 
     try {
-      // 반납 예정 및 완료된 예약 목록 조회 (반납관리에서 필요한 상태만)
-      const { data: rentalsData, error } = await supabase
-        .from("rental_reservations")
-        .select("*")
-        .in("status", ["picked_up", "not_picked_up", "returned", "problem"])
-        .order("return_date", { ascending: true })
-        .order("return_time", { ascending: true });
+      let allRentals: RentalReservation[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
 
-      if (error) {
-        console.error("반납 관리 데이터 로딩 에러:", error);
-        setRentals([]);
-      } else {
-        console.log("반납 관리 데이터 로드됨:", rentalsData?.length, "건");
-        console.log({ rentalsData });
-        setRentals(rentalsData || []);
+      // 배치로 데이터 가져오기 (1000개씩)
+      while (hasMore) {
+        const { data: rentalsData, error } = await supabase
+          .from("rental_reservations")
+          .select("*")
+          .in("status", ["picked_up", "not_picked_up", "returned", "problem"])
+          .is("cancelled_at", null)
+          .order("return_date", { ascending: false })
+          .order("return_time", { ascending: false })
+          .range(from, from + batchSize - 1);
+
+        if (error) {
+          console.error("반납 관리 데이터 로딩 에러:", error);
+          break;
+        }
+
+        if (rentalsData && rentalsData.length > 0) {
+          allRentals = [...allRentals, ...rentalsData];
+          from += batchSize;
+          hasMore = rentalsData.length === batchSize; // 1000개 미만이면 마지막 배치
+        } else {
+          hasMore = false;
+        }
+
+        // 안전장치: 최대 10만개까지만
+        if (allRentals.length >= 100000) {
+          break;
+        }
       }
+
+      console.log("반납 관리 데이터 로드됨:", allRentals.length, "건");
+      setRentals(allRentals);
     } catch (error) {
       console.error("반납 관리 데이터 로딩 실패:", error);
       setRentals([]);
