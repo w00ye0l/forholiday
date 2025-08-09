@@ -17,7 +17,6 @@ export type DeviceCategory =
   | "GP12"
   | "GP11"
   | "GP10"
-  | "GP8"
   | "POCKET3"
   | "ACTION5"
   | "S23"
@@ -26,11 +25,10 @@ export type DeviceCategory =
   | "PS5"
   | "GLAMPAM"
   | "AIRWRAP"
-  | "AIRSTRAIGHT"
   | "INSTA360"
   | "STROLLER"
-  | "WAGON"
   | "MINIEVO"
+  | "OJM360"
   | "ETC";
 
 // 카테고리 한글 라벨
@@ -39,7 +37,6 @@ export const DEVICE_CATEGORY_LABELS: Record<DeviceCategory, string> = {
   GP12: "GP12",
   GP11: "GP11",
   GP10: "GP10",
-  GP8: "GP8",
   POCKET3: "포켓3",
   ACTION5: "액션5",
   S23: "S23",
@@ -48,11 +45,10 @@ export const DEVICE_CATEGORY_LABELS: Record<DeviceCategory, string> = {
   PS5: "PS5",
   GLAMPAM: "글램팜",
   AIRWRAP: "에어랩",
-  AIRSTRAIGHT: "에어스트레이트",
   INSTA360: "인스타360",
   STROLLER: "유모차",
-  WAGON: "웨건",
   MINIEVO: "미니에보",
+  OJM360: "오즈모360",
   ETC: "기타",
 };
 
@@ -62,7 +58,6 @@ export const DEVICE_CATEGORY_LABELS_EN: Record<DeviceCategory, string> = {
   GP12: "GP12",
   GP11: "GP11",
   GP10: "GP10",
-  GP8: "GP8",
   POCKET3: "Pocket3",
   ACTION5: "Action5",
   S23: "S23",
@@ -71,11 +66,10 @@ export const DEVICE_CATEGORY_LABELS_EN: Record<DeviceCategory, string> = {
   PS5: "PS5",
   GLAMPAM: "Glampam",
   AIRWRAP: "Airwrap",
-  AIRSTRAIGHT: "Airstraight",
   INSTA360: "Insta360",
   STROLLER: "Stroller",
-  WAGON: "Wagon",
   MINIEVO: "Minievo",
+  OJM360: "OJM360",
   ETC: "Etc",
 };
 

@@ -27,11 +27,11 @@ export default function DevicesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  
+
   // 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  
+
   const supabase = createClient();
 
   // 기기 목록 fetch 함수
@@ -130,14 +130,9 @@ export default function DevicesPage() {
 
   const statusCounts = getStatusCounts();
 
-  // 고유한 카테고리 목록 추출
-  const getUniqueCategories = () => {
-    const categories = devices
-      .map((device) => device.category)
-      .filter((category) => category)
-      .filter((category, index, arr) => arr.indexOf(category) === index)
-      .sort();
-    return categories;
+  // device.ts에서 정의된 카테고리 목록 사용
+  const getAllCategories = (): DeviceCategory[] => {
+    return Object.keys(DEVICE_CATEGORY_LABELS) as DeviceCategory[];
   };
 
   // 페이지네이션 계산
@@ -194,11 +189,16 @@ export default function DevicesPage() {
                   <SelectValue placeholder="카테고리 선택" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">전체 카테고리</SelectItem>
-                  {getUniqueCategories().map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {DEVICE_CATEGORY_LABELS[category as DeviceCategory] ||
-                        category}
+                  <SelectItem value="all" className="whitespace-nowrap">
+                    전체 카테고리
+                  </SelectItem>
+                  {getAllCategories().map((category) => (
+                    <SelectItem
+                      key={category}
+                      value={category}
+                      className="whitespace-nowrap"
+                    >
+                      {DEVICE_CATEGORY_LABELS[category]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -307,7 +307,7 @@ export default function DevicesPage() {
               onDeviceUpdated={fetchDevices}
               onEditDevice={handleEditDevice}
             />
-            
+
             {/* 페이지네이션 */}
             {filteredDevices.length > 0 && (
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t">
@@ -315,7 +315,9 @@ export default function DevicesPage() {
                   <span>페이지 크기:</span>
                   <Select
                     value={pageSize.toString()}
-                    onValueChange={(value) => handlePageSizeChange(parseInt(value))}
+                    onValueChange={(value) =>
+                      handlePageSizeChange(parseInt(value))
+                    }
                   >
                     <SelectTrigger className="w-20">
                       <SelectValue />
@@ -328,13 +330,15 @@ export default function DevicesPage() {
                     </SelectContent>
                   </Select>
                   <span className="ml-4">
-                    {filteredDevices.length > 0 
-                      ? `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, filteredDevices.length)} / ${filteredDevices.length}개`
-                      : '0개'
-                    }
+                    {filteredDevices.length > 0
+                      ? `${(currentPage - 1) * pageSize + 1}-${Math.min(
+                          currentPage * pageSize,
+                          filteredDevices.length
+                        )} / ${filteredDevices.length}개`
+                      : "0개"}
                   </span>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
@@ -352,14 +356,14 @@ export default function DevicesPage() {
                   >
                     {"<"}
                   </Button>
-                  
+
                   {/* 페이지 번호 */}
                   <div className="flex items-center gap-1">
                     {(() => {
                       const startPage = Math.max(1, currentPage - 2);
                       const endPage = Math.min(totalPages, currentPage + 2);
                       const pages = [];
-                      
+
                       if (startPage > 1) {
                         pages.push(
                           <Button
@@ -373,10 +377,14 @@ export default function DevicesPage() {
                           </Button>
                         );
                         if (startPage > 2) {
-                          pages.push(<span key="ellipsis1" className="px-2">...</span>);
+                          pages.push(
+                            <span key="ellipsis1" className="px-2">
+                              ...
+                            </span>
+                          );
                         }
                       }
-                      
+
                       for (let i = startPage; i <= endPage; i++) {
                         pages.push(
                           <Button
@@ -390,15 +398,21 @@ export default function DevicesPage() {
                           </Button>
                         );
                       }
-                      
+
                       if (endPage < totalPages) {
                         if (endPage < totalPages - 1) {
-                          pages.push(<span key="ellipsis2" className="px-2">...</span>);
+                          pages.push(
+                            <span key="ellipsis2" className="px-2">
+                              ...
+                            </span>
+                          );
                         }
                         pages.push(
                           <Button
                             key={totalPages}
-                            variant={currentPage === totalPages ? "default" : "outline"}
+                            variant={
+                              currentPage === totalPages ? "default" : "outline"
+                            }
                             size="sm"
                             onClick={() => handlePageChange(totalPages)}
                             className="w-8 h-8"
@@ -407,11 +421,11 @@ export default function DevicesPage() {
                           </Button>
                         );
                       }
-                      
+
                       return pages;
                     })()}
                   </div>
-                  
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -429,10 +443,12 @@ export default function DevicesPage() {
                     {">>"}
                   </Button>
                 </div>
-                
+
                 {totalPages <= 1 && (
                   <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <span>페이지 {currentPage} / {totalPages}</span>
+                    <span>
+                      페이지 {currentPage} / {totalPages}
+                    </span>
                   </div>
                 )}
               </div>
