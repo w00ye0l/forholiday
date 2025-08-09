@@ -31,10 +31,14 @@ export type MenuKey =
   | 'rentals_pending'
   | 'rentals_pickup'
   | 'rentals_return'
+  | 'rentals_data'
   | 'storage'
   | 'storage_pending'
   | 'storage_stored'
   | 'storage_pickup'
   | 'devices'
-  | 'arrival_checkin_admin';
+  | 'arrival_checkin_admin'
+  | 'customer_check_reservation'
+  | 'customer_arrival_checkin'
+  | 'data_management';
 

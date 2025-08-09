@@ -24,6 +24,7 @@ import {
 
 import { NavStorage } from "@/components/nav-storage";
 import { NavRental } from "@/components/nav-rental";
+import { NavCustomer } from "@/components/nav-customer";
 import { NavSystem } from "@/components/nav-system";
 import { useMenuPermissions } from "@/hooks/use-menu-permissions";
 import { MenuKey } from "@/types/profile";
@@ -51,44 +52,44 @@ const allMenuItems = {
     title: "대시보드",
     url: "/",
     icon: HomeIcon,
-    menuKey: 'dashboard' as MenuKey,
+    menuKey: "dashboard" as MenuKey,
   },
   rentalMenu: [
     {
       title: "예약 대기",
       url: "/rentals/pending",
       icon: ClockIcon,
-      menuKey: 'rentals_pending' as MenuKey,
+      menuKey: "rentals_pending" as MenuKey,
     },
     {
       title: "예약 목록",
       url: "/rentals",
       icon: CalendarIcon,
-      menuKey: 'rentals' as MenuKey,
+      menuKey: "rentals" as MenuKey,
     },
     {
       title: "신규 예약",
       url: "/rentals/new",
       icon: PlusCircleIcon,
-      menuKey: 'rentals' as MenuKey, // 렌탈 관리 권한으로 통합
+      menuKey: "rentals" as MenuKey, // 렌탈 관리 권한으로 통합
     },
     {
       title: "출고 관리",
       url: "/rentals/out",
       icon: ArrowRightIcon,
-      menuKey: 'rentals_pickup' as MenuKey,
+      menuKey: "rentals_pickup" as MenuKey,
     },
     {
       title: "반납 관리",
       url: "/rentals/return",
       icon: RotateCcwIcon,
-      menuKey: 'rentals_return' as MenuKey,
+      menuKey: "rentals_return" as MenuKey,
     },
     {
       title: "데이터 관리",
       url: "/rentals/data-transfer",
       icon: DatabaseIcon,
-      menuKey: 'rentals' as MenuKey, // 렌탈 관리 권한으로 통합
+      menuKey: "rentals_data" as MenuKey,
     },
   ],
   storageMenu: [
@@ -96,25 +97,39 @@ const allMenuItems = {
       title: "짐보관 목록",
       url: "/storage",
       icon: CalendarIcon,
-      menuKey: 'storage' as MenuKey,
+      menuKey: "storage" as MenuKey,
     },
     {
       title: "보관 예약",
       url: "/storage/new",
       icon: PlusCircleIcon,
-      menuKey: 'storage_pending' as MenuKey,
+      menuKey: "storage_pending" as MenuKey,
     },
     {
       title: "입고 관리",
       url: "/storage/incoming",
       icon: ArrowDownIcon,
-      menuKey: 'storage_stored' as MenuKey,
+      menuKey: "storage_stored" as MenuKey,
     },
     {
       title: "픽업 관리",
       url: "/storage/outgoing",
       icon: ArrowUpIcon,
-      menuKey: 'storage_pickup' as MenuKey,
+      menuKey: "storage_pickup" as MenuKey,
+    },
+  ],
+  customerMenu: [
+    {
+      title: "고객 조회 페이지",
+      url: "/check-reservation",
+      icon: BoltIcon,
+      menuKey: "customer_check_reservation" as MenuKey,
+    },
+    {
+      title: "도착 체크인",
+      url: "/arrival-checkin",
+      icon: PlaneIcon,
+      menuKey: "customer_arrival_checkin" as MenuKey,
     },
   ],
   systemMenu: [
@@ -122,43 +137,31 @@ const allMenuItems = {
       title: "사용자 관리",
       url: "/users",
       icon: UserIcon,
-      menuKey: 'users' as MenuKey,
+      menuKey: "users" as MenuKey,
     },
     {
       title: "기기 관리",
       url: "/devices",
       icon: BoxIcon,
-      menuKey: 'devices' as MenuKey,
+      menuKey: "devices" as MenuKey,
     },
     {
       title: "재고 관리",
       url: "/inventory",
       icon: TableIcon,
-      menuKey: 'devices' as MenuKey, // 기기 관리 권한으로 통합
-    },
-    {
-      title: "고객 조회 페이지",
-      url: "/check-reservation",
-      icon: BoltIcon,
-      menuKey: 'dashboard' as MenuKey, // 대시보드 권한으로 통합
-    },
-    {
-      title: "도착 체크인",
-      url: "/arrival-checkin",
-      icon: PlaneIcon,
-      menuKey: 'dashboard' as MenuKey, // 대시보드 권한으로 통합
+      menuKey: "devices" as MenuKey,
     },
     {
       title: "도착 체크인 관리",
       url: "/admin/arrival-checkin",
       icon: PlaneIcon,
-      menuKey: 'arrival_checkin_admin' as MenuKey,
+      menuKey: "arrival_checkin_admin" as MenuKey,
     },
     {
       title: "이메일 템플릿 관리",
       url: "/admin/email-templates",
       icon: MailIcon,
-      menuKey: 'data_management' as MenuKey,
+      menuKey: "data_management" as MenuKey,
     },
   ],
 };
@@ -175,11 +178,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // 권한에 따라 메뉴 필터링
   const filterMenuItems = (items: MenuItem[]) => {
     if (loading) return [];
-    return items.filter(item => hasPermission(item.menuKey, 'view'));
+    return items.filter((item) => hasPermission(item.menuKey, "view"));
   };
 
   const filteredRentalMenu = filterMenuItems(allMenuItems.rentalMenu);
   const filteredStorageMenu = filterMenuItems(allMenuItems.storageMenu);
+  const filteredCustomerMenu = filterMenuItems(allMenuItems.customerMenu);
   const filteredSystemMenu = filterMenuItems(allMenuItems.systemMenu);
 
   if (loading) {
@@ -242,6 +246,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
         {filteredStorageMenu.length > 0 && (
           <NavStorage items={filteredStorageMenu} />
+        )}
+        {filteredCustomerMenu.length > 0 && (
+          <NavCustomer items={filteredCustomerMenu} />
         )}
         {filteredSystemMenu.length > 0 && (
           <NavSystem items={filteredSystemMenu} />
