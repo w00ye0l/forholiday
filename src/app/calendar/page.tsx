@@ -486,6 +486,7 @@ export default function CalendarPage() {
         STROLLER: ["STROLLER", "유모차", "stroller"],
         WAGON: ["WAGON", "웨건", "wagon"],
         MINIEVO: ["MINIEVO", "미니에보"],
+        OJM360: ["OJM360", "OJM", "오즈모", "오즈모360"],
         ETC: ["기타", "etc", "other", "그외", "기타기기"],
       };
 
@@ -728,12 +729,13 @@ export default function CalendarPage() {
     }
 
     const confirmed = confirm(
-      `${optionReservations.length}개의 예약에 옵션을 일괄 업데이트하시겠습니까?\n\n업데이트될 내용:\n${optionReservations
-        .map(
-          (r) =>
-            `• ${r.renter_name}: ${r.sd_option ? `SD ${r.sd_option}` : ""} ${
-              r.data_transmission ? "데이터전송" : ""
-            }`.trim()
+      `${
+        optionReservations.length
+      }개의 예약에 옵션을 일괄 업데이트하시겠습니까?\n\n업데이트될 내용:\n${optionReservations
+        .map((r) =>
+          `• ${r.renter_name}: ${r.sd_option ? `SD ${r.sd_option}` : ""} ${
+            r.data_transmission ? "데이터전송" : ""
+          }`.trim()
         )
         .slice(0, 5)
         .join("\n")}${
@@ -913,7 +915,15 @@ export default function CalendarPage() {
 
       if (response.ok && result.success) {
         alert(
-          `예약 옵션이 성공적으로 업데이트되었습니다.\n예약번호: ${matchedReservation.existing_reservation_id}\n${matchedReservation.sd_option ? `SD 옵션: ${matchedReservation.sd_option}` : ""}\n${matchedReservation.data_transmission ? "데이터 전송: 활성화" : ""}`
+          `예약 옵션이 성공적으로 업데이트되었습니다.\n예약번호: ${
+            matchedReservation.existing_reservation_id
+          }\n${
+            matchedReservation.sd_option
+              ? `SD 옵션: ${matchedReservation.sd_option}`
+              : ""
+          }\n${
+            matchedReservation.data_transmission ? "데이터 전송: 활성화" : ""
+          }`
         );
       } else {
         alert(
@@ -1310,7 +1320,9 @@ export default function CalendarPage() {
                     let optionFilter = true;
                     if (showOptionsOnly) {
                       // SD카드 옵션이나 데이터 전송이 있는 것만
-                      optionFilter = !!(reservation.sd_option || reservation.data_transmission);
+                      optionFilter = !!(
+                        reservation.sd_option || reservation.data_transmission
+                      );
                     }
 
                     return matchFilter && optionFilter;
@@ -1486,9 +1498,12 @@ export default function CalendarPage() {
                                 이미 생성됨
                               </span>
                               {/* SD카드/데이터전송 옵션이 있는 경우 업데이트 버튼 표시 */}
-                              {(reservation.sd_option || reservation.data_transmission) && (
+                              {(reservation.sd_option ||
+                                reservation.data_transmission) && (
                                 <Button
-                                  onClick={() => handleUpdateReservation(reservation)}
+                                  onClick={() =>
+                                    handleUpdateReservation(reservation)
+                                  }
                                   size="sm"
                                   variant="outline"
                                   className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300"
@@ -1508,7 +1523,9 @@ export default function CalendarPage() {
                             </>
                           ) : convertToReservationDto(reservation) ? (
                             <Button
-                              onClick={() => handleCreateReservation(reservation)}
+                              onClick={() =>
+                                handleCreateReservation(reservation)
+                              }
                               size="sm"
                               variant="outline"
                               className="text-xs"
@@ -1538,7 +1555,7 @@ export default function CalendarPage() {
             {/* 필터링 결과가 비어있을 때 메시지 */}
             {matchedReservations.filter((r) => {
               const confidence = r.match_confidence || 0;
-              
+
               // 매칭도 필터
               let matchFilter = true;
               if (showIncompleteOnly) {

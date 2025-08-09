@@ -50,7 +50,6 @@ const formSchema = z.object({
     "GP13",
     "GP12",
     "GP11",
-    "GP8",
     "POCKET3",
     "ACTION5",
     "S23",
@@ -58,11 +57,10 @@ const formSchema = z.object({
     "PS5",
     "GLAMPAM",
     "AIRWRAP",
-    "AIRSTRAIGHT",
     "INSTA360",
     "STROLLER",
-    "WAGON",
     "MINIEVO",
+    "OJM360",
     "ETC",
   ] as const),
   pickup_date: z.date(),
@@ -78,7 +76,10 @@ const formSchema = z.object({
   renter_email: z.string().optional(),
   renter_address: z.string(),
   data_transmission: z.boolean().default(false),
-  sd_option: z.enum(["대여", "구매", "구매+대여"] as const).nullable().optional(),
+  sd_option: z
+    .enum(["대여", "구매", "구매+대여"] as const)
+    .nullable()
+    .optional(),
   reservation_site: z.enum([
     "naver",
     "forholiday",
@@ -143,21 +144,32 @@ export function RentalEditForm({
     resolver: zodResolver(formSchema) as any,
     defaultValues: {
       device_category: (rental.device_category || "GP13") as any,
-      pickup_date: rental.pickup_date ? parse(rental.pickup_date, "yyyy-MM-dd", new Date()) : new Date(),
-      pickup_time: rental.pickup_time ? rental.pickup_time.slice(0, 5) : "09:00",
-      return_date: rental.return_date ? parse(rental.return_date, "yyyy-MM-dd", new Date()) : new Date(),
-      return_time: rental.return_time ? rental.return_time.slice(0, 5) : "18:00",
+      pickup_date: rental.pickup_date
+        ? parse(rental.pickup_date, "yyyy-MM-dd", new Date())
+        : new Date(),
+      pickup_time: rental.pickup_time
+        ? rental.pickup_time.slice(0, 5)
+        : "09:00",
+      return_date: rental.return_date
+        ? parse(rental.return_date, "yyyy-MM-dd", new Date())
+        : new Date(),
+      return_time: rental.return_time
+        ? rental.return_time.slice(0, 5)
+        : "18:00",
       pickup_method: (rental.pickup_method || "T1") as PickupMethod,
       return_method: (rental.return_method || "T1") as ReturnMethod,
       renter_name: rental.renter_name || "",
-      contact_input_type: rental.contact_image_url ? ("image" as const) : ("text" as const),
+      contact_input_type: rental.contact_image_url
+        ? ("image" as const)
+        : ("text" as const),
       contact_image_url: rental.contact_image_url || "",
       renter_phone: rental.renter_phone || "",
       renter_email: rental.renter_email || "",
       renter_address: rental.renter_address || "",
       data_transmission: Boolean(rental.data_transmission),
       sd_option: rental.sd_option as "대여" | "구매" | "구매+대여" | undefined,
-      reservation_site: (rental.reservation_site || "forholiday") as ReservationSite,
+      reservation_site: (rental.reservation_site ||
+        "forholiday") as ReservationSite,
       order_number: rental.order_number || "",
       description: rental.description || "",
       status: (rental.status || "pending") as ReservationStatus,
@@ -204,8 +216,14 @@ export function RentalEditForm({
         ...data,
         pickup_date: format(data.pickup_date, "yyyy-MM-dd"),
         return_date: format(data.return_date, "yyyy-MM-dd"),
-        pickup_time: data.pickup_time.length === 5 ? `${data.pickup_time}:00` : data.pickup_time,
-        return_time: data.return_time.length === 5 ? `${data.return_time}:00` : data.return_time,
+        pickup_time:
+          data.pickup_time.length === 5
+            ? `${data.pickup_time}:00`
+            : data.pickup_time,
+        return_time:
+          data.return_time.length === 5
+            ? `${data.return_time}:00`
+            : data.return_time,
       };
 
       console.log("RentalEditForm - Submitting data:", formattedData);
@@ -230,7 +248,10 @@ export function RentalEditForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit, handleInvalid)} className="space-y-4">
+      <form
+        onSubmit={form.handleSubmit(handleSubmit, handleInvalid)}
+        className="space-y-4"
+      >
         {/* 1. 예약 정보 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField

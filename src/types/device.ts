@@ -169,10 +169,10 @@ export const DEVICE_FEATURES = {
     "GP12",
     "GP11",
     "GP10",
-    "GP8",
     "POCKET3",
     "ACTION5",
     "INSTA360",
+    "OJM360",
   ] as DeviceCategory[],
 };
 
