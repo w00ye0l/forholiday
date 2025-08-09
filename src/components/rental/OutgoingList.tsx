@@ -87,7 +87,7 @@ export function OutgoingList({
     null
   );
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
@@ -151,12 +151,18 @@ export function OutgoingList({
   const timeOptions = generateTimeOptions();
 
   // 상태별 카드 스타일 반환
-  const getCardStyle = (status: ReservationStatus) => {
+  const getCardStyle = (
+    status: ReservationStatus,
+    deviceTagName?: string | null
+  ) => {
     const baseClasses = "p-3 shadow-sm border-l-4";
 
     switch (status) {
       case "pending":
-        // 수령전 - 하얀색/무색
+        // 수령전 - 기기 할당 여부에 따라 색상 변경
+        if (deviceTagName) {
+          return `${baseClasses} bg-teal-50 border-l-teal-600`;
+        }
         return `${baseClasses} bg-white border-l-gray-400`;
       case "picked_up":
         // 수령완료 - 파란색
@@ -308,222 +314,227 @@ export function OutgoingList({
     <>
       <div className="grid gap-2 md:gap-4 md:grid-cols-2 xl:grid-cols-3">
         {paginatedRentals.map((rental) => (
-        <Card key={rental.id} className={getCardStyle(rental.status)}>
-          <div className="flex flex-col gap-2 text-sm">
-            <div className="flex gap-2 justify-between">
-              {/* 메인 정보 (이름, 연락처, 시간) */}
-              <div className="flex flex-col justify-between gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-base">
-                    {rental.renter_name}
-                  </span>
+          <Card
+            key={rental.id}
+            className={getCardStyle(rental.status, rental.device_tag_name)}
+          >
+            <div className="flex flex-col gap-2 text-sm">
+              <div className="flex gap-2 justify-between">
+                {/* 메인 정보 (이름, 연락처, 시간) */}
+                <div className="flex flex-col justify-between gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-base">
+                      {rental.renter_name}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 flex gap-2 items-center">
+                    <CalendarIcon className="w-3 h-3" />
+                    <span>
+                      {format(new Date(rental.pickup_date), "yyyy.MM.dd", {
+                        locale: ko,
+                      })}{" "}
+                      {rental.pickup_time.slice(0, 5)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 flex gap-2 items-center">
+                    <MapPinIcon className="w-3 h-3" />
+                    <span>{PICKUP_METHOD_LABELS[rental.pickup_method]}</span>
+                  </div>
+                  {rental.pickup_method === "delivery" &&
+                    rental.renter_address && (
+                      <div className="text-xs text-gray-600 flex gap-2 items-center">
+                        <Map className="min-w-3 min-h-3 w-3 h-3" />
+                        <span className="text-xs text-gray-600 break-all">
+                          {rental.renter_address}
+                        </span>
+                      </div>
+                    )}
+                  <div className="text-xs text-gray-600 flex gap-2 items-center">
+                    <PhoneIcon className="min-w-3 min-h-3 w-3 h-3" />
+                    <span className="text-xs text-gray-600 break-all">
+                      {rental.renter_phone}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-600 flex gap-2 items-center">
-                  <CalendarIcon className="w-3 h-3" />
-                  <span>
-                    {format(new Date(rental.pickup_date), "yyyy.MM.dd", {
-                      locale: ko,
-                    })}{" "}
-                    {rental.pickup_time.slice(0, 5)}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-600 flex gap-2 items-center">
-                  <MapPinIcon className="w-3 h-3" />
-                  <span>{PICKUP_METHOD_LABELS[rental.pickup_method]}</span>
-                </div>
-                {rental.pickup_method === "delivery" &&
-                  rental.renter_address && (
-                    <div className="text-xs text-gray-600 flex gap-2 items-center">
-                      <Map className="min-w-3 min-h-3 w-3 h-3" />
-                      <span className="text-xs text-gray-600 break-all">
-                        {rental.renter_address}
-                      </span>
-                    </div>
-                  )}
-                <div className="text-xs text-gray-600 flex gap-2 items-center">
-                  <PhoneIcon className="min-w-3 min-h-3 w-3 h-3" />
-                  <span className="text-xs text-gray-600 break-all">
-                    {rental.renter_phone}
-                  </span>
-                </div>
-              </div>
 
-              <div className="flex flex-col items-end gap-2 text-sm">
-                {/* 수정 버튼 */}
-                <div className="w-36 flex justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    onClick={() => {
-                      setEditingRental(rental);
-                      setIsDialogOpen(true);
-                    }}
-                  >
-                    <EditIcon className="w-3 h-3" />
-                  </Button>
-                </div>
-                {/* 기기 선택/표시 */}
-                <div className="w-36">
-                  {rental.status === "pending" ? (
-                    <Select
-                      value={
-                        rental.device_tag_name ||
-                        selectedDevices[rental.id] ||
-                        "placeholder"
-                      }
-                      onValueChange={(value) => {
-                        setSelectedDevices((prev) => ({
-                          ...prev,
-                          [rental.id]: value,
-                        }));
-                        handleDeviceSelect(rental.id, value);
+                <div className="flex flex-col items-end gap-2 text-sm">
+                  {/* 수정 버튼 */}
+                  <div className="w-36 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => {
+                        setEditingRental(rental);
+                        setIsDialogOpen(true);
                       }}
-                      disabled={isUpdating[rental.id]}
                     >
-                      <SelectTrigger
-                        className={`h-7 text-sm ${
+                      <EditIcon className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  {/* 기기 선택/표시 */}
+                  <div className="w-36">
+                    {rental.status === "pending" ? (
+                      <Select
+                        value={
+                          rental.device_tag_name ||
+                          selectedDevices[rental.id] ||
+                          "placeholder"
+                        }
+                        onValueChange={(value) => {
+                          setSelectedDevices((prev) => ({
+                            ...prev,
+                            [rental.id]: value,
+                          }));
+                          handleDeviceSelect(rental.id, value);
+                        }}
+                        disabled={isUpdating[rental.id]}
+                      >
+                        <SelectTrigger
+                          className={`h-7 text-sm ${
+                            rental.device_tag_name
+                              ? "bg-device-assigned text-white border-device-assigned"
+                              : "bg-white border-gray-400"
+                          }`}
+                        >
+                          <SelectValue>
+                            {rental.device_tag_name ||
+                              (selectedDevices[rental.id] &&
+                              selectedDevices[rental.id] !== "placeholder"
+                                ? selectedDevices[rental.id]
+                                : `${
+                                    DEVICE_CATEGORY_LABELS[
+                                      rental.device_category
+                                    ]
+                                  } 선택`)}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="placeholder">
+                            {`${
+                              DEVICE_CATEGORY_LABELS[rental.device_category]
+                            } 선택`}
+                          </SelectItem>
+                          {devices
+                            .filter(
+                              (device) =>
+                                device.category === rental.device_category
+                            )
+                            .map((device) => (
+                              <SelectItem
+                                key={device.tag_name}
+                                value={device.tag_name}
+                              >
+                                {device.tag_name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div
+                        className={`text-sm font-mono px-2 py-1 rounded-md border text-center ${
                           rental.device_tag_name
-                            ? "bg-device-assigned text-white border-device-assigned"
-                            : "bg-white border-gray-400"
+                            ? "bg-device-assigned text-white"
+                            : "bg-white text-gray-800"
                         }`}
                       >
-                        <SelectValue>
-                          {rental.device_tag_name ||
-                            (selectedDevices[rental.id] &&
-                            selectedDevices[rental.id] !== "placeholder"
-                              ? selectedDevices[rental.id]
-                              : `${
-                                  DEVICE_CATEGORY_LABELS[rental.device_category]
-                                } 선택`)}
-                        </SelectValue>
+                        {rental.device_tag_name || rental.device_category}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 상태 수동 변경 (출고관리용 - 반납완료, 미반납 제외) */}
+                  <div className="w-24">
+                    <Select
+                      value={rental.status}
+                      onValueChange={(value: ReservationStatus) =>
+                        handleStatusChange(rental.id, value)
+                      }
+                      disabled={isUpdating[rental.id]}
+                    >
+                      <SelectTrigger className="h-6 text-xs bg-white border-gray-300">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="placeholder">
-                          {`${
-                            DEVICE_CATEGORY_LABELS[rental.device_category]
-                          } 선택`}
-                        </SelectItem>
-                        {devices
-                          .filter(
-                            (device) =>
-                              device.category === rental.device_category
-                          )
-                          .map((device) => (
-                            <SelectItem
-                              key={device.tag_name}
-                              value={device.tag_name}
-                            >
-                              {device.tag_name}
+                        {/* 출고관리에서는 반납완료 상태 제외 */}
+                        {Object.entries(STATUS_MAP)
+                          .filter(([status]) => status !== "returned")
+                          .map(([status, statusInfo]) => (
+                            <SelectItem key={status} value={status}>
+                              {statusInfo.label}
                             </SelectItem>
                           ))}
                       </SelectContent>
                     </Select>
-                  ) : (
-                    <div
-                      className={`text-sm font-mono px-2 py-1 rounded-md border text-center ${
-                        rental.device_tag_name
-                          ? "bg-device-assigned text-white"
-                          : "bg-white text-gray-800"
-                      }`}
-                    >
-                      {rental.device_tag_name || rental.device_category}
-                    </div>
-                  )}
-                </div>
-
-                {/* 상태 수동 변경 (출고관리용 - 반납완료, 미반납 제외) */}
-                <div className="w-24">
-                  <Select
-                    value={rental.status}
-                    onValueChange={(value: ReservationStatus) =>
-                      handleStatusChange(rental.id, value)
-                    }
-                    disabled={isUpdating[rental.id]}
-                  >
-                    <SelectTrigger className="h-6 text-xs bg-white border-gray-300">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {/* 출고관리에서는 반납완료 상태 제외 */}
-                      {Object.entries(STATUS_MAP)
-                        .filter(([status]) => status !== "returned")
-                        .map(([status, statusInfo]) => (
-                          <SelectItem key={status} value={status}>
-                            {statusInfo.label}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* SD 카드, 데이터 전송 옵션 */}
-            <div>
-              {rental.sd_option && (
-                <Badge variant="secondary" className="border-gray-400">
-                  SD카드 {rental.sd_option}
-                </Badge>
-              )}
-              {rental.data_transmission && (
-                <Badge variant="secondary" className="border-gray-400">
-                  데이터 전송
-                </Badge>
-              )}
-            </div>
+              {/* SD 카드, 데이터 전송 옵션 */}
+              <div>
+                {rental.sd_option && (
+                  <Badge variant="secondary" className="border-gray-400">
+                    SD카드 {rental.sd_option}
+                  </Badge>
+                )}
+                {rental.data_transmission && (
+                  <Badge variant="secondary" className="border-gray-400">
+                    데이터 전송
+                  </Badge>
+                )}
+              </div>
 
-            {/* 비고 및 로딩 */}
-            <div className="flex items-center gap-1">
-              {editingNotes[rental.id] ? (
-                <>
-                  <Input
-                    value={notes[rental.id] || ""}
-                    onChange={(e) =>
-                      setNotes((prev) => ({
-                        ...prev,
-                        [rental.id]: e.target.value,
-                      }))
-                    }
-                    placeholder="비고"
-                    className="h-7 text-sm flex-1 min-w-0 bg-white border-gray-400"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => handleNotesUpdate(rental.id)}
-                    className="h-7 w-7 p-0 text-xs flex-shrink-0"
-                  >
-                    ✓
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <p
-                    className="text-sm text-gray-600 break-all min-w-0"
-                    title={rental.description || "비고 없음"}
-                  >
-                    비고: {rental.description || "비고 없음"}
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      startEditingNotes(rental.id, rental.description)
-                    }
-                    className="h-7 w-7 p-0 text-xs flex-shrink-0"
-                  >
-                    <PencilIcon className="w-3 h-3" />
-                  </Button>
-                </>
-              )}
+              {/* 비고 및 로딩 */}
+              <div className="flex items-center gap-1">
+                {editingNotes[rental.id] ? (
+                  <>
+                    <Input
+                      value={notes[rental.id] || ""}
+                      onChange={(e) =>
+                        setNotes((prev) => ({
+                          ...prev,
+                          [rental.id]: e.target.value,
+                        }))
+                      }
+                      placeholder="비고"
+                      className="h-7 text-sm flex-1 min-w-0 bg-white border-gray-400"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => handleNotesUpdate(rental.id)}
+                      className="h-7 w-7 p-0 text-xs flex-shrink-0"
+                    >
+                      ✓
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p
+                      className="text-sm text-gray-600 break-all min-w-0"
+                      title={rental.description || "비고 없음"}
+                    >
+                      비고: {rental.description || "비고 없음"}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        startEditingNotes(rental.id, rental.description)
+                      }
+                      className="h-7 w-7 p-0 text-xs flex-shrink-0"
+                    >
+                      <PencilIcon className="w-3 h-3" />
+                    </Button>
+                  </>
+                )}
 
-              {isUpdating[rental.id] && (
-                <div className="animate-spin h-3 w-3 border border-blue-500 border-t-transparent rounded-full ml-1 flex-shrink-0"></div>
-              )}
+                {isUpdating[rental.id] && (
+                  <div className="animate-spin h-3 w-3 border border-blue-500 border-t-transparent rounded-full ml-1 flex-shrink-0"></div>
+                )}
+              </div>
             </div>
-          </div>
-        </Card>
-      ))}
+          </Card>
+        ))}
 
         {rentals.length === 0 && (
           <div className="col-span-full text-center py-6 text-gray-500 text-sm">
@@ -566,7 +577,9 @@ export function OutgoingList({
 
               <PaginationItem>
                 <PaginationNext
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  onClick={() =>
+                    setCurrentPage(Math.min(totalPages, currentPage + 1))
+                  }
                   className={
                     currentPage === totalPages
                       ? "pointer-events-none opacity-50"
@@ -593,9 +606,7 @@ export function OutgoingList({
               {/* 기본 정보 - 2컬럼 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">
-                    예약자명
-                  </label>
+                  <label className="text-sm font-medium">예약자명</label>
                   <Input
                     value={editingRental.renter_name}
                     onChange={(e) => {
@@ -610,9 +621,7 @@ export function OutgoingList({
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">
-                    연락처
-                  </label>
+                  <label className="text-sm font-medium">연락처</label>
                   <Input
                     value={editingRental.renter_phone}
                     onChange={(e) => {
@@ -630,9 +639,7 @@ export function OutgoingList({
 
               {/* 이메일 - 1컬럼 */}
               <div>
-                <label className="text-sm font-medium">
-                  이메일
-                </label>
+                <label className="text-sm font-medium">이메일</label>
                 <Input
                   value={editingRental.renter_email || ""}
                   onChange={(e) => {
@@ -651,35 +658,27 @@ export function OutgoingList({
               {/* 수령 날짜/시간 - 2컬럼 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">
-                    수령 날짜
-                  </label>
+                  <label className="text-sm font-medium">수령 날짜</label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal text-sm",
-                          !editingRental.pickup_date &&
-                            "text-muted-foreground"
+                          !editingRental.pickup_date && "text-muted-foreground"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {editingRental.pickup_date ? (
-                          format(
-                            new Date(editingRental.pickup_date),
-                            "PPP",
-                            { locale: ko }
-                          )
+                          format(new Date(editingRental.pickup_date), "PPP", {
+                            locale: ko,
+                          })
                         ) : (
                           <span>수령 날짜를 선택하세요</span>
                         )}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent
-                      className="w-auto p-0"
-                      align="start"
-                    >
+                    <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
                         selected={
@@ -702,9 +701,7 @@ export function OutgoingList({
                   </Popover>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">
-                    수령 시간
-                  </label>
+                  <label className="text-sm font-medium">수령 시간</label>
                   <Select
                     value={
                       editingRental.pickup_time
@@ -729,10 +726,7 @@ export function OutgoingList({
                     </SelectTrigger>
                     <SelectContent>
                       {timeOptions.map((time) => (
-                        <SelectItem
-                          key={`pickup-${time}`}
-                          value={time}
-                        >
+                        <SelectItem key={`pickup-${time}`} value={time}>
                           {time}
                         </SelectItem>
                       ))}
@@ -744,35 +738,27 @@ export function OutgoingList({
               {/* 반납 날짜/시간 - 2컬럼 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">
-                    반납 날짜
-                  </label>
+                  <label className="text-sm font-medium">반납 날짜</label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal text-sm",
-                          !editingRental.return_date &&
-                            "text-muted-foreground"
+                          !editingRental.return_date && "text-muted-foreground"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {editingRental.return_date ? (
-                          format(
-                            new Date(editingRental.return_date),
-                            "PPP",
-                            { locale: ko }
-                          )
+                          format(new Date(editingRental.return_date), "PPP", {
+                            locale: ko,
+                          })
                         ) : (
                           <span>반납 날짜를 선택하세요</span>
                         )}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent
-                      className="w-auto p-0"
-                      align="start"
-                    >
+                    <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
                         selected={
@@ -795,9 +781,7 @@ export function OutgoingList({
                   </Popover>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">
-                    반납 시간
-                  </label>
+                  <label className="text-sm font-medium">반납 시간</label>
                   <Select
                     value={
                       editingRental.return_time
@@ -822,10 +806,7 @@ export function OutgoingList({
                     </SelectTrigger>
                     <SelectContent>
                       {timeOptions.map((time) => (
-                        <SelectItem
-                          key={`return-${time}`}
-                          value={time}
-                        >
+                        <SelectItem key={`return-${time}`} value={time}>
                           {time}
                         </SelectItem>
                       ))}
@@ -837,9 +818,7 @@ export function OutgoingList({
               {/* 수령/반납 방법 - 2컬럼 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">
-                    수령 방법
-                  </label>
+                  <label className="text-sm font-medium">수령 방법</label>
                   <Select
                     value={editingRental.pickup_method}
                     onValueChange={(value) => {
@@ -866,9 +845,7 @@ export function OutgoingList({
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">
-                    반납 방법
-                  </label>
+                  <label className="text-sm font-medium">반납 방법</label>
                   <Select
                     value={editingRental.return_method}
                     onValueChange={(value) => {
@@ -903,15 +880,9 @@ export function OutgoingList({
               ) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">
-                      데이터 전송
-                    </label>
+                    <label className="text-sm font-medium">데이터 전송</label>
                     <Select
-                      value={
-                        editingRental.data_transmission
-                          ? "true"
-                          : "false"
-                      }
+                      value={editingRental.data_transmission ? "true" : "false"}
                       onValueChange={(value) => {
                         if (editingRental) {
                           setEditingRental({
@@ -926,9 +897,7 @@ export function OutgoingList({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="true">예</SelectItem>
-                        <SelectItem value="false">
-                          아니오
-                        </SelectItem>
+                        <SelectItem value="false">아니오</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -940,9 +909,7 @@ export function OutgoingList({
                 editingRental.device_category
               ) && (
                 <div>
-                  <label className="text-sm font-medium">
-                    SD 카드 옵션
-                  </label>
+                  <label className="text-sm font-medium">SD 카드 옵션</label>
                   <Select
                     value={editingRental.sd_option || "none"}
                     onValueChange={(value) => {
@@ -952,10 +919,7 @@ export function OutgoingList({
                           sd_option:
                             value === "none"
                               ? undefined
-                              : (value as
-                                  | "대여"
-                                  | "구매"
-                                  | "구매+대여"),
+                              : (value as "대여" | "구매" | "구매+대여"),
                         });
                       }
                     }}
@@ -967,9 +931,7 @@ export function OutgoingList({
                       <SelectItem value="none">없음</SelectItem>
                       <SelectItem value="대여">대여</SelectItem>
                       <SelectItem value="구매">구매</SelectItem>
-                      <SelectItem value="구매+대여">
-                        구매+대여
-                      </SelectItem>
+                      <SelectItem value="구매+대여">구매+대여</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -978,9 +940,7 @@ export function OutgoingList({
               {/* 주소와 예약사이트 정보 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">
-                    주소
-                  </label>
+                  <label className="text-sm font-medium">주소</label>
                   <Input
                     value={editingRental.renter_address}
                     onChange={(e) => {
@@ -996,9 +956,7 @@ export function OutgoingList({
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">
-                    예약 사이트
-                  </label>
+                  <label className="text-sm font-medium">예약 사이트</label>
                   <Select
                     value={editingRental.reservation_site}
                     onValueChange={(value) => {
@@ -1056,7 +1014,7 @@ export function OutgoingList({
                 <Button
                   onClick={async () => {
                     if (!editingRental) return;
-                    
+
                     try {
                       // 예약 정보 업데이트
                       const { error } = await supabase
@@ -1065,22 +1023,16 @@ export function OutgoingList({
                           renter_name: editingRental.renter_name,
                           renter_phone: editingRental.renter_phone,
                           renter_email: editingRental.renter_email,
-                          renter_address:
-                            editingRental.renter_address,
-                          pickup_method:
-                            editingRental.pickup_method,
+                          renter_address: editingRental.renter_address,
+                          pickup_method: editingRental.pickup_method,
                           pickup_date: editingRental.pickup_date,
                           pickup_time: editingRental.pickup_time,
-                          return_method:
-                            editingRental.return_method,
+                          return_method: editingRental.return_method,
                           return_date: editingRental.return_date,
                           return_time: editingRental.return_time,
-                          reservation_site:
-                            editingRental.reservation_site,
-                          data_transmission:
-                            editingRental.data_transmission,
-                          sd_option:
-                            editingRental.sd_option || null,
+                          reservation_site: editingRental.reservation_site,
+                          data_transmission: editingRental.data_transmission,
+                          sd_option: editingRental.sd_option || null,
                           description: editingRental.description,
                         })
                         .eq("id", editingRental.id);
