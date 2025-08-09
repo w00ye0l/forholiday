@@ -31,7 +31,7 @@ export default function StorageOutgoingPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [locationTab, setLocationTab] = useState("all");
-  const [statusTab, setStatusTab] = useState("all");
+  const [statusTab, setStatusTab] = useState("stored");
 
   // 검색 상태
   const [searchTerm, setSearchTerm] = useState("");
@@ -63,7 +63,7 @@ export default function StorageOutgoingPage() {
     if (storage.pickup_location) {
       return storage.pickup_location;
     }
-    
+
     // 없으면 notes에서 찾기 (하위 호환성)
     const notes = storage.notes?.toLowerCase() || "";
 
@@ -353,21 +353,15 @@ export default function StorageOutgoingPage() {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="all">
             전체{" "}
-            <span className="ml-1 text-xs">
-              ({getLocationTabCount("all")})
-            </span>
+            <span className="ml-1 text-xs">({getLocationTabCount("all")})</span>
           </TabsTrigger>
           <TabsTrigger value="T1">
             터미널1{" "}
-            <span className="ml-1 text-xs">
-              ({getLocationTabCount("T1")})
-            </span>
+            <span className="ml-1 text-xs">({getLocationTabCount("T1")})</span>
           </TabsTrigger>
           <TabsTrigger value="T2">
             터미널2{" "}
-            <span className="ml-1 text-xs">
-              ({getLocationTabCount("T2")})
-            </span>
+            <span className="ml-1 text-xs">({getLocationTabCount("T2")})</span>
           </TabsTrigger>
           <TabsTrigger value="office">
             사무실{" "}
