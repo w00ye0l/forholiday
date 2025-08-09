@@ -25,6 +25,12 @@ const DeviceFilter = lazy(() =>
   }))
 );
 
+const InventoryNotes = lazy(() =>
+  import("@/components/inventory/InventoryNotes").then((module) => ({
+    default: module.InventoryNotes,
+  }))
+);
+
 const DAYS_TO_SHOW = 14; // 과거/미래로 보여줄 날짜 수
 
 // 인벤토리 대시보드 컴포넌트
@@ -121,6 +127,13 @@ const InventoryDashboard = React.memo(() => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* 메모장 영역 */}
+      <div className="mb-4">
+        <Suspense fallback={<InventoryLoadingSkeleton />}>
+          <InventoryNotes />
+        </Suspense>
       </div>
 
       {/* 필터 영역 - 모든 화면에서 상단 */}
