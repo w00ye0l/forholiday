@@ -37,8 +37,15 @@ import {
   PICKUP_METHOD_LABELS,
   RETURN_METHOD_LABELS,
   RESERVATION_SITE_LABELS,
+  PickupMethod,
+  ReturnMethod,
+  ReservationSite,
 } from "@/types/rental";
-import { DEVICE_FEATURES, DEVICE_CATEGORY_LABELS } from "@/types/device";
+import { 
+  DEVICE_FEATURES, 
+  DEVICE_CATEGORY_LABELS,
+  DeviceCategory,
+} from "@/types/device";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -60,30 +67,20 @@ import Link from "next/link";
  * 예약 사이트
  */
 
+// DEVICE_CATEGORY_LABELS의 키를 배열로 변환하여 타입 안전성 보장
+const deviceCategories = Object.keys(DEVICE_CATEGORY_LABELS) as [DeviceCategory, ...DeviceCategory[]];
+const pickupMethods = Object.keys(PICKUP_METHOD_LABELS) as [PickupMethod, ...PickupMethod[]];
+const returnMethods = Object.keys(RETURN_METHOD_LABELS) as [ReturnMethod, ...ReturnMethod[]];
+const reservationSites = Object.keys(RESERVATION_SITE_LABELS) as [ReservationSite, ...ReservationSite[]];
+
 const formSchema = z.object({
-  device_category: z.enum([
-    "GP13",
-    "GP12",
-    "GP11",
-    "POCKET3",
-    "ACTION5",
-    "S23",
-    "S24",
-    "PS5",
-    "GLAMPAM",
-    "AIRWRAP",
-    "INSTA360",
-    "STROLLER",
-    "MINIEVO",
-    "OJM360",
-    "ETC",
-  ] as const),
+  device_category: z.enum(deviceCategories),
   pickup_date: z.date(),
   pickup_time: z.string(),
   return_date: z.date(),
   return_time: z.string(),
-  pickup_method: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const),
-  return_method: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const),
+  pickup_method: z.enum(pickupMethods),
+  return_method: z.enum(returnMethods),
   renter_name: z.string(),
   contact_input_type: z.enum(["text", "image"] as const).default("text"),
   contact_image_url: z.string().optional(),
@@ -92,20 +89,7 @@ const formSchema = z.object({
   renter_address: z.string(),
   data_transmission: z.boolean().default(false),
   sd_option: z.enum(["대여", "구매", "구매+대여"] as const).optional(),
-  reservation_site: z.enum([
-    "naver",
-    "forholiday",
-    "creatrip",
-    "klook",
-    "seoulpass",
-    "trip_com",
-    "rakuten",
-    "triple",
-    "forholidayg",
-    "myrealtrip",
-    "waug",
-    "hanatour",
-  ] as const),
+  reservation_site: z.enum(reservationSites),
   order_number: z.string().min(1, "주문번호는 필수입니다"),
   description: z.string().optional(),
 });
