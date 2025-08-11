@@ -48,6 +48,10 @@ import {
   PICKUP_METHOD_LABELS,
 } from "@/types/rental";
 import {
+  DeviceCategory,
+  DEVICE_CATEGORY_LABELS,
+} from "@/types/device";
+import {
   exportToExcel,
   transformRentalDataForExcel,
   transformRentalStatsForExcel,
@@ -381,14 +385,9 @@ export default function RentalsPage() {
     }
   };
 
-  // 고유한 카테고리 목록 추출
-  const getUniqueCategories = () => {
-    const categories = rentals
-      .map((rental) => rental.devices.category)
-      .filter((category) => category)
-      .filter((category, index, arr) => arr.indexOf(category) === index)
-      .sort();
-    return categories;
+  // 전체 카테고리 목록 (타입에서 가져옴)
+  const getAllCategories = () => {
+    return Object.keys(DEVICE_CATEGORY_LABELS) as DeviceCategory[];
   };
 
   // 상태별 개수 계산 (필터링된 결과 기준)
@@ -586,9 +585,9 @@ export default function RentalsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">전체 카테고리</SelectItem>
-                    {getUniqueCategories().map((category) => (
+                    {getAllCategories().map((category) => (
                       <SelectItem key={category} value={category}>
-                        {category}
+                        {DEVICE_CATEGORY_LABELS[category]}
                       </SelectItem>
                     ))}
                   </SelectContent>
