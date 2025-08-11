@@ -1,8 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-
 import { createClient } from "@/lib/supabase/server";
 
 // 에러 상태 타입을 정의합니다.
@@ -12,7 +10,7 @@ interface LoginState {
 }
 
 export async function login(
-  prevState: LoginState,
+  _prevState: LoginState,
   formData: FormData
 ): Promise<LoginState> {
   const username = String(formData.get("email") ?? "");
@@ -29,6 +27,9 @@ export async function login(
     return { error: error.message };
   }
 
+  // 로그인 성공 시 레이아웃과 모든 페이지를 재검증
+  revalidatePath("/", "layout");
+  
   // 성공 시 성공 상태를 반환합니다.
   return { error: null, success: true };
 }

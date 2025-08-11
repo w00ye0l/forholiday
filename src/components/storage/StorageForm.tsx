@@ -49,6 +49,11 @@ const formSchema = z.object({
   quantity: z.number().optional(),
   customer_name: z.string().optional(),
   phone_number: z.string().optional(),
+  customer_email: z
+    .string()
+    .email("올바른 이메일 형식이 아닙니다")
+    .optional()
+    .or(z.literal("")),
   tag_number: z.string().optional(),
   drop_off_date: z.date().optional(),
   drop_off_time: z.string().optional(),
@@ -99,6 +104,7 @@ export default function StorageForm({
       quantity: 1,
       customer_name: "",
       phone_number: "",
+      customer_email: "",
       tag_number: "",
       drop_off_time: "",
       drop_off_location: "T1",
@@ -117,6 +123,7 @@ export default function StorageForm({
         quantity: storage.quantity,
         customer_name: storage.customer_name,
         phone_number: storage.phone_number,
+        customer_email: storage.customer_email || "",
         tag_number: storage.tag_number || "",
         drop_off_date: new Date(storage.drop_off_date),
         drop_off_time: storage.drop_off_time,
@@ -146,11 +153,16 @@ export default function StorageForm({
         quantity: data.quantity || 1,
         customer_name: data.customer_name || "",
         phone_number: data.phone_number || "",
+        customer_email: data.customer_email || null,
         tag_number: data.tag_number || null,
-        drop_off_date: data.drop_off_date ? format(data.drop_off_date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
+        drop_off_date: data.drop_off_date
+          ? format(data.drop_off_date, "yyyy-MM-dd")
+          : format(new Date(), "yyyy-MM-dd"),
         drop_off_time: data.drop_off_time || "00:00",
         drop_off_location: data.drop_off_location || "T1",
-        pickup_date: data.pickup_date ? format(data.pickup_date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
+        pickup_date: data.pickup_date
+          ? format(data.pickup_date, "yyyy-MM-dd")
+          : format(new Date(), "yyyy-MM-dd"),
         pickup_time: data.pickup_time || "00:00",
         pickup_location: data.pickup_location || "T1",
         notes: data.notes || null,
@@ -290,6 +302,24 @@ export default function StorageForm({
                   <FormLabel>연락처</FormLabel>
                   <FormControl>
                     <Input {...field} placeholder="연락처" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="customer_email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>이메일</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="email"
+                      placeholder="example@email.com"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
