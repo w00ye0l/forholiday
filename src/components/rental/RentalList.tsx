@@ -118,7 +118,7 @@ export function RentalList({
         <div className="text-gray-500 text-center py-8">
           {searchTerm.trim()
             ? `'${searchTerm}' 검색 결과가 없습니다.`
-            : "예약된 기기가 없습니다."}
+            : "등록된 예약이 없습니다."}
         </div>
       </div>
     );
