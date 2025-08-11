@@ -5,21 +5,19 @@ import { login } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function LoginPage() {
   // login 서버 액션을 직접 useFormState에 전달합니다.
   const [state, formAction] = useFormState(login, { error: null });
-  const router = useRouter();
 
   useEffect(() => {
     if (state.success) {
       alert("로그인 성공");
-      router.push("/");
-      router.refresh(); // Supabase 세션 및 기타 데이터를 다시 가져오도록 강제합니다.
+      // 완전한 페이지 새로고침으로 홈으로 이동
+      window.location.href = "/";
     }
-  }, [state.success, router]);
+  }, [state.success]);
 
   return (
     <div className="flex min-h-screen items-center justify-center">
