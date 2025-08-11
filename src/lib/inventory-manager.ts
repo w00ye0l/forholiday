@@ -9,6 +9,7 @@ import {
 } from "@/types/device";
 import { RentalReservation } from "@/types/rental";
 import { createClient } from "@/lib/supabase/client";
+import { findOptimalDeviceWithTagPriority } from "@/lib/algorithms/auto-assign";
 
 export class InventoryManager {
   private supabase = createClient();
@@ -76,7 +77,143 @@ export class InventoryManager {
   }
 
   /**
-   * 예약에 기기를 자동으로 할당합니다.
+   * 태그 우선 기기 할당 (새로운 알고리즘)
+   */
+  async allocateDeviceWithTagPriority(
+    reservation: RentalReservation
+  ): Promise<DeviceAllocation & { assignmentType?: string; reason?: string }> {
+    try {
+      // 해당 카테고리의 모든 기기 조회
+      const { data: devices, error: devicesError } = await this.supabase
+        .from("devices")
+        .select("*")
+        .eq("category", reservation.device_category)
+        .eq("status", "available");
+
+      if (devicesError) {
+        return {
+          success: false,
+          error_message: `기기 조회 실패: ${devicesError.message}`,
+        };
+      }
+
+      const availableDevices = devices?.map(d => d.tag_name) || [];
+
+      // 기존 예약 이력 조회 (사용 이력 생성용)
+      const { data: reservationHistory, error: historyError } = await this.supabase
+        .from("rental_reservations")
+        .select("device_tag_name, pickup_date, return_date")
+        .neq("status", "returned")
+        .not("device_tag_name", "is", null);
+
+      if (historyError) {
+        return {
+          success: false,
+          error_message: `예약 이력 조회 실패: ${historyError.message}`,
+        };
+      }
+
+      // 디바이스 사용 이력 맵 생성
+      const deviceUsageHistory = new Map();
+      reservationHistory?.forEach((res) => {
+        if (res.device_tag_name) {
+          if (!deviceUsageHistory.has(res.device_tag_name)) {
+            deviceUsageHistory.set(res.device_tag_name, []);
+          }
+          deviceUsageHistory.get(res.device_tag_name).push({
+            pickup_date: res.pickup_date,
+            return_date: res.return_date,
+          });
+        }
+      });
+
+      // 태그 우선 할당 알고리즘 실행
+      const assignmentResult = findOptimalDeviceWithTagPriority(
+        reservation,
+        availableDevices,
+        deviceUsageHistory
+      );
+
+      if (!assignmentResult.success || !assignmentResult.deviceTag) {
+        return {
+          success: false,
+          error_message: assignmentResult.reason || "할당 가능한 기기가 없습니다.",
+          assignmentType: assignmentResult.assignmentType,
+          reason: assignmentResult.reason,
+        };
+      }
+
+      const selectedDevice = devices.find(d => d.tag_name === assignmentResult.deviceTag);
+      if (!selectedDevice) {
+        return {
+          success: false,
+          error_message: "선택된 기기를 찾을 수 없습니다.",
+        };
+      }
+
+      // 기기 상태를 'reserved'로 변경하고 예약 ID 할당
+      const { error: updateError } = await this.supabase
+        .from("devices")
+        .update({
+          status: "reserved",
+          assigned_reservation_id: reservation.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", selectedDevice.id);
+
+      if (updateError) {
+        return {
+          success: false,
+          error_message: `기기 할당 실패: ${updateError.message}`,
+        };
+      }
+
+      // 예약에 기기 태그명 업데이트
+      const { error: reservationUpdateError } = await this.supabase
+        .from("rental_reservations")
+        .update({
+          device_tag_name: selectedDevice.tag_name,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", reservation.id);
+
+      if (reservationUpdateError) {
+        // 롤백: 기기 상태 원복
+        await this.supabase
+          .from("devices")
+          .update({
+            status: "available",
+            assigned_reservation_id: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", selectedDevice.id);
+
+        return {
+          success: false,
+          error_message: `예약 업데이트 실패: ${reservationUpdateError.message}`,
+        };
+      }
+
+      return {
+        success: true,
+        device_id: selectedDevice.id,
+        device_tag_name: selectedDevice.tag_name,
+        assignmentType: assignmentResult.assignmentType,
+        reason: assignmentResult.reason,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error_message:
+          error instanceof Error
+            ? error.message
+            : "알 수 없는 오류가 발생했습니다.",
+      };
+    }
+  }
+
+  /**
+   * 예약에 기기를 자동으로 할당합니다. (기존 방식)
    */
   async allocateDevice(
     reservationId: string,
