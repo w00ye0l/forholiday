@@ -12,6 +12,16 @@ interface DeviceScore {
 }
 
 /**
+ * 태그 우선 할당 결과 인터페이스
+ */
+interface TagAssignmentResult {
+  success: boolean;
+  deviceTag: string | null;
+  assignmentType: 'tag_match' | 'available_fallback' | 'none';
+  reason?: string;
+}
+
+/**
  * 예약에 대해 최적의 디바이스를 찾는 함수
  * 디바이스 사용 이력을 기반으로 가장 효율적인 디바이스를 자동 할당
  * 
@@ -84,4 +94,94 @@ export const findOptimalDevice = (
   
   // 가장 점수가 낮은 (최적의) 디바이스 반환
   return deviceScores.length > 0 ? deviceScores[0].deviceTag : null;
+};
+
+/**
+ * 태그 우선 할당 알고리즘
+ * 1. 예약에 device_tag_name이 지정된 경우, 해당 태그가 사용 가능하면 우선 할당
+ * 2. 태그가 사용 불가능하거나 지정되지 않은 경우, 기존 알고리즘 사용
+ * 
+ * @param reservation - 대상 렌탈 예약 정보 (태그 포함)
+ * @param availableDevices - 사용 가능한 디바이스 태그 목록
+ * @param deviceUsageHistory - 각 디바이스의 사용 이력
+ * @returns 태그 할당 결과 객체
+ */
+export const findOptimalDeviceWithTagPriority = (
+  reservation: RentalReservation,
+  availableDevices: string[],
+  deviceUsageHistory: Map<
+    string,
+    { pickup_date: string; return_date: string }[]
+  >
+): TagAssignmentResult => {
+  const reservationStart = new Date(reservation.pickup_date);
+  const reservationEnd = new Date(reservation.return_date);
+  
+  // 1단계: 예약에 태그가 지정된 경우, 해당 태그 우선 검사
+  if (reservation.device_tag_name) {
+    const requestedTag = reservation.device_tag_name;
+    
+    // 요청된 태그가 사용 가능한 디바이스 목록에 있는지 확인
+    if (availableDevices.includes(requestedTag)) {
+      const tagUsage = deviceUsageHistory.get(requestedTag) || [];
+      
+      // 태그의 시간 충돌 검사
+      const hasConflict = tagUsage.some((usage) => {
+        const usageStart = new Date(usage.pickup_date);
+        const usageEnd = new Date(usage.return_date);
+        
+        return (reservationStart <= usageEnd && reservationEnd >= usageStart);
+      });
+      
+      if (!hasConflict) {
+        // 태그가 사용 가능한 경우 우선 할당
+        return {
+          success: true,
+          deviceTag: requestedTag,
+          assignmentType: 'tag_match',
+          reason: `지정된 태그 '${requestedTag}'가 요청 기간에 사용 가능하여 우선 할당됨`
+        };
+      } else {
+        // 태그가 충돌하는 경우, 기존 알고리즘으로 대체 할당
+        const fallbackDevice = findOptimalDevice(
+          reservation,
+          availableDevices.filter(tag => tag !== requestedTag), // 충돌하는 태그 제외
+          deviceUsageHistory
+        );
+        
+        return {
+          success: fallbackDevice !== null,
+          deviceTag: fallbackDevice,
+          assignmentType: fallbackDevice ? 'available_fallback' : 'none',
+          reason: fallbackDevice 
+            ? `지정된 태그 '${requestedTag}'가 충돌하여 대체 디바이스 '${fallbackDevice}' 할당됨`
+            : `지정된 태그 '${requestedTag}'가 충돌하고 사용 가능한 대체 디바이스가 없음`
+        };
+      }
+    } else {
+      // 요청된 태그가 사용 가능한 목록에 없는 경우
+      const fallbackDevice = findOptimalDevice(reservation, availableDevices, deviceUsageHistory);
+      
+      return {
+        success: fallbackDevice !== null,
+        deviceTag: fallbackDevice,
+        assignmentType: fallbackDevice ? 'available_fallback' : 'none',
+        reason: fallbackDevice
+          ? `지정된 태그 '${requestedTag}'가 사용 불가능하여 대체 디바이스 '${fallbackDevice}' 할당됨`
+          : `지정된 태그 '${requestedTag}'가 사용 불가능하고 사용 가능한 대체 디바이스가 없음`
+      };
+    }
+  }
+  
+  // 2단계: 태그가 지정되지 않은 경우, 기존 알고리즘 사용
+  const optimalDevice = findOptimalDevice(reservation, availableDevices, deviceUsageHistory);
+  
+  return {
+    success: optimalDevice !== null,
+    deviceTag: optimalDevice,
+    assignmentType: optimalDevice ? 'available_fallback' : 'none',
+    reason: optimalDevice
+      ? `태그가 지정되지 않아 최적 디바이스 '${optimalDevice}' 할당됨`
+      : '사용 가능한 디바이스가 없음'
+  };
 };
