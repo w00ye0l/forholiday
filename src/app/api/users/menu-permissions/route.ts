@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { UserRole } from '@/types/profile';
 import { ALL_MENU_ITEMS, getDefaultPermissionsForRole } from '@/lib/constants/menu-permissions';
 
@@ -142,16 +143,29 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // admin은 super_admin의 권한을 수정할 수 없음 (다른 admin은 수정 가능)
     if (currentUserProfile.role === 'admin' && 
-        ['super_admin', 'admin'].includes(targetUserProfile.role)) {
+        targetUserProfile.role === 'super_admin') {
       return NextResponse.json(
-        { success: false, error: '관리자 이상의 권한을 가진 사용자는 수정할 수 없습니다.' },
+        { success: false, error: '최고관리자의 권한은 수정할 수 없습니다.' },
         { status: 403 }
       );
     }
 
-    // 기존 권한 삭제 후 새로운 권한 추가
-    const { error: deleteError } = await supabase
+    // 서비스 롤 클라이언트 생성 (RLS 우회)
+    const serviceSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
+    // 기존 권한 삭제 후 새로운 권한 추가 (서비스 클라이언트 사용)
+    const { error: deleteError } = await serviceSupabase
       .from('menu_permissions')
       .delete()
       .eq('user_id', userId);
@@ -176,7 +190,7 @@ export async function PUT(request: NextRequest) {
       }));
 
     if (newPermissions.length > 0) {
-      const { error: insertError } = await supabase
+      const { error: insertError } = await serviceSupabase
         .from('menu_permissions')
         .insert(newPermissions);
 
@@ -241,8 +255,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 기존 권한 삭제
-    const { error: deleteError } = await supabase
+    // 서비스 롤 클라이언트 생성 (RLS 우회)
+    const serviceSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
+    // 기존 권한 삭제 (서비스 클라이언트 사용)
+    const { error: deleteError } = await serviceSupabase
       .from('menu_permissions')
       .delete()
       .eq('user_id', userId);
@@ -268,7 +294,7 @@ export async function POST(request: NextRequest) {
       }));
 
     if (newPermissions.length > 0) {
-      const { error: insertError } = await supabase
+      const { error: insertError } = await serviceSupabase
         .from('menu_permissions')
         .insert(newPermissions);
 
