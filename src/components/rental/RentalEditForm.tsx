@@ -43,32 +43,16 @@ import {
   ReservationSite,
   ReservationStatus,
 } from "@/types/rental";
-import { DEVICE_FEATURES, DEVICE_CATEGORY_LABELS } from "@/types/device";
+import { DEVICE_FEATURES, DEVICE_CATEGORY_LABELS, DeviceCategory } from "@/types/device";
 
 const formSchema = z.object({
-  device_category: z.enum([
-    "GP13",
-    "GP12",
-    "GP11",
-    "POCKET3",
-    "ACTION5",
-    "S23",
-    "S24",
-    "PS5",
-    "GLAMPAM",
-    "AIRWRAP",
-    "INSTA360",
-    "STROLLER",
-    "MINIEVO",
-    "OJM360",
-    "ETC",
-  ] as const),
+  device_category: z.enum(Object.keys(DEVICE_CATEGORY_LABELS) as [DeviceCategory, ...DeviceCategory[]]),
   pickup_date: z.date(),
   pickup_time: z.string(),
   return_date: z.date(),
   return_time: z.string(),
-  pickup_method: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const),
-  return_method: z.enum(["T1", "T2", "delivery", "office", "hotel"] as const),
+  pickup_method: z.enum(Object.keys(PICKUP_METHOD_LABELS) as [PickupMethod, ...PickupMethod[]]),
+  return_method: z.enum(Object.keys(RETURN_METHOD_LABELS) as [ReturnMethod, ...ReturnMethod[]]),
   renter_name: z.string(),
   contact_input_type: z.enum(["text", "image"] as const).default("text"),
   contact_image_url: z.string().optional(),
@@ -80,29 +64,10 @@ const formSchema = z.object({
     .enum(["대여", "구매", "구매+대여"] as const)
     .nullable()
     .optional(),
-  reservation_site: z.enum([
-    "naver",
-    "forholiday",
-    "creatrip",
-    "klook",
-    "seoulpass",
-    "trip_com",
-    "rakuten",
-    "triple",
-    "forholidayg",
-    "myrealtrip",
-    "waug",
-    "hanatour",
-  ] as const),
+  reservation_site: z.enum(Object.keys(RESERVATION_SITE_LABELS) as [ReservationSite, ...ReservationSite[]]),
   order_number: z.string().optional(),
   description: z.string().optional(),
-  status: z.enum([
-    "pending",
-    "picked_up",
-    "not_picked_up",
-    "returned",
-    "problem",
-  ] as const),
+  status: z.enum(Object.keys(STATUS_MAP) as [ReservationStatus, ...ReservationStatus[]]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
