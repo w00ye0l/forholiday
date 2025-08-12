@@ -71,7 +71,10 @@ export default function Page() {
   });
 
   const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
-  const tomorrow = useMemo(() => format(addDays(new Date(), 1), "yyyy-MM-dd"), []);
+  const tomorrow = useMemo(
+    () => format(addDays(new Date(), 1), "yyyy-MM-dd"),
+    []
+  );
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
@@ -169,60 +172,65 @@ export default function Page() {
     }
   };
 
-  const handleNotesChange = useCallback((terminal: "T1" | "T2", value: string) => {
-    setTerminalNotes((prev) => ({
-      ...prev,
-      [terminal]: value,
-    }));
-  }, []);
+  const handleNotesChange = useCallback(
+    (terminal: "T1" | "T2", value: string) => {
+      setTerminalNotes((prev) => ({
+        ...prev,
+        [terminal]: value,
+      }));
+    },
+    []
+  );
 
   // T1, T2별 렌탈 필터링 함수 - useCallback으로 최적화
-  const getRentalsByTerminal = useCallback((
-    rentals: RentalReservation[],
-    terminal: "T1" | "T2"
-  ) => rentals.filter((rental) => rental.pickup_method === terminal), []);
+  const getRentalsByTerminal = useCallback(
+    (rentals: RentalReservation[], terminal: "T1" | "T2") =>
+      rentals.filter((rental) => rental.pickup_method === terminal),
+    []
+  );
 
   // 카테고리별 그룹화 함수 - useMemo로 최적화
-  const groupRentalsByCategory = useCallback((
-    rentals: RentalReservation[]
-  ): CategoryGroup[] => {
-    const categoryMap = new Map<string, RentalReservation[]>();
+  const groupRentalsByCategory = useCallback(
+    (rentals: RentalReservation[]): CategoryGroup[] => {
+      const categoryMap = new Map<string, RentalReservation[]>();
 
-    // 모든 가능한 카테고리를 0으로 초기화
-    Object.keys(DEVICE_CATEGORY_LABELS).forEach((category) => {
-      categoryMap.set(category, []);
-    });
-
-    // 실제 렌탈 데이터로 카운트 업데이트
-    rentals.forEach((rental) => {
-      const category = rental.device_category;
-      if (!categoryMap.has(category)) {
+      // 모든 가능한 카테고리를 0으로 초기화
+      Object.keys(DEVICE_CATEGORY_LABELS).forEach((category) => {
         categoryMap.set(category, []);
-      }
-      categoryMap.get(category)!.push(rental);
-    });
-
-    return Array.from(categoryMap.entries())
-      .map(([category, categoryRentals]) => ({
-        category,
-        categoryLabel:
-          DEVICE_CATEGORY_LABELS[
-            category as keyof typeof DEVICE_CATEGORY_LABELS
-          ] || category,
-        count: categoryRentals.length,
-        rentals: categoryRentals.sort((a, b) =>
-          a.pickup_time.localeCompare(b.pickup_time)
-        ),
-      }))
-      .sort((a, b) => {
-        // 0건인 항목들은 마지막에, 나머지는 수량 많은 순으로 정렬
-        if (a.count === 0 && b.count === 0)
-          return a.categoryLabel.localeCompare(b.categoryLabel);
-        if (a.count === 0) return 1;
-        if (b.count === 0) return -1;
-        return b.count - a.count;
       });
-  }, []);
+
+      // 실제 렌탈 데이터로 카운트 업데이트
+      rentals.forEach((rental) => {
+        const category = rental.device_category;
+        if (!categoryMap.has(category)) {
+          categoryMap.set(category, []);
+        }
+        categoryMap.get(category)!.push(rental);
+      });
+
+      return Array.from(categoryMap.entries())
+        .map(([category, categoryRentals]) => ({
+          category,
+          categoryLabel:
+            DEVICE_CATEGORY_LABELS[
+              category as keyof typeof DEVICE_CATEGORY_LABELS
+            ] || category,
+          count: categoryRentals.length,
+          rentals: categoryRentals.sort((a, b) =>
+            a.pickup_time.localeCompare(b.pickup_time)
+          ),
+        }))
+        .sort((a, b) => {
+          // 0건인 항목들은 마지막에, 나머지는 수량 많은 순으로 정렬
+          if (a.count === 0 && b.count === 0)
+            return a.categoryLabel.localeCompare(b.categoryLabel);
+          if (a.count === 0) return 1;
+          if (b.count === 0) return -1;
+          return b.count - a.count;
+        });
+    },
+    []
+  );
 
   // 카테고리 그룹 데이터 미리 계산
   const todayCategoryGroups = useMemo(() => {
@@ -268,16 +276,16 @@ export default function Page() {
     }
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         {categoryGroups.map((group) => (
           <div
             key={group.category}
-            className={`p-3 ${bgColorClass} border ${colorClass.replace(
+            className={`p-2 ${bgColorClass} border ${colorClass.replace(
               "text-",
               "border-"
             )} rounded-lg`}
           >
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <div
                 className={`font-semibold ${colorClass} flex items-center gap-2 text-sm`}
               >
@@ -304,7 +312,7 @@ export default function Page() {
             </div>
 
             {/* 카테고리별 간단 요약 */}
-            <div className="flex items-center justify-between mb-3 text-xs text-gray-600">
+            <div className="flex items-center justify-between mb-2 text-xs text-gray-600">
               <div className="flex gap-4">
                 <span>
                   수령전:{" "}
@@ -319,20 +327,28 @@ export default function Page() {
               <div className="text-gray-500">
                 {group.rentals.length > 0 && (
                   <>
-                    {group.rentals[0].pickup_time} ~{" "}
-                    {group.rentals[group.rentals.length - 1].pickup_time}
+                    {group.rentals[0].pickup_time.length > 5
+                      ? group.rentals[0].pickup_time.slice(0, 5)
+                      : group.rentals[0].pickup_time}{" "}
+                    ~{" "}
+                    {group.rentals[group.rentals.length - 1].pickup_time
+                      .length > 5
+                      ? group.rentals[
+                          group.rentals.length - 1
+                        ].pickup_time.slice(0, 5)
+                      : group.rentals[group.rentals.length - 1].pickup_time}
                   </>
                 )}
               </div>
             </div>
 
-            <div className="grid gap-2">
+            <div className="space-y-2">
               {group.rentals.map((rental) => (
                 <div
                   key={rental.id}
-                  className="bg-white/70 p-3 rounded-lg text-xs border shadow-sm"
+                  className="text-xs bg-white/90 rounded-lg p-2 shadow-sm border border-gray-200"
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1">
                     <div className="font-semibold text-gray-900 flex items-center gap-1">
                       <User className="w-3 h-3" />
                       {rental.renter_name}
@@ -348,23 +364,21 @@ export default function Page() {
                   </div>
 
                   {/* 기본 정보 */}
-                  <div className="space-y-1 mb-2">
+                  <div className="space-y-1 mb-1">
                     <div className="flex items-center justify-between text-gray-600">
                       <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         <span className="font-medium">픽업시간:</span>
-                        {rental.pickup_time}
+                        {rental.pickup_time.length > 5
+                          ? rental.pickup_time.slice(0, 5)
+                          : rental.pickup_time}
                       </div>
                       <div className="flex items-center gap-1">
                         <Phone className="w-3 h-3" />
-                        {rental.renter_phone}
+                        <span className="text-xs w-24 truncate">
+                          {rental.renter_phone}
+                        </span>
                       </div>
-                    </div>
-
-                    {/* 예약 ID */}
-                    <div className="flex items-center gap-1 text-gray-500">
-                      <span className="font-medium">예약번호:</span>
-                      <span className="font-mono text-xs">{rental.id}</span>
                     </div>
 
                     {/* 반납 예정일 */}
@@ -372,66 +386,59 @@ export default function Page() {
                       <div className="flex items-center gap-1 text-gray-500">
                         <Calendar className="w-3 h-3" />
                         <span className="font-medium">반납예정:</span>
-                        {rental.return_date} {rental.return_time}
-                      </div>
-                    )}
-
-                    {/* 예약 생성일 */}
-                    {rental.created_at && (
-                      <div className="flex items-center gap-1 text-gray-400">
-                        <span className="font-medium">예약일:</span>
-                        {format(new Date(rental.created_at), "MM/dd HH:mm")}
+                        {rental.return_date}{" "}
+                        {rental.return_time && rental.return_time.length > 5
+                          ? rental.return_time.slice(0, 5)
+                          : rental.return_time}
                       </div>
                     )}
                   </div>
 
                   {/* 설명 */}
                   {rental.description && (
-                    <div className="mt-2 p-2 bg-gray-50 rounded text-gray-600 italic text-xs">
+                    <div className="mt-1 p-1 bg-gray-50 rounded text-gray-600 italic text-xs">
                       <span className="font-medium">요청사항:</span>{" "}
                       {rental.description}
                     </div>
                   )}
 
                   {/* 추가 정보 */}
-                  <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
+                  <div className="mt-1 pt-1 border-t border-gray-200">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">예약 사이트:</span>
-                      <Badge variant="outline" className="text-xs">
-                        {rental.reservation_site === "naver"
-                          ? "네이버"
-                          : rental.reservation_site === "forholiday"
-                          ? "포할리데이"
-                          : rental.reservation_site}
-                      </Badge>
+                      {/* 좌측: 옵션들 */}
+                      <div className="flex items-center gap-2">
+                        {rental.data_transmission && (
+                          <Badge
+                            variant="default"
+                            className="text-xs bg-green-500"
+                          >
+                            데이터전송
+                          </Badge>
+                        )}
+                        {rental.sd_option && (
+                          <Badge variant="secondary" className="text-xs">
+                            SD카드 {rental.sd_option}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* 우측: 할당 기기 */}
+                      <div className="flex items-center gap-1">
+                        {rental.device_tag_name ? (
+                          <>
+                            <span className="text-gray-600">기기:</span>
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-mono font-bold border-blue-500 text-blue-700 bg-blue-50"
+                            >
+                              {rental.device_tag_name}
+                            </Badge>
+                          </>
+                        ) : (
+                          <span className="text-gray-400 text-xs">미할당</span>
+                        )}
+                      </div>
                     </div>
-                    {rental.data_transmission && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-600">데이터 전송:</span>
-                        <Badge
-                          variant="default"
-                          className="text-xs bg-green-500"
-                        >
-                          필요
-                        </Badge>
-                      </div>
-                    )}
-                    {rental.sd_option && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-600">SD카드:</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {rental.sd_option}
-                        </Badge>
-                      </div>
-                    )}
-                    {rental.device_tag_name && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-600">할당기기:</span>
-                        <span className="font-mono text-xs font-medium">
-                          {rental.device_tag_name}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
@@ -462,14 +469,10 @@ export default function Page() {
                 내일 출고: {stats.tomorrowRentals.length}건
               </Badge>
             </div>
-            <div className="flex items-center gap-1">
-              <Badge variant="default" className="text-xs bg-green-500">
-                이용가능: {stats.totalDevicesAvailable}대
-              </Badge>
-            </div>
           </div>
         </div>
       </div>
+
       {/* 요약 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-2 md:gap-4">
         {/* 오늘 출고 예정 - 카테고리별 */}
@@ -479,9 +482,7 @@ export default function Page() {
               <CardTitle className="text-sm font-medium text-blue-600">
                 오늘 출고 예정
               </CardTitle>
-              {todayCategoryGroups.some(
-                (g) => g.count === 0
-              ) && (
+              {todayCategoryGroups.some((g) => g.count === 0) && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -554,9 +555,7 @@ export default function Page() {
               <CardTitle className="text-sm font-medium text-orange-600">
                 내일 출고 예정
               </CardTitle>
-              {tomorrowCategoryGroups.some(
-                (g) => g.count === 0
-              ) && (
+              {tomorrowCategoryGroups.some((g) => g.count === 0) && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -641,7 +640,9 @@ export default function Page() {
                 <Badge variant="outline" className="text-xs">
                   {
                     stats.todayStorage.filter(
-                      (s) => (s as any).drop_off_location === "T1" || (s as any).pickup_location === "T1"
+                      (s) =>
+                        (s as any).drop_off_location === "T1" ||
+                        (s as any).pickup_location === "T1"
                     ).length
                   }
                 </Badge>
@@ -651,7 +652,9 @@ export default function Page() {
                 <Badge variant="outline" className="text-xs">
                   {
                     stats.todayStorage.filter(
-                      (s) => (s as any).drop_off_location === "T2" || (s as any).pickup_location === "T2"
+                      (s) =>
+                        (s as any).drop_off_location === "T2" ||
+                        (s as any).pickup_location === "T2"
                     ).length
                   }
                 </Badge>
@@ -785,8 +788,7 @@ export default function Page() {
               <div>
                 <h3 className="font-semibold text-blue-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  T1 터미널 (
-                  {terminalData.todayT1.length}건)
+                  T1 터미널 ({terminalData.todayT1.length}건)
                 </h3>
                 {renderTerminalCategories(
                   stats.todayRentals,
@@ -800,8 +802,7 @@ export default function Page() {
               <div>
                 <h3 className="font-semibold text-green-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  T2 터미널 (
-                  {terminalData.todayT2.length}건)
+                  T2 터미널 ({terminalData.todayT2.length}건)
                 </h3>
                 {renderTerminalCategories(
                   stats.todayRentals,
@@ -828,8 +829,7 @@ export default function Page() {
               <div>
                 <h3 className="font-semibold text-blue-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  T1 터미널 (
-                  {terminalData.tomorrowT1.length}
+                  T1 터미널 ({terminalData.tomorrowT1.length}
                   건)
                 </h3>
                 {renderTerminalCategories(
@@ -844,8 +844,7 @@ export default function Page() {
               <div>
                 <h3 className="font-semibold text-green-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  T2 터미널 (
-                  {terminalData.tomorrowT2.length}
+                  T2 터미널 ({terminalData.tomorrowT2.length}
                   건)
                 </h3>
                 {renderTerminalCategories(
