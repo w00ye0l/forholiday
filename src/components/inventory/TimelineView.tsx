@@ -65,18 +65,25 @@ export const TimelineView = function TimelineView({
     setIsDialogOpen(true);
   };
 
-  // 예약 블록 계산 (메모이제이션)
+  // 성능 최적화: 예약 블록 계산 (메모이제이션)
   const reservationBlocks = useMemo(() => {
     const blocks = new Map<string, ReservationBlock[]>();
     const globalProcessedReservations = new Set<string>();
+    
+    // 성능 최적화: 날짜별 인덱스 맵 생성 (findIndex 반복 호출 방지)
+    const dateToIndexMap = new Map<string, number>();
+    timeSlots.forEach((slot, index) => {
+      dateToIndexMap.set(slot.date, index);
+    });
 
-    devices.forEach((deviceTag) => {
+    // 성능 최적화: for 루프 사용
+    for (const deviceTag of devices) {
       const deviceBlocks: ReservationBlock[] = [];
-
-      // 모든 타임슬롯에서 해당 기기의 예약들을 수집
       const deviceReservations: RentalReservation[] = [];
-      timeSlots.forEach((slot) => {
-        slot.reservations.forEach((reservation) => {
+      
+      // 모든 타임슬롯에서 해당 기기의 예약들을 수집
+      for (const slot of timeSlots) {
+        for (const reservation of slot.reservations) {
           if (
             reservation.device_tag_name === deviceTag &&
             !globalProcessedReservations.has(reservation.reservation_id)
@@ -84,19 +91,15 @@ export const TimelineView = function TimelineView({
             deviceReservations.push(reservation);
             globalProcessedReservations.add(reservation.reservation_id);
           }
-        });
-      });
+        }
+      }
 
-      // 수집된 예약들에 대해 블록 생성
-      deviceReservations.forEach((reservation) => {
-        const startIndex = timeSlots.findIndex(
-          (s) => s.date === reservation.pickup_date
-        );
-        const endIndex = timeSlots.findIndex(
-          (s) => s.date === reservation.return_date
-        );
+      // 수집된 예약들에 대해 블록 생성 (최적화된 인덱스 조회)
+      for (const reservation of deviceReservations) {
+        const startIndex = dateToIndexMap.get(reservation.pickup_date);
+        const endIndex = dateToIndexMap.get(reservation.return_date);
 
-        if (startIndex !== -1 && endIndex !== -1) {
+        if (startIndex !== undefined && endIndex !== undefined) {
           const duration = endIndex - startIndex + 1;
 
           deviceBlocks.push({
@@ -106,10 +109,10 @@ export const TimelineView = function TimelineView({
             duration,
           });
         }
-      });
+      }
 
       blocks.set(deviceTag, deviceBlocks);
-    });
+    }
 
     return blocks;
   }, [devices, timeSlots]);
@@ -120,20 +123,6 @@ export const TimelineView = function TimelineView({
     0
   );
 
-  // 디버깅 로그 추가
-  console.log("🖥️ TimelineView 렌더링:", {
-    devices,
-    timeSlots,
-    deviceCount: devices.length,
-    slotCount: timeSlots.length,
-    totalReservations,
-    reservationBlocks: Array.from(reservationBlocks.entries()).map(
-      ([device, blocks]) => ({
-        device,
-        blockCount: blocks.length,
-      })
-    ),
-  });
 
   const handleLoadPrevious = async () => {
     if (loadingPrevious || loading) return;
@@ -188,7 +177,6 @@ export const TimelineView = function TimelineView({
   }
 
   if (timeSlots.length === 0) {
-    console.log("⚠️ TimelineView: 타임슬롯 없음");
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center text-gray-600">예약 정보가 없습니다.</div>
@@ -197,7 +185,6 @@ export const TimelineView = function TimelineView({
   }
 
   if (devices.length === 0) {
-    console.log("⚠️ TimelineView: 기기 없음");
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center text-gray-600">
@@ -209,7 +196,6 @@ export const TimelineView = function TimelineView({
 
   // 기기는 있지만 예약이 없는 경우
   if (totalReservations === 0) {
-    console.log("⚠️ TimelineView: 예약 없음");
     return (
       <div className="bg-white rounded-lg border border-gray-200 w-full h-full">
         <div className="p-8 text-center">

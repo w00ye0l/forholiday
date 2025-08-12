@@ -299,10 +299,11 @@ export const assignDevicesForTimelineDisplayWithHistory = (
   allReservationsHistory: RentalReservation[],
   devicesByCategory: Map<string, string[]>
 ): RentalReservation[] => {
-  // 전체 예약 이력에서 기기별 사용 이력 생성
+  // 성능 최적화: 기기별 사용 이력 생성 (Map을 미리 할당)
   const deviceUsageHistory = new Map<string, { pickup_date: string; return_date: string }[]>();
 
-  allReservationsHistory.forEach((reservation) => {
+  // 한 번만 순회하여 이력 생성 (성능 개선)
+  for (const reservation of allReservationsHistory) {
     if (reservation.device_tag_name && reservation.pickup_date && reservation.return_date) {
       if (!deviceUsageHistory.has(reservation.device_tag_name)) {
         deviceUsageHistory.set(reservation.device_tag_name, []);
@@ -312,101 +313,68 @@ export const assignDevicesForTimelineDisplayWithHistory = (
         return_date: reservation.return_date,
       });
     }
-  });
+  }
 
-  // 기기별 사용 가능 여부 체크 함수
+  // 성능 최적화: 기기별 사용 가능 여부 체크 함수 (Date 객체 생성 최소화)
   const isDeviceAvailable = (deviceTag: string, pickupDate: string, returnDate: string): boolean => {
-    const usage = deviceUsageHistory.get(deviceTag) || [];
+    const usage = deviceUsageHistory.get(deviceTag);
+    if (!usage || usage.length === 0) return true;
     
+    // 문자열 비교로 성능 개선 (ISO 날짜 형식의 경우)
     return !usage.some((u) => {
-      const usageStart = new Date(u.pickup_date);
-      const usageEnd = new Date(u.return_date);
-      const reservationStart = new Date(pickupDate);
-      const reservationEnd = new Date(returnDate);
-      
-      // 기간 겹침 검사
-      return (reservationStart <= usageEnd && reservationEnd >= usageStart);
+      return (pickupDate <= u.return_date && returnDate >= u.pickup_date);
     });
   };
 
   // 임시 할당 추적용 맵 (같은 요청 내에서 중복 할당 방지)
   const tempAssignments = new Map<string, { pickup_date: string; return_date: string }[]>();
 
-  return reservations.map((reservation) => {
+  // 성능 최적화: 일반 for문 사용 (map보다 빠름)
+  const results: RentalReservation[] = [];
+  
+  for (const reservation of reservations) {
     // 이미 할당된 기기가 있으면 그대로 유지
     if (reservation.device_tag_name) {
-      return reservation;
+      results.push(reservation);
+      continue;
     }
 
     // 미할당된 예약에 대해 타임라인 표시용 임시 할당
     const availableDevices = devicesByCategory.get(reservation.device_category) || [];
     
-    // S23 예약의 임시 할당 과정 디버깅
-    if (reservation.device_category === 'S23' && reservation.pickup_date === '2025-08-15' && reservation.return_date === '2025-08-18') {
-      console.log("🔧 S23 임시 할당 시작:", {
-        renter_name: reservation.renter_name,
-        reservation_id: reservation.reservation_id,
-        pickup_date: reservation.pickup_date,
-        return_date: reservation.return_date,
-        availableDevicesCount: availableDevices.length,
-        availableDevicesSample: availableDevices.slice(0, 5)
-      });
-    }
     
     if (availableDevices.length > 0) {
       let tempAssignedDevice: string | null = null;
 
       // 날짜가 있는 경우에만 충돌 검사
       if (reservation.pickup_date && reservation.return_date) {
-        // 앞번호 기기부터 순차적으로 사용 가능 여부 체크
+        // 성능 최적화: 앞번호 기기부터 순차적으로 사용 가능 여부 체크
         for (const device of availableDevices) {
           // 전체 예약 이력과 임시 할당 모두 고려
-          const isAvailableInHistory = isDeviceAvailable(device, reservation.pickup_date, reservation.return_date);
+          if (!isDeviceAvailable(device, reservation.pickup_date, reservation.return_date)) {
+            continue; // 사용 불가능하면 바로 다음 기기 확인
+          }
           
-          // 현재 요청에서 이미 임시 할당된 기간과 충돌 체크
-          const tempUsage = tempAssignments.get(device) || [];
-          const hasConflictWithTemp = tempUsage.some((u) => {
-            const usageStart = new Date(u.pickup_date);
-            const usageEnd = new Date(u.return_date);
-            const reservationStart = new Date(reservation.pickup_date);
-            const reservationEnd = new Date(reservation.return_date);
-            
-            return (reservationStart <= usageEnd && reservationEnd >= usageStart);
+          // 현재 요청에서 이미 임시 할당된 기간과 충돌 체크 (문자열 비교로 최적화)
+          const tempUsage = tempAssignments.get(device);
+          if (tempUsage && tempUsage.some((u) => {
+            return (reservation.pickup_date <= u.return_date && reservation.return_date >= u.pickup_date);
+          })) {
+            continue; // 임시 할당과 충돌하면 다음 기기 확인
+          }
+
+          // 사용 가능한 기기 찾음
+          tempAssignedDevice = device;
+          
+          // 임시 할당 기록 (같은 요청 내에서 중복 방지)
+          if (!tempAssignments.has(device)) {
+            tempAssignments.set(device, []);
+          }
+          tempAssignments.get(device)!.push({
+            pickup_date: reservation.pickup_date,
+            return_date: reservation.return_date,
           });
-
-          // S23 8월 15-18일 예약의 기기 체크 과정 디버깅
-          if (reservation.device_category === 'S23' && reservation.pickup_date === '2025-08-15' && reservation.return_date === '2025-08-18') {
-            console.log(`🔍 기기 ${device} 체크:`, {
-              renter_name: reservation.renter_name,
-              device,
-              isAvailableInHistory,
-              hasConflictWithTemp,
-              tempUsageCount: tempUsage.length,
-              canAssign: isAvailableInHistory && !hasConflictWithTemp
-            });
-          }
-
-          if (isAvailableInHistory && !hasConflictWithTemp) {
-            tempAssignedDevice = device;
-            
-            // S23 8월 15-18일 예약의 할당 완료 디버깅
-            if (reservation.device_category === 'S23' && reservation.pickup_date === '2025-08-15' && reservation.return_date === '2025-08-18') {
-              console.log(`✅ 임시 할당 완료:`, {
-                renter_name: reservation.renter_name,
-                assignedDevice: device
-              });
-            }
-            
-            // 임시 할당 기록 (같은 요청 내에서 중복 방지)
-            if (!tempAssignments.has(device)) {
-              tempAssignments.set(device, []);
-            }
-            tempAssignments.get(device)!.push({
-              pickup_date: reservation.pickup_date,
-              return_date: reservation.return_date,
-            });
-            break;
-          }
+          break;
         }
       } else {
         // 날짜가 비어있는 경우 첫 번째 기기 할당
@@ -419,17 +387,19 @@ export const assignDevicesForTimelineDisplayWithHistory = (
       }
 
       // 타임라인 표시용으로만 임시 할당
-      return {
+      results.push({
         ...reservation,
         device_tag_name: tempAssignedDevice, // 타임라인 표시용 임시 할당
         original_device_tag_name: null, // 실제 DB 값 표시 (미할당)
-      } as RentalReservation;
+      } as RentalReservation);
+    } else {
+      // 할당할 기기가 없으면 그대로 반환
+      results.push({
+        ...reservation,
+        original_device_tag_name: null, // 실제 DB 값 표시 (미할당)
+      } as RentalReservation);
     }
-
-    // 할당할 기기가 없으면 그대로 반환
-    return {
-      ...reservation,
-      original_device_tag_name: null, // 실제 DB 값 표시 (미할당)
-    } as RentalReservation;
-  });
+  }
+  
+  return results;
 };
