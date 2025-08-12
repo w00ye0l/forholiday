@@ -152,7 +152,9 @@ export default async function StorageDetailPage({ params }: PageProps) {
               <div>
                 <p className="text-sm text-gray-600">찾아가는 일시</p>
                 <p className="font-medium">
-                  {formatDateTime(storage.pickup_date, storage.pickup_time)}
+                  {storage.pickup_date && storage.pickup_time 
+                    ? formatDateTime(storage.pickup_date, storage.pickup_time)
+                    : "미정"}
                 </p>
               </div>
             </div>

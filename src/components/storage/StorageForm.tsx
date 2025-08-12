@@ -128,9 +128,9 @@ export default function StorageForm({
         drop_off_date: new Date(storage.drop_off_date),
         drop_off_time: storage.drop_off_time,
         drop_off_location: storage.drop_off_location || "T1",
-        pickup_date: new Date(storage.pickup_date),
-        pickup_time: storage.pickup_time,
-        pickup_location: storage.pickup_location || "T1",
+        pickup_date: storage.pickup_date ? new Date(storage.pickup_date) : undefined,
+        pickup_time: storage.pickup_time || "",
+        pickup_location: storage.pickup_location || undefined,
         notes: storage.notes || "",
         reservation_site: storage.reservation_site as ReservationSite,
       });
@@ -162,9 +162,9 @@ export default function StorageForm({
         drop_off_location: data.drop_off_location || "T1",
         pickup_date: data.pickup_date
           ? format(data.pickup_date, "yyyy-MM-dd")
-          : format(new Date(), "yyyy-MM-dd"),
-        pickup_time: data.pickup_time || "00:00",
-        pickup_location: data.pickup_location || "T1",
+          : null,
+        pickup_time: data.pickup_time || null,
+        pickup_location: data.pickup_location || null,
         notes: data.notes || null,
         reservation_site: data.reservation_site || "현금",
       };

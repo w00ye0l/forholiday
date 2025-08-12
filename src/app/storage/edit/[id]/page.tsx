@@ -1,39 +1,53 @@
-import { notFound } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import StorageEditForm from "@/components/storage/StorageEditForm";
+import StorageForm from "@/components/storage/StorageForm";
+import { StorageReservation } from "@/types/storage";
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
+export default function StorageEditPage() {
+  const params = useParams();
+  const router = useRouter();
+  const [storage, setStorage] = useState<StorageReservation | null>(null);
+  const [loading, setLoading] = useState(true);
 
-async function getStorage(id: string) {
-  const supabase = await createClient();
-  const { data: storage, error } = await supabase
-    .from("storage_reservations")
-    .select("*")
-    .eq("id", id)
-    .single();
+  useEffect(() => {
+    const fetchStorage = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("storage_reservations")
+        .select("*")
+        .eq("id", params.id)
+        .single();
 
-  if (error || !storage) {
-    return null;
+      if (error || !data) {
+        router.push("/storage");
+        return;
+      }
+
+      setStorage(data);
+      setLoading(false);
+    };
+
+    fetchStorage();
+  }, [params.id, router]);
+
+  if (loading) {
+    return (
+      <main className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-gray-500">로딩 중...</div>
+        </div>
+      </main>
+    );
   }
 
-  return storage;
-}
-
-// 캐싱 비활성화
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-export default async function StorageEditPage({ params }: PageProps) {
-  const { id } = await params;
-  const storage = await getStorage(id);
-
   if (!storage) {
-    notFound();
+    return null;
   }
 
   return (
@@ -54,7 +68,17 @@ export default async function StorageEditPage({ params }: PageProps) {
         </div>
       </div>
 
-      <StorageEditForm storage={storage} />
+      <StorageForm
+        storage={storage}
+        onCreated={() => {
+          // 수정 완료 후 상세페이지로 이동
+          router.back();
+        }}
+        onCancel={() => {
+          // 취소 시 상세페이지로 이동
+          router.back();
+        }}
+      />
     </main>
   );
 }
