@@ -34,11 +34,13 @@ class MemoryCache {
   
   clear(prefix?: string): void {
     if (prefix) {
-      for (const key of this.cache.keys()) {
+      const keysToDelete: string[] = [];
+      this.cache.forEach((_, key) => {
         if (key.startsWith(prefix)) {
-          this.cache.delete(key);
+          keysToDelete.push(key);
         }
-      }
+      });
+      keysToDelete.forEach(key => this.cache.delete(key));
     } else {
       this.cache.clear();
     }
@@ -189,14 +191,14 @@ export class PerformanceMonitor {
   static getPerformanceReport(): Record<string, { count: number; average: number; total: number }> {
     const report: Record<string, { count: number; average: number; total: number }> = {};
     
-    for (const [name, times] of this.measurements) {
-      const total = times.reduce((sum, time) => sum + time, 0);
+    this.measurements.forEach((times, name) => {
+      const total = times.reduce((sum: number, time: number) => sum + time, 0);
       report[name] = {
         count: times.length,
         average: total / times.length,
         total
       };
-    }
+    });
     
     return report;
   }

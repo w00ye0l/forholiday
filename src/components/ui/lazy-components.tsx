@@ -9,7 +9,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
-// 사용 빈도가 낮은 대용량 컴포넌트들을 Lazy Load
+// 실제로 사용되는 컴포넌트들만 Lazy Load
 export const LazyDeviceManager = dynamic(
   () => import('@/components/device/DeviceManager'),
   {
@@ -18,66 +18,14 @@ export const LazyDeviceManager = dynamic(
   }
 );
 
-export const LazyInventoryDashboard = dynamic(
-  () => import('@/components/device/InventoryDashboard'),
-  {
-    loading: LoadingSpinner,
-    ssr: false
-  }
-);
-
-export const LazyRentalStatistics = dynamic(
-  () => import('@/components/rental/RentalStatistics'),
-  {
-    loading: LoadingSpinner,
-    ssr: false
-  }
-);
-
-export const LazyStorageStatistics = dynamic(
-  () => import('@/components/storage/StorageStatistics'),
-  {
-    loading: LoadingSpinner,
-    ssr: false
-  }
-);
-
-export const LazyChartAreaInteractive = dynamic(
-  () => import('@/components/chart-area-interactive'),
-  {
-    loading: LoadingSpinner,
-    ssr: false
-  }
-);
-
-// 관리자 전용 컴포넌트들
-export const LazyStructuredTemplateEditor = dynamic(
-  () => import('@/components/admin/StructuredTemplateEditor'),
-  {
-    loading: LoadingSpinner,
-    ssr: false
-  }
-);
-
-// 날짜 관련 대용량 라이브러리 최적화
-export const useDateFns = () => {
-  return import('date-fns').then(module => module);
+// 기본적인 유틸리티 함수들
+export const loadDateFns = async () => {
+  return import('date-fns');
 };
 
-export const useDateFnsLocale = () => {
-  return import('date-fns/locale').then(module => module.ko);
-};
-
-// 아이콘 번들 최적화 - 필요한 아이콘만 로드
-export const LucideIcons = {
-  Calendar: dynamic(() => import('lucide-react').then(mod => ({ default: mod.Calendar })), { ssr: false }),
-  Package: dynamic(() => import('lucide-react').then(mod => ({ default: mod.Package })), { ssr: false }),
-  MapPin: dynamic(() => import('lucide-react').then(mod => ({ default: mod.MapPin })), { ssr: false }),
-  TrendingUp: dynamic(() => import('lucide-react').then(mod => ({ default: mod.TrendingUp })), { ssr: false }),
-  Save: dynamic(() => import('lucide-react').then(mod => ({ default: mod.Save })), { ssr: false }),
-  Clock: dynamic(() => import('lucide-react').then(mod => ({ default: mod.Clock })), { ssr: false }),
-  User: dynamic(() => import('lucide-react').then(mod => ({ default: mod.User })), { ssr: false }),
-  Phone: dynamic(() => import('lucide-react').then(mod => ({ default: mod.Phone })), { ssr: false }),
+export const loadDateFnsLocale = async () => {
+  const module = await import('date-fns/locale');
+  return module.ko;
 };
 
 // 타입 정의
