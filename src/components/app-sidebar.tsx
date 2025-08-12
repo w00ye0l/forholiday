@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { memo } from "react";
 import {
   ArrowRightIcon,
   ArrowDownIcon,
@@ -26,7 +27,7 @@ import { NavStorage } from "@/components/nav-storage";
 import { NavRental } from "@/components/nav-rental";
 import { NavCustomer } from "@/components/nav-customer";
 import { NavSystem } from "@/components/nav-system";
-import { useMenuPermissions } from "@/hooks/use-menu-permissions";
+import { usePermissions } from "@/context/permissions-context";
 import { MenuKey } from "@/types/profile";
 import {
   Sidebar,
@@ -166,25 +167,25 @@ const allMenuItems = {
   ],
 };
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export const AppSidebar = memo(function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { setOpenMobile } = useSidebar();
-  const { hasPermission, loading } = useMenuPermissions();
+  const { hasPermission, loading } = usePermissions();
 
   const handleLogoClick = () => {
     // 모바일에서 로고 클릭 시 사이드바 닫기
     setOpenMobile(false);
   };
 
-  // 권한에 따라 메뉴 필터링
-  const filterMenuItems = (items: MenuItem[]) => {
+  // 권한에 따라 메뉴 필터링 - React.useMemo로 최적화
+  const filterMenuItems = React.useCallback((items: MenuItem[]) => {
     if (loading) return [];
     return items.filter((item) => hasPermission(item.menuKey, "view"));
-  };
+  }, [loading, hasPermission]);
 
-  const filteredRentalMenu = filterMenuItems(allMenuItems.rentalMenu);
-  const filteredStorageMenu = filterMenuItems(allMenuItems.storageMenu);
-  const filteredCustomerMenu = filterMenuItems(allMenuItems.customerMenu);
-  const filteredSystemMenu = filterMenuItems(allMenuItems.systemMenu);
+  const filteredRentalMenu = React.useMemo(() => filterMenuItems(allMenuItems.rentalMenu), [filterMenuItems]);
+  const filteredStorageMenu = React.useMemo(() => filterMenuItems(allMenuItems.storageMenu), [filterMenuItems]);
+  const filteredCustomerMenu = React.useMemo(() => filterMenuItems(allMenuItems.customerMenu), [filterMenuItems]);
+  const filteredSystemMenu = React.useMemo(() => filterMenuItems(allMenuItems.systemMenu), [filterMenuItems]);
 
   if (loading) {
     return (
@@ -256,4 +257,4 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
     </Sidebar>
   );
-}
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { format, addDays } from "date-fns";
 import { ko } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
@@ -70,9 +70,9 @@ export default function Page() {
     tomorrow: false,
   });
 
-  const today = format(new Date(), "yyyy-MM-dd");
-  const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
-  const supabase = createClient();
+  const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const tomorrow = useMemo(() => format(addDays(new Date(), 1), "yyyy-MM-dd"), []);
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -169,21 +169,21 @@ export default function Page() {
     }
   };
 
-  const handleNotesChange = (terminal: "T1" | "T2", value: string) => {
+  const handleNotesChange = useCallback((terminal: "T1" | "T2", value: string) => {
     setTerminalNotes((prev) => ({
       ...prev,
       [terminal]: value,
     }));
-  };
+  }, []);
 
-  // T1, T2별 렌탈 필터링 함수
-  const getRentalsByTerminal = (
+  // T1, T2별 렌탈 필터링 함수 - useCallback으로 최적화
+  const getRentalsByTerminal = useCallback((
     rentals: RentalReservation[],
     terminal: "T1" | "T2"
-  ) => rentals.filter((rental) => rental.pickup_method === terminal);
+  ) => rentals.filter((rental) => rental.pickup_method === terminal), []);
 
-  // 카테고리별 그룹화 함수
-  const groupRentalsByCategory = (
+  // 카테고리별 그룹화 함수 - useMemo로 최적화
+  const groupRentalsByCategory = useCallback((
     rentals: RentalReservation[]
   ): CategoryGroup[] => {
     const categoryMap = new Map<string, RentalReservation[]>();
@@ -222,7 +222,26 @@ export default function Page() {
         if (b.count === 0) return -1;
         return b.count - a.count;
       });
-  };
+  }, []);
+
+  // 카테고리 그룹 데이터 미리 계산
+  const todayCategoryGroups = useMemo(() => {
+    return groupRentalsByCategory(stats.todayRentals);
+  }, [stats.todayRentals, groupRentalsByCategory]);
+
+  const tomorrowCategoryGroups = useMemo(() => {
+    return groupRentalsByCategory(stats.tomorrowRentals);
+  }, [stats.tomorrowRentals, groupRentalsByCategory]);
+
+  // 터미널별 데이터 미리 계산
+  const terminalData = useMemo(() => {
+    return {
+      todayT1: getRentalsByTerminal(stats.todayRentals, "T1"),
+      todayT2: getRentalsByTerminal(stats.todayRentals, "T2"),
+      tomorrowT1: getRentalsByTerminal(stats.tomorrowRentals, "T1"),
+      tomorrowT2: getRentalsByTerminal(stats.tomorrowRentals, "T2"),
+    };
+  }, [stats.todayRentals, stats.tomorrowRentals, getRentalsByTerminal]);
 
   // 터미널별 카테고리 그룹 렌더링
   const renderTerminalCategories = (
@@ -460,7 +479,7 @@ export default function Page() {
               <CardTitle className="text-sm font-medium text-blue-600">
                 오늘 출고 예정
               </CardTitle>
-              {groupRentalsByCategory(stats.todayRentals).some(
+              {todayCategoryGroups.some(
                 (g) => g.count === 0
               ) && (
                 <Button
@@ -495,7 +514,7 @@ export default function Page() {
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-2 gap-y-1">
               {/* 카테고리 표시 - 접기/펼치기에 따라 필터링 */}
-              {groupRentalsByCategory(stats.todayRentals)
+              {todayCategoryGroups
                 .filter((group) => showZeroCategories.today || group.count > 0)
                 .map((group) => (
                   <div
@@ -535,7 +554,7 @@ export default function Page() {
               <CardTitle className="text-sm font-medium text-orange-600">
                 내일 출고 예정
               </CardTitle>
-              {groupRentalsByCategory(stats.tomorrowRentals).some(
+              {tomorrowCategoryGroups.some(
                 (g) => g.count === 0
               ) && (
                 <Button
@@ -570,7 +589,7 @@ export default function Page() {
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-2 gap-y-1">
               {/* 카테고리 표시 - 접기/펼치기에 따라 필터링 */}
-              {groupRentalsByCategory(stats.tomorrowRentals)
+              {tomorrowCategoryGroups
                 .filter(
                   (group) => showZeroCategories.tomorrow || group.count > 0
                 )
@@ -622,7 +641,7 @@ export default function Page() {
                 <Badge variant="outline" className="text-xs">
                   {
                     stats.todayStorage.filter(
-                      (s) => (s as any).terminal === "T1"
+                      (s) => (s as any).drop_off_location === "T1" || (s as any).pickup_location === "T1"
                     ).length
                   }
                 </Badge>
@@ -632,7 +651,7 @@ export default function Page() {
                 <Badge variant="outline" className="text-xs">
                   {
                     stats.todayStorage.filter(
-                      (s) => (s as any).terminal === "T2"
+                      (s) => (s as any).drop_off_location === "T2" || (s as any).pickup_location === "T2"
                     ).length
                   }
                 </Badge>
@@ -767,7 +786,7 @@ export default function Page() {
                 <h3 className="font-semibold text-blue-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
                   T1 터미널 (
-                  {getRentalsByTerminal(stats.todayRentals, "T1").length}건)
+                  {terminalData.todayT1.length}건)
                 </h3>
                 {renderTerminalCategories(
                   stats.todayRentals,
@@ -782,7 +801,7 @@ export default function Page() {
                 <h3 className="font-semibold text-green-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
                   T2 터미널 (
-                  {getRentalsByTerminal(stats.todayRentals, "T2").length}건)
+                  {terminalData.todayT2.length}건)
                 </h3>
                 {renderTerminalCategories(
                   stats.todayRentals,
@@ -810,7 +829,7 @@ export default function Page() {
                 <h3 className="font-semibold text-blue-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
                   T1 터미널 (
-                  {getRentalsByTerminal(stats.tomorrowRentals, "T1").length}
+                  {terminalData.tomorrowT1.length}
                   건)
                 </h3>
                 {renderTerminalCategories(
@@ -826,7 +845,7 @@ export default function Page() {
                 <h3 className="font-semibold text-green-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
                   T2 터미널 (
-                  {getRentalsByTerminal(stats.tomorrowRentals, "T2").length}
+                  {terminalData.tomorrowT2.length}
                   건)
                 </h3>
                 {renderTerminalCategories(

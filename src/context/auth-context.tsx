@@ -14,6 +14,7 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  clearAllData: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,9 +52,29 @@ export function AuthProvider({
     };
   }, []); // 빈 배열로 변경하여 마운트 시에만 실행
 
+  // 모든 클라이언트 데이터 클리어 함수
+  const clearAllData = () => {
+    // 권한 캐시 클리어 (전역 이벤트로 통신)
+    window.dispatchEvent(new CustomEvent('clearPermissions'));
+    
+    // 기타 클라이언트 캐시들 클리어
+    if (typeof window !== 'undefined') {
+      // 로컬 스토리지 클리어 (필요한 경우)
+      // localStorage.removeItem('permissions');
+      
+      // 세션 스토리지 클리어 (필요한 경우)
+      // sessionStorage.clear();
+    }
+  };
+
   const signOut = async () => {
+    // 먼저 클라이언트 데이터 클리어
+    clearAllData();
+    
+    // Supabase 로그아웃
     await supabase.auth.signOut();
-    // 로그아웃 후 페이지를 완전히 새로고침하여 레이아웃 상태를 리셋
+    
+    // 페이지를 완전히 새로고침하여 레이아웃 상태를 리셋
     window.location.href = "/";
   };
 
@@ -61,6 +82,7 @@ export function AuthProvider({
     user,
     loading,
     signOut,
+    clearAllData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

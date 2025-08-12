@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/context/auth-context";
+import { PermissionsProvider } from "@/context/permissions-context";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
@@ -47,18 +48,20 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider initialUser={initialUser}>
-          {initialUser && !isAuthPage ? (
-            <SidebarProvider>
-              <AppSidebar variant="inset" />
-              <SidebarInset>
-                <SiteHeader />
-                {children}
-              </SidebarInset>
-            </SidebarProvider>
-          ) : (
-            <div className="min-h-screen">{children}</div>
-          )}
-          <Toaster position="top-center" richColors />
+          <PermissionsProvider>
+            {initialUser && !isAuthPage ? (
+              <SidebarProvider>
+                <AppSidebar variant="inset" />
+                <SidebarInset>
+                  <SiteHeader />
+                  {children}
+                </SidebarInset>
+              </SidebarProvider>
+            ) : (
+              <div className="min-h-screen">{children}</div>
+            )}
+            <Toaster position="top-center" richColors />
+          </PermissionsProvider>
         </AuthProvider>
       </body>
     </html>
