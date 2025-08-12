@@ -68,40 +68,43 @@ export const TimelineView = function TimelineView({
   // 예약 블록 계산 (메모이제이션)
   const reservationBlocks = useMemo(() => {
     const blocks = new Map<string, ReservationBlock[]>();
+    const globalProcessedReservations = new Set<string>();
 
     devices.forEach((deviceTag) => {
       const deviceBlocks: ReservationBlock[] = [];
-      const processedReservations = new Set<string>();
 
-      timeSlots.forEach((slot, slotIndex) => {
-        const reservation = slot.reservations.find(
-          (r) => r.device_tag_name === deviceTag
+      // 모든 타임슬롯에서 해당 기기의 예약들을 수집
+      const deviceReservations: RentalReservation[] = [];
+      timeSlots.forEach((slot) => {
+        slot.reservations.forEach((reservation) => {
+          if (
+            reservation.device_tag_name === deviceTag &&
+            !globalProcessedReservations.has(reservation.reservation_id)
+          ) {
+            deviceReservations.push(reservation);
+            globalProcessedReservations.add(reservation.reservation_id);
+          }
+        });
+      });
+
+      // 수집된 예약들에 대해 블록 생성
+      deviceReservations.forEach((reservation) => {
+        const startIndex = timeSlots.findIndex(
+          (s) => s.date === reservation.pickup_date
+        );
+        const endIndex = timeSlots.findIndex(
+          (s) => s.date === reservation.return_date
         );
 
-        if (
-          reservation &&
-          !processedReservations.has(reservation.reservation_id)
-        ) {
-          processedReservations.add(reservation.reservation_id);
+        if (startIndex !== -1 && endIndex !== -1) {
+          const duration = endIndex - startIndex + 1;
 
-          // 예약이 차지하는 날짜 범위 계산
-          const startIndex = timeSlots.findIndex(
-            (s) => s.date === reservation.pickup_date
-          );
-          const endIndex = timeSlots.findIndex(
-            (s) => s.date === reservation.return_date
-          );
-
-          if (startIndex !== -1 && endIndex !== -1) {
-            const duration = endIndex - startIndex + 1;
-
-            deviceBlocks.push({
-              reservation,
-              startIndex,
-              endIndex,
-              duration,
-            });
-          }
+          deviceBlocks.push({
+            reservation,
+            startIndex,
+            endIndex,
+            duration,
+          });
         }
       });
 
@@ -517,16 +520,24 @@ export const TimelineView = function TimelineView({
                       {selectedReservation.device_category}
                     </p>
                   </div>
-                  {selectedReservation.device_tag_name && (
-                    <div>
-                      <label className="text-xs font-medium text-gray-500">
-                        할당 기기
-                      </label>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500">
+                      할당 기기
+                    </label>
+                    {(selectedReservation as any).original_device_tag_name ? (
+                      <p className="text-sm font-semibold text-blue-600">
+                        {(selectedReservation as any).original_device_tag_name}
+                      </p>
+                    ) : selectedReservation.device_tag_name && !(selectedReservation as any).hasOwnProperty('original_device_tag_name') ? (
                       <p className="text-sm font-semibold text-blue-600">
                         {selectedReservation.device_tag_name}
                       </p>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-sm font-medium text-gray-400">
+                        미할당
+                      </p>
+                    )}
+                  </div>
                   <div>
                     <label className="text-xs font-medium text-gray-500">
                       예약 사이트

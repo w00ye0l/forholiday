@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { findOptimalDeviceWithTagPriority } from "@/lib/algorithms/auto-assign";
+import { assignDevicesForTimelineDisplayWithHistory } from "@/lib/algorithms/auto-assign";
 
 export async function GET(request: NextRequest) {
   try {
@@ -89,28 +89,106 @@ export async function GET(request: NextRequest) {
           )
         : allDevicesData;
 
-    // 4. 날짜 범위에 해당하는 예약 데이터 가져오기 (배치 처리로 1000개 제한 해결)
-    // 미반납 예약을 포함하여 모든 관련 예약 조회
+    // 4. 전체 예약 데이터 가져오기 (임시 할당을 위한 기기 사용 이력 파악)
+    let allReservationsForHistory: any[] = [];
+    let historyFrom = 0;
+    let historyHasMore = true;
+
+    console.log("🔄 전체 예약 데이터 조회 시작 (임시 할당용)");
+
+    while (historyHasMore) {
+      const { data: historyData, error: historyError } =
+        await supabase
+          .from("rental_reservations")
+          .select("*")
+          .not("device_tag_name", "is", null) // 할당된 기기가 있는 예약만
+          .range(historyFrom, historyFrom + batchSize - 1);
+
+      if (historyError) {
+        console.error("❌ 전체 예약 데이터 조회 오류:", historyError);
+        return NextResponse.json(
+          { success: false, error: "전체 예약 데이터 조회에 실패했습니다." },
+          { status: 500 }
+        );
+      }
+
+      if (historyData && historyData.length > 0) {
+        allReservationsForHistory = [...allReservationsForHistory, ...historyData];
+        historyFrom += batchSize;
+        historyHasMore = historyData.length === batchSize;
+      } else {
+        historyHasMore = false;
+      }
+
+      // 안전장치
+      if (allReservationsForHistory.length >= 100000) {
+        console.log("⚠️ 전체 예약 최대 제한에 도달하여 조회 중단");
+        break;
+      }
+    }
+
+    console.log(`✅ 전체 예약 데이터 조회 완료: 총 ${allReservationsForHistory.length}개`);
+
+    // 5. 날짜 범위에 해당하는 표시용 예약 데이터 가져오기
     let allReservations: any[] = [];
     let from = 0;
     let hasMore = true;
 
-    console.log("🔄 배치 처리로 예약 데이터 조회 시작");
+    console.log("🔄 표시용 예약 데이터 조회 시작", { 
+      startDate, 
+      endDate,
+      dateRangeQuery: `and(pickup_date.lte.${endDate},return_date.gte.${startDate}),and(pickup_date.gte.${startDate},pickup_date.lte.${endDate}),and(return_date.gte.${startDate},return_date.lte.${endDate})`
+    });
 
     while (hasMore) {
+      console.log(`🔍 배치 ${Math.floor(from / batchSize) + 1} 조회 시작: ${from} ~ ${from + batchSize - 1}`);
+      
       const { data: reservationsData, error: reservationsError } =
         await supabase
           .from("rental_reservations")
           .select("*")
           .or(
-            `and(pickup_date.lte.${endDate},return_date.gte.${startDate}),status.neq.returned`
+            `and(pickup_date.lte.${endDate},return_date.gte.${startDate}),and(pickup_date.gte.${startDate},pickup_date.lte.${endDate}),and(return_date.gte.${startDate},return_date.lte.${endDate})`
           )
           .range(from, from + batchSize - 1);
 
+      // 8월 15일 S23 예약 추적을 위한 디버깅
+      if (reservationsData) {
+        const s23Reservations = reservationsData.filter(r => r.device_category === 'S23');
+        const augustReservations = reservationsData.filter(r => 
+          r.pickup_date && r.pickup_date.includes('2025-08')
+        );
+        
+        console.log(`📊 배치 ${Math.floor(from / batchSize) + 1} 상세 분석:`, {
+          totalCount: reservationsData.length,
+          s23Count: s23Reservations.length,
+          augustCount: augustReservations.length,
+          s23Sample: s23Reservations.slice(0, 3).map(r => ({
+            reservation_id: r.reservation_id,
+            pickup_date: r.pickup_date,
+            return_date: r.return_date,
+            device_category: r.device_category,
+            device_tag_name: r.device_tag_name
+          })),
+          dateRange: `${startDate} ~ ${endDate}`
+        });
+        
+        // 특별히 8월 15-18일 예약 찾기
+        const aug15to18 = reservationsData.filter(r => 
+          r.device_category === 'S23' && 
+          r.pickup_date === '2025-08-15' && 
+          r.return_date === '2025-08-18'
+        );
+        
+        if (aug15to18.length > 0) {
+          console.log("🎯 찾았다! 8월 15-18 S23 예약:", aug15to18);
+        }
+      }
+
       if (reservationsError) {
-        console.error("❌ 예약 데이터 조회 오류:", reservationsError);
+        console.error("❌ 표시용 예약 데이터 조회 오류:", reservationsError);
         return NextResponse.json(
-          { success: false, error: "예약 데이터 조회에 실패했습니다." },
+          { success: false, error: "표시용 예약 데이터 조회에 실패했습니다." },
           { status: 500 }
         );
       }
@@ -124,13 +202,24 @@ export async function GET(request: NextRequest) {
             reservationsData.length
           }개 조회됨 (누적: ${allReservations.length}개)`
         );
+        
+        // 처음 몇 개 예약의 날짜 정보 로그
+        if (from === batchSize && reservationsData.length > 0) {
+          console.log("🔍 첫 배치 예약 샘플:", reservationsData.slice(0, 3).map(r => ({
+            id: r.reservation_id,
+            pickup_date: r.pickup_date,
+            return_date: r.return_date,
+            status: r.status
+          })));
+        }
       } else {
+        console.log(`⚠️ 배치 ${Math.floor(from / batchSize) + 1}: 조회된 데이터 없음`);
         hasMore = false;
       }
 
       // 안전장치: 최대 10만개까지만
       if (allReservations.length >= 100000) {
-        console.log("⚠️ 최대 제한(10만개)에 도달하여 조회 중단");
+        console.log("⚠️ 표시용 예약 최대 제한에 도달하여 조회 중단");
         break;
       }
     }
@@ -157,13 +246,43 @@ export async function GET(request: NextRequest) {
     );
 
     // 5. 기기 목록에 해당하는 예약만 선별 (카테고리 기반 필터링 포함)
+    console.log("🔍 필터링 전 상태:", {
+      allReservationsCount: allReservations.length,
+      selectedCategories,
+      devicesListCount: devicesList.length,
+      sampleDevices: devicesList.slice(0, 5),
+    });
+
     const filteredReservations = allReservations.filter((reservation) => {
       // 기기 태그가 있으면 해당 기기가 포함되는지 확인
       if (reservation.device_tag_name) {
-        return devicesList.includes(reservation.device_tag_name);
+        const included = devicesList.includes(reservation.device_tag_name);
+        if (!included && reservation.device_category === 'S23') {
+          console.log("❌ S23 예약이 기기 목록에서 제외됨:", {
+            reservation_id: reservation.reservation_id,
+            device_tag_name: reservation.device_tag_name,
+            pickup_date: reservation.pickup_date,
+            return_date: reservation.return_date,
+          });
+        }
+        return included;
       }
       // 기기 태그가 없으면 카테고리가 선택된 카테고리에 포함되는지 확인
-      return selectedCategories.includes(reservation.device_category);
+      const included = selectedCategories.includes(reservation.device_category);
+      if (!included && reservation.device_category === 'S23') {
+        console.log("❌ S23 미할당 예약이 카테고리에서 제외됨:", {
+          reservation_id: reservation.reservation_id,
+          device_category: reservation.device_category,
+          pickup_date: reservation.pickup_date,
+          return_date: reservation.return_date,
+        });
+      }
+      return included;
+    });
+
+    console.log("🔍 필터링 후 상태:", {
+      filteredReservationsCount: filteredReservations.length,
+      s23Reservations: filteredReservations.filter(r => r.device_category === 'S23').length,
     });
 
     // 6. 예약 정보 변환
@@ -217,10 +336,10 @@ export async function GET(request: NextRequest) {
       })
       .filter((r) => r !== null);
 
-    // 6.5. 일관된 기기 할당 (이미 할당된 기기는 유지, 미할당만 최적화)
-    console.log("🔧 일관된 기기 할당 시작");
+    // 6.5. 타임라인 표시용 임시 할당 (실제 DB는 변경하지 않음)
+    console.log("🔧 타임라인 표시용 임시 할당 시작");
 
-    // 카테고리별로 기기 그룹화
+    // 카테고리별로 기기 그룹화 (이름순 정렬)
     const devicesByCategory = new Map();
     filteredDevices.forEach((device) => {
       if (!devicesByCategory.has(device.category)) {
@@ -229,61 +348,44 @@ export async function GET(request: NextRequest) {
       devicesByCategory.get(device.category).push(device.tag_name);
     });
 
-    // 이미 할당된 기기와 미할당 예약 분리
-    const alreadyAssigned = rentalReservations.filter((r) => r.device_tag_name);
-    const unassignedReservations = rentalReservations.filter(
-      (r) => !r.device_tag_name
+    // 카테고리별로 기기 이름순 정렬
+    devicesByCategory.forEach((devices, category) => {
+      devicesByCategory.set(category, devices.sort());
+    });
+
+    // 기기 카테고리 맵 디버깅
+    console.log("📱 카테고리별 기기 분포:", {
+      totalCategories: devicesByCategory.size,
+      s23DevicesCount: devicesByCategory.get('S23')?.length || 0,
+      s23DevicesSample: devicesByCategory.get('S23')?.slice(0, 5),
+      allCategories: Array.from(devicesByCategory.keys()).sort()
+    });
+
+    // 할당 알고리즘을 사용하여 타임라인 표시용 임시 할당
+    const assignedReservations = assignDevicesForTimelineDisplayWithHistory(
+      rentalReservations,
+      allReservationsForHistory,
+      devicesByCategory
     );
 
-    // 기기 사용 이력 맵 생성 (이미 할당된 예약만 포함)
-    const deviceUsageHistory = new Map();
-    alreadyAssigned.forEach((reservation) => {
-      if (!deviceUsageHistory.has(reservation.device_tag_name)) {
-        deviceUsageHistory.set(reservation.device_tag_name, []);
-      }
-      deviceUsageHistory.get(reservation.device_tag_name).push({
-        pickup_date: reservation.pickup_date,
-        return_date: reservation.return_date,
-      });
+    // 임시 할당 결과 디버깅 - 8월 15-18일 S23 예약 추적
+    const aug15to18AfterAssignment = assignedReservations.filter(r => 
+      r.device_category === 'S23' && 
+      r.pickup_date === '2025-08-15' && 
+      r.return_date === '2025-08-18'
+    );
+
+    console.log("🔧 임시 할당 결과 - 8월 15-18 S23:", {
+      totalAssigned: assignedReservations.length,
+      aug15to18Count: aug15to18AfterAssignment.length,
+      aug15to18Sample: aug15to18AfterAssignment.slice(0, 3).map(r => ({
+        renter_name: r.renter_name,
+        original_device_tag_name: (r as any).original_device_tag_name,
+        device_tag_name: r.device_tag_name,
+        pickup_date: r.pickup_date,
+        return_date: r.return_date
+      }))
     });
-
-    // 태그 우선 할당 알고리즘 사용
-
-    // 미할당 예약들만 태그 우선 할당 알고리즘으로 할당
-    const newlyAssigned: any[] = [];
-    unassignedReservations.forEach((reservation) => {
-      const availableDevices =
-        devicesByCategory.get(reservation.device_category) || [];
-
-      // 태그 우선 할당 알고리즘 적용
-      const assignmentResult = findOptimalDeviceWithTagPriority(
-        reservation,
-        availableDevices,
-        deviceUsageHistory
-      );
-
-      if (assignmentResult.success && assignmentResult.deviceTag) {
-        // 할당된 기기의 사용 이력 업데이트
-        if (!deviceUsageHistory.has(assignmentResult.deviceTag)) {
-          deviceUsageHistory.set(assignmentResult.deviceTag, []);
-        }
-        deviceUsageHistory.get(assignmentResult.deviceTag).push({
-          pickup_date: reservation.pickup_date,
-          return_date: reservation.return_date,
-        });
-
-        newlyAssigned.push({
-          ...reservation,
-          device_tag_name: assignmentResult.deviceTag,
-        });
-      } else {
-        // 할당 실패한 예약은 그대로 유지
-        newlyAssigned.push(reservation);
-      }
-    });
-
-    // 이미 할당된 예약과 새로 할당된 예약 통합
-    const assignedReservations = [...alreadyAssigned, ...newlyAssigned];
 
     // 7. 날짜별 타임슬롯 생성
     const start = new Date(startDate);
@@ -309,6 +411,22 @@ export async function GET(request: NextRequest) {
 
         return isInDateRange || isUnreturned;
       });
+
+      // 8월 15일 슬롯에서 S23 예약 확인
+      if (dateStr === '2025-08-15') {
+        const s23InSlot = slotReservations.filter(r => r.device_category === 'S23');
+        console.log(`📅 8월 15일 슬롯 S23 예약:`, {
+          dateStr,
+          totalInSlot: slotReservations.length,
+          s23Count: s23InSlot.length,
+          s23Sample: s23InSlot.slice(0, 3).map(r => ({
+            renter_name: r.renter_name,
+            device_tag_name: r.device_tag_name,
+            pickup_date: r.pickup_date,
+            return_date: r.return_date
+          }))
+        });
+      }
 
       return {
         date: dateStr,
