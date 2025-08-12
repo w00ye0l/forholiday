@@ -1,7 +1,6 @@
 "use client";
 
-import * as React from "react";
-import { memo } from "react";
+import { memo, useMemo, useCallback } from "react";
 import {
   ArrowRightIcon,
   ArrowDownIcon,
@@ -185,6 +184,64 @@ const allMenuItems = {
   ],
 };
 
+// 개별 메뉴 아이템 컴포넌트 - 메모화를 통한 최적화
+const MenuItemComponent = memo(function MenuItemComponent({ 
+  item, 
+  isActive, 
+  onClick 
+}: { 
+  item: MenuItem; 
+  isActive: boolean; 
+  onClick: () => void;
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        size="lg"
+        asChild
+        className={cn(
+          "data-[slot=sidebar-menu-button]:!p-1.5 text-base",
+          isActive && "bg-gray-200 hover:bg-gray-200 text-gray-900"
+        )}
+      >
+        <Link href={item.url} onClick={onClick}>
+          <item.icon className="h-4 w-4" />
+          <span>{item.title}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+});
+
+// 메뉴 그룹 컴포넌트 - 메모화를 통한 최적화
+const MenuGroupComponent = memo(function MenuGroupComponent({
+  group,
+  pathname,
+  onLinkClick
+}: {
+  group: MenuGroup;
+  pathname: string;
+  onLinkClick: () => void;
+}) {
+  return (
+    <SidebarGroup>
+      <SidebarGroupContent className="flex flex-col gap-2">
+        <SidebarGroupLabel className="text-base">{group.label}</SidebarGroupLabel>
+        <SidebarMenu>
+          {group.items.map((item) => (
+            <MenuItemComponent
+              key={item.url}
+              item={item}
+              isActive={pathname === item.url}
+              onClick={onLinkClick}
+            />
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+});
+
 export const AppSidebar = memo(function AppSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
@@ -197,23 +254,24 @@ export const AppSidebar = memo(function AppSidebar({
     setOpenMobile(false);
   };
 
-  const handleLinkClick = () => {
+  const handleLinkClick = useCallback(() => {
     // 모바일에서 링크 클릭 시 사이드바 닫기
     setOpenMobile(false);
-  };
+  }, [setOpenMobile]);
 
-  // 권한에 따라 메뉴 그룹 필터링
-  const filteredMenuGroups = React.useMemo(() => {
-    if (loading) {
-      return [];
-    }
+  // 권한에 따라 메뉴 그룹 필터링 - 최적화된 버전
+  const filteredMenuGroups = useMemo(() => {
+    if (loading) return [];
     
-    return allMenuItems.menuGroups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => hasPermission(item.menuKey, "view"))
-      }))
-      .filter((group) => group.items.length > 0); // 빈 그룹은 제외
+    const filtered = allMenuItems.menuGroups.reduce<MenuGroup[]>((acc, group) => {
+      const visibleItems = group.items.filter((item) => hasPermission(item.menuKey, "view"));
+      if (visibleItems.length > 0) {
+        acc.push({ ...group, items: visibleItems });
+      }
+      return acc;
+    }, []);
+    
+    return filtered;
   }, [loading, hasPermission]);
 
   return (
@@ -240,33 +298,12 @@ export const AppSidebar = memo(function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         {filteredMenuGroups.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupContent className="flex flex-col gap-2">
-              <SidebarGroupLabel className="text-base">{group.label}</SidebarGroupLabel>
-              <SidebarMenu>
-                {group.items.map((item) => {
-                  const isActive = pathname === item.url;
-                  return (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton
-                        size="lg"
-                        asChild
-                        className={cn(
-                          "data-[slot=sidebar-menu-button]:!p-1.5 text-base",
-                          isActive && "bg-gray-200 hover:bg-gray-200 text-gray-900"
-                        )}
-                      >
-                        <Link href={item.url} onClick={handleLinkClick}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <MenuGroupComponent
+            key={group.label}
+            group={group}
+            pathname={pathname}
+            onLinkClick={handleLinkClick}
+          />
         ))}
       </SidebarContent>
     </Sidebar>

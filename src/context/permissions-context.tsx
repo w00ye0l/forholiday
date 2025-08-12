@@ -134,12 +134,16 @@ export function PermissionsProvider({
     };
   }, [clearPermissions]);
 
-  // 특정 메뉴에 대한 권한 확인 - Map 기반으로 최적화
+  // 특정 메뉴에 대한 권한 확인 - Set 기반으로 더욱 최적화
   const hasPermission = useMemo(() => {
-    const permissionMap = new Map(permissions.map(p => [p.menu_key, p.has_access]));
+    const allowedMenus = new Set(
+      permissions
+        .filter(p => p.has_access)
+        .map(p => p.menu_key)
+    );
     
     return (menuKey: MenuKey, _type: 'view' | 'edit' = 'view') => {
-      return permissionMap.get(menuKey) || false;
+      return allowedMenus.has(menuKey);
     };
   }, [permissions]);
 
