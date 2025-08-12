@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { format, addDays } from "date-fns";
 import { ko } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +19,8 @@ import {
   Phone,
   ChevronDown,
   ChevronUp,
+  Edit3,
+  X,
 } from "lucide-react";
 import type { RentalReservation } from "@/types/rental";
 import type { StorageReservation } from "@/types/storage";
@@ -61,6 +63,31 @@ export default function Page() {
   const [savingNotes, setSavingNotes] = useState<{ T1: boolean; T2: boolean }>({
     T1: false,
     T2: false,
+  });
+  const [editingNotes, setEditingNotes] = useState<{
+    T1: boolean;
+    T2: boolean;
+  }>({
+    T1: false,
+    T2: false,
+  });
+  const [textareaHeights, setTextareaHeights] = useState<{
+    T1: number;
+    T2: number;
+  }>({
+    T1: 120,
+    T2: 120,
+  });
+  const divRefs = useRef<{
+    T1: HTMLDivElement | null;
+    T2: HTMLDivElement | null;
+  }>({
+    T1: null,
+    T2: null,
+  });
+  const [originalNotes, setOriginalNotes] = useState<TerminalNotes>({
+    T1: "",
+    T2: "",
   });
   const [showZeroCategories, setShowZeroCategories] = useState<{
     today: boolean;
@@ -161,10 +188,9 @@ export default function Page() {
       }
 
       // 성공 피드백
-      setTimeout(() => {
-        setSavingNotes((prev) => ({ ...prev, [terminal]: false }));
-        toast.success("특이사항이 저장되었습니다.");
-      }, 1000);
+      setSavingNotes((prev) => ({ ...prev, [terminal]: false }));
+      setEditingNotes((prev) => ({ ...prev, [terminal]: false }));
+      toast.success("특이사항이 저장되었습니다.");
     } catch (error) {
       console.error("특이사항 저장 실패:", error);
       alert("특이사항 저장에 실패했습니다.");
@@ -181,6 +207,27 @@ export default function Page() {
     },
     []
   );
+
+  const handleEditToggle = (terminal: "T1" | "T2") => {
+    if (!editingNotes[terminal]) {
+      // 편집 모드로 전환할 때 원본 텍스트 저장
+      setOriginalNotes((prev) => ({ ...prev, [terminal]: terminalNotes[terminal] }));
+      
+      // div의 높이를 측정
+      const divElement = divRefs.current[terminal];
+      if (divElement) {
+        const height = Math.max(divElement.offsetHeight, 120); // 최소 120px
+        setTextareaHeights((prev) => ({ ...prev, [terminal]: height }));
+      }
+    }
+    setEditingNotes((prev) => ({ ...prev, [terminal]: !prev[terminal] }));
+  };
+
+  const handleCancelEdit = (terminal: "T1" | "T2") => {
+    // 원본 텍스트로 되돌리기
+    setTerminalNotes((prev) => ({ ...prev, [terminal]: originalNotes[terminal] }));
+    setEditingNotes((prev) => ({ ...prev, [terminal]: false }));
+  };
 
   // T1, T2별 렌탈 필터링 함수 - useCallback으로 최적화
   const getRentalsByTerminal = useCallback(
@@ -496,13 +543,13 @@ export default function Page() {
                 >
                   {showZeroCategories.today ? (
                     <>
-                      <ChevronUp className="w-3 h-3 mr-1" />
-                      접기
+                      <ChevronUp className="w-3 h-3 md:mr-1" />
+                      <p className="hidden md:block">접기</p>
                     </>
                   ) : (
                     <>
-                      <ChevronDown className="w-3 h-3 mr-1" />
-                      전체보기
+                      <ChevronDown className="w-3 h-3 md:mr-1" />
+                      <p className="hidden md:block">전체보기</p>
                     </>
                   )}
                 </Button>
@@ -510,7 +557,7 @@ export default function Page() {
             </div>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <div className="text-2xl font-bold mb-4">
+            <div className="text-xl md:text-2xl font-bold mb-4">
               총 {stats.todayRentals.length}건
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-2 gap-y-1">
@@ -569,13 +616,13 @@ export default function Page() {
                 >
                   {showZeroCategories.tomorrow ? (
                     <>
-                      <ChevronUp className="w-3 h-3 mr-1" />
-                      접기
+                      <ChevronUp className="w-3 h-3 md:mr-1" />
+                      <p className="hidden md:block">접기</p>
                     </>
                   ) : (
                     <>
-                      <ChevronDown className="w-3 h-3 mr-1" />
-                      전체보기
+                      <ChevronDown className="w-3 h-3 md:mr-1" />
+                      <p className="hidden md:block">전체보기</p>
                     </>
                   )}
                 </Button>
@@ -583,7 +630,7 @@ export default function Page() {
             </div>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <div className="text-2xl font-bold mb-4">
+            <div className="text-xl md:text-2xl font-bold mb-4">
               총 {stats.tomorrowRentals.length}건
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-2 gap-y-1">
@@ -631,7 +678,7 @@ export default function Page() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <div className="text-2xl font-bold mb-2">
+            <div className="text-xl md:text-2xl font-bold mb-2">
               {stats.todayStorage.length}건
             </div>
             <div className="space-y-1">
@@ -672,7 +719,7 @@ export default function Page() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <div className="text-2xl font-bold mb-2">
+            <div className="text-xl md:text-2xl font-bold mb-2">
               {stats.totalDevicesAvailable}대
             </div>
             <div className="space-y-1">
@@ -706,29 +753,66 @@ export default function Page() {
                 <MapPin className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
                 T1 터미널 특이사항
               </CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleSaveNotes("T1")}
-                disabled={savingNotes.T1}
-                className="text-xs px-2 py-1 md:px-3 md:py-2"
-              >
-                {savingNotes.T1 ? (
-                  <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-spin" />
+              <div className="flex gap-2">
+                {editingNotes.T1 ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSaveNotes("T1")}
+                      disabled={savingNotes.T1}
+                      className="text-xs px-2 py-1 md:px-3 md:py-2"
+                    >
+                      {savingNotes.T1 ? (
+                        <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                      )}
+                      저장
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCancelEdit("T1")}
+                      disabled={savingNotes.T1}
+                      className="text-xs px-2 py-1 md:px-3 md:py-2"
+                    >
+                      <X className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                      취소
+                    </Button>
+                  </>
                 ) : (
-                  <Save className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleEditToggle("T1")}
+                    className="text-xs px-2 py-1 md:px-3 md:py-2"
+                  >
+                    <Edit3 className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                    수정
+                  </Button>
                 )}
-                저장
-              </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <Textarea
-              placeholder="T1 터미널의 특이사항이나 중요한 공지사항을 입력하세요..."
-              value={terminalNotes.T1}
-              onChange={(e) => handleNotesChange("T1", e.target.value)}
-              className="min-h-[120px] resize-none"
-            />
+            {editingNotes.T1 ? (
+              <Textarea
+                placeholder="T1 터미널의 특이사항이나 중요한 공지사항을 입력하세요..."
+                value={terminalNotes.T1}
+                onChange={(e) => handleNotesChange("T1", e.target.value)}
+                style={{ height: `${textareaHeights.T1}px` }}
+                className="resize-none"
+                autoFocus
+              />
+            ) : (
+              <div
+                ref={(el) => { divRefs.current.T1 = el; }}
+                className="min-h-[120px] p-3 border border-input bg-background rounded-md text-sm whitespace-pre-wrap"
+              >
+                {terminalNotes.T1 || "특이사항이 없습니다."}
+              </div>
+            )}
             <div className="text-xs text-gray-500 mt-2">
               모든 직원이 공유 가능한 특이사항
             </div>
@@ -743,29 +827,66 @@ export default function Page() {
                 <MapPin className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
                 T2 터미널 특이사항
               </CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleSaveNotes("T2")}
-                disabled={savingNotes.T2}
-                className="text-xs px-2 py-1 md:px-3 md:py-2"
-              >
-                {savingNotes.T2 ? (
-                  <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-spin" />
+              <div className="flex gap-2">
+                {editingNotes.T2 ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSaveNotes("T2")}
+                      disabled={savingNotes.T2}
+                      className="text-xs px-2 py-1 md:px-3 md:py-2"
+                    >
+                      {savingNotes.T2 ? (
+                        <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                      )}
+                      저장
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCancelEdit("T2")}
+                      disabled={savingNotes.T2}
+                      className="text-xs px-2 py-1 md:px-3 md:py-2"
+                    >
+                      <X className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                      취소
+                    </Button>
+                  </>
                 ) : (
-                  <Save className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleEditToggle("T2")}
+                    className="text-xs px-2 py-1 md:px-3 md:py-2"
+                  >
+                    <Edit3 className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                    수정
+                  </Button>
                 )}
-                저장
-              </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <Textarea
-              placeholder="T2 터미널의 특이사항이나 중요한 공지사항을 입력하세요..."
-              value={terminalNotes.T2}
-              onChange={(e) => handleNotesChange("T2", e.target.value)}
-              className="min-h-[120px] resize-none"
-            />
+            {editingNotes.T2 ? (
+              <Textarea
+                placeholder="T2 터미널의 특이사항이나 중요한 공지사항을 입력하세요..."
+                value={terminalNotes.T2}
+                onChange={(e) => handleNotesChange("T2", e.target.value)}
+                style={{ height: `${textareaHeights.T2}px` }}
+                className="resize-none"
+                autoFocus
+              />
+            ) : (
+              <div
+                ref={(el) => { divRefs.current.T2 = el; }}
+                className="min-h-[120px] p-3 border border-input bg-background rounded-md text-sm whitespace-pre-wrap"
+              >
+                {terminalNotes.T2 || "특이사항이 없습니다."}
+              </div>
+            )}
             <div className="text-xs text-gray-500 mt-2">
               모든 직원이 공유 가능한 특이사항
             </div>
