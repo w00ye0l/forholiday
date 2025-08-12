@@ -34,29 +34,30 @@ export function PermissionsProvider({
 }) {
   const { user } = useAuth();
   const [permissions, setPermissions] = useState<MenuPermission[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const [loading, setLoading] = useState(false); // 초기값 false로 변경
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // 권한 조회 함수
-  const fetchPermissions = useCallback(async () => {
-    if (!user) {
-      setPermissions([]);
-      setLoading(false);
-      setHasInitialized(false);
-      return;
-    }
-
-    // 이미 해당 사용자의 권한을 로드했다면 재조회하지 않음
-    if (hasInitialized) {
-      console.log('🔄 권한 이미 로드됨, 재조회 건너뜀');
-      return;
-    }
-
-    setLoading(true);
-    console.log('🔍 권한 데이터 조회 시작...');
+  // 권한 조회 함수 - 로그인 시에만 실행
+  const fetchPermissions = useCallback(async (userId: string) => {
+    console.log('🔍 권한 데이터 조회 시작...', userId);
 
     try {
-      const response = await fetch(`/api/users/menu-permissions?userId=${user.id}`);
+      // localStorage에서 캐시된 권한 확인
+      const cachedData = localStorage.getItem(`permissions_${userId}`);
+      if (cachedData) {
+        const { data, timestamp } = JSON.parse(cachedData);
+        // 24시간 내 캐시는 유효한 것으로 간주
+        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+          console.log('💾 캐시된 권한 데이터 사용');
+          setPermissions(data);
+          return; // 캐시 히트 시 로딩 상태 없이 즉시 반환
+        }
+      }
+
+      // 캐시 미스 시에만 로딩 상태 활성화
+      setLoading(true);
+
+      const response = await fetch(`/api/users/menu-permissions?userId=${userId}`);
       const result = await response.json();
 
       if (response.ok && result.success) {
@@ -66,7 +67,12 @@ export function PermissionsProvider({
         }));
         
         setPermissions(userPermissions);
-        setHasInitialized(true);
+        
+        // 권한 데이터를 localStorage에 캐시
+        localStorage.setItem(`permissions_${userId}`, JSON.stringify({
+          data: userPermissions,
+          timestamp: Date.now()
+        }));
         
         console.log('✅ 권한 데이터 로드 완료:', userPermissions.length, '개 권한');
       } else {
@@ -79,40 +85,41 @@ export function PermissionsProvider({
     } finally {
       setLoading(false);
     }
-  }, [user?.id]); // hasInitialized 제거하여 무한 루프 방지
+  }, []);
 
   // 권한 강제 새로고침 함수
   const refreshPermissions = useCallback(async () => {
-    setHasInitialized(false);
-    await fetchPermissions();
-  }, [fetchPermissions]);
+    if (currentUserId) {
+      // localStorage 캐시 삭제 후 다시 로드
+      localStorage.removeItem(`permissions_${currentUserId}`);
+      await fetchPermissions(currentUserId);
+    }
+  }, [currentUserId, fetchPermissions]);
 
   // 권한 데이터 클리어 함수
   const clearPermissions = useCallback(() => {
     setPermissions([]);
-    setHasInitialized(false);
+    setCurrentUserId(null);
     setLoading(false);
     console.log('🗑️ 권한 데이터 클리어됨');
   }, []);
 
-  // 사용자 변경 시 초기화 플래그 리셋
+  // 사용자 변경 감지 및 권한 로드
   useEffect(() => {
     if (user?.id) {
-      // 새로운 사용자인 경우에만 초기화 플래그 리셋
-      setHasInitialized(false);
-    }
-  }, [user?.id]);
-
-  // 권한 조회 실행
-  useEffect(() => {
-    if (user && !hasInitialized) {
-      console.log('👤 권한 조회 시작 for user:', user.id);
-      fetchPermissions();
-    } else if (!user) {
+      // 새로운 사용자인 경우에만 권한 로드
+      if (currentUserId !== user.id) {
+        console.log('👤 새로운 사용자 로그인:', user.id);
+        setCurrentUserId(user.id);
+        fetchPermissions(user.id);
+      } else {
+        console.log('🔄 동일한 사용자, 권한 재사용');
+      }
+    } else if (currentUserId) {
       console.log('🚪 사용자 로그아웃, 권한 클리어');
       clearPermissions();
     }
-  }, [user, hasInitialized]);
+  }, [user?.id, currentUserId, fetchPermissions, clearPermissions]);
 
   // 로그아웃 이벤트 리스너
   useEffect(() => {
@@ -127,12 +134,16 @@ export function PermissionsProvider({
     };
   }, [clearPermissions]);
 
-  // 특정 메뉴에 대한 권한 확인 - Map 기반으로 최적화
+  // 특정 메뉴에 대한 권한 확인 - Set 기반으로 더욱 최적화
   const hasPermission = useMemo(() => {
-    const permissionMap = new Map(permissions.map(p => [p.menu_key, p.has_access]));
+    const allowedMenus = new Set(
+      permissions
+        .filter(p => p.has_access)
+        .map(p => p.menu_key)
+    );
     
     return (menuKey: MenuKey, _type: 'view' | 'edit' = 'view') => {
-      return permissionMap.get(menuKey) || false;
+      return allowedMenus.has(menuKey);
     };
   }, [permissions]);
 

@@ -57,13 +57,14 @@ export function AuthProvider({
     // 권한 캐시 클리어 (전역 이벤트로 통신)
     window.dispatchEvent(new CustomEvent('clearPermissions'));
     
-    // 기타 클라이언트 캐시들 클리어
+    // 로컬스토리지의 권한 캐시 삭제
     if (typeof window !== 'undefined') {
-      // 로컬 스토리지 클리어 (필요한 경우)
-      // localStorage.removeItem('permissions');
-      
-      // 세션 스토리지 클리어 (필요한 경우)
-      // sessionStorage.clear();
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('permissions_')) {
+          localStorage.removeItem(key);
+        }
+      });
     }
   };
 

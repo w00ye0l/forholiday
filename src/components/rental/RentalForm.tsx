@@ -30,7 +30,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn, uploadContactImage, compressImage } from "@/lib/utils";
 import {
   CreateRentalReservationDto,
@@ -41,8 +40,8 @@ import {
   ReturnMethod,
   ReservationSite,
 } from "@/types/rental";
-import { 
-  DEVICE_FEATURES, 
+import {
+  DEVICE_FEATURES,
   DEVICE_CATEGORY_LABELS,
   DeviceCategory,
 } from "@/types/device";
@@ -68,10 +67,22 @@ import Link from "next/link";
  */
 
 // DEVICE_CATEGORY_LABELS의 키를 배열로 변환하여 타입 안전성 보장
-const deviceCategories = Object.keys(DEVICE_CATEGORY_LABELS) as [DeviceCategory, ...DeviceCategory[]];
-const pickupMethods = Object.keys(PICKUP_METHOD_LABELS) as [PickupMethod, ...PickupMethod[]];
-const returnMethods = Object.keys(RETURN_METHOD_LABELS) as [ReturnMethod, ...ReturnMethod[]];
-const reservationSites = Object.keys(RESERVATION_SITE_LABELS) as [ReservationSite, ...ReservationSite[]];
+const deviceCategories = Object.keys(DEVICE_CATEGORY_LABELS) as [
+  DeviceCategory,
+  ...DeviceCategory[],
+];
+const pickupMethods = Object.keys(PICKUP_METHOD_LABELS) as [
+  PickupMethod,
+  ...PickupMethod[],
+];
+const returnMethods = Object.keys(RETURN_METHOD_LABELS) as [
+  ReturnMethod,
+  ...ReturnMethod[],
+];
+const reservationSites = Object.keys(RESERVATION_SITE_LABELS) as [
+  ReservationSite,
+  ...ReservationSite[],
+];
 
 const formSchema = z.object({
   device_category: z.enum(deviceCategories),
@@ -87,7 +98,7 @@ const formSchema = z.object({
   renter_phone: z.string().optional(),
   renter_email: z.string().optional(),
   renter_address: z.string(),
-  data_transmission: z.boolean().default(false),
+  data_transmission: z.enum(["필요없음", "필요"] as const).default("필요없음"),
   sd_option: z.enum(["대여", "구매", "구매+대여"] as const).optional(),
   reservation_site: z.enum(reservationSites),
   order_number: z.string().min(1, "주문번호는 필수입니다"),
@@ -136,7 +147,7 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
       renter_name: "",
       renter_phone: "",
       renter_address: "",
-      data_transmission: false,
+      data_transmission: "필요없음",
       sd_option: undefined,
       reservation_site: undefined,
       contact_input_type: "text" as const,
@@ -181,11 +192,12 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
         }
       }
 
-      // Date 객체를 문자열로 변환
+      // Date 객체를 문자열로 변환하고 data_transmission을 boolean으로 변환
       const formattedData: CreateRentalReservationDto = {
         ...data,
         pickup_date: format(data.pickup_date, "yyyy-MM-dd"),
         return_date: format(data.return_date, "yyyy-MM-dd"),
+        data_transmission: data.data_transmission === "필요", // 문자열을 boolean으로 변환
       };
 
       await onSubmit(formattedData);
@@ -252,7 +264,7 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
 
         {/* 2. 대여 정보 */}
         {/* 기기 선택 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <FormField
             control={form.control}
             name="device_category"
@@ -635,16 +647,23 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
             control={form.control}
             name="data_transmission"
             render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>데이터 전송 필요</FormLabel>
-                </div>
+              <FormItem>
+                <FormLabel>데이터 전송</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="데이터 전송 옵션을 선택해주세요" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="필요없음">필요없음</SelectItem>
+                    <SelectItem value="필요">필요</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
               </FormItem>
             )}
           />

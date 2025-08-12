@@ -14,17 +14,13 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { RentalEditDialog } from "@/components/rental/RentalEditDialog";
 import {
   RentalReservation,
   ReservationStatus,
   DisplayStatus,
   STATUS_MAP,
   RETURN_METHOD_LABELS,
-  PICKUP_METHOD_LABELS,
-  RESERVATION_SITE_LABELS,
-  PickupMethod,
-  ReturnMethod,
-  ReservationSite,
 } from "@/types/rental";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -35,22 +31,6 @@ import {
   MapPinIcon,
   EditIcon,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
-import { DEVICE_FEATURES } from "@/types/device";
 import {
   Pagination,
   PaginationContent,
@@ -78,7 +58,9 @@ export function ReturnList({
   const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
-  const [editingRental, setEditingRental] = useState<RentalReservation | null>(null);
+  const [editingRental, setEditingRental] = useState<RentalReservation | null>(
+    null
+  );
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // 페이지네이션 상태
@@ -124,21 +106,7 @@ export function ReturnList({
     return pages;
   };
 
-  // 30분 단위 시간 옵션 생성
-  const generateTimeOptions = () => {
-    const times = [];
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const timeString = `${hour.toString().padStart(2, "0")}:${minute
-          .toString()
-          .padStart(2, "0")}`;
-        times.push(timeString);
-      }
-    }
-    return times;
-  };
 
-  const timeOptions = generateTimeOptions();
 
   const supabase = createClient();
 
@@ -238,7 +206,7 @@ export function ReturnList({
   };
 
   return (
-    <div className="space-y-4">
+    <>
       <div className="grid gap-2 md:gap-4 md:grid-cols-2 xl:grid-cols-3">
         {paginatedRentals.map((rental) => (
           <Card
@@ -485,7 +453,9 @@ export function ReturnList({
 
               <PaginationItem>
                 <PaginationNext
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  onClick={() =>
+                    setCurrentPage(Math.min(totalPages, currentPage + 1))
+                  }
                   className={
                     currentPage === totalPages
                       ? "pointer-events-none opacity-50"
@@ -498,525 +468,63 @@ export function ReturnList({
         </div>
       )}
 
-      {/* Single Dialog for editing - outside the map */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-full overflow-auto">
-          <DialogHeader>
-            <DialogTitle>예약 상세 정보</DialogTitle>
-            <DialogDescription>
-              예약 정보를 수정하거나 확인할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
-          {editingRental && (
-            <div className="space-y-4">
-              {/* 기본 정보 - 2컬럼 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">
-                    예약자명
-                  </label>
-                  <Input
-                    value={editingRental.renter_name}
-                    onChange={(e) => {
-                      if (editingRental) {
-                        setEditingRental({
-                          ...editingRental,
-                          renter_name: e.target.value,
-                        });
-                      }
-                    }}
-                    className="text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">
-                    연락처
-                  </label>
-                  <Input
-                    value={editingRental.renter_phone}
-                    onChange={(e) => {
-                      if (editingRental) {
-                        setEditingRental({
-                          ...editingRental,
-                          renter_phone: e.target.value,
-                        });
-                      }
-                    }}
-                    className="text-sm"
-                  />
-                </div>
-              </div>
+      {/* Rental Edit Dialog */}
+      <RentalEditDialog
+        isOpen={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        rental={
+          editingRental
+            ? {
+                id: editingRental.id,
+                renter_name: editingRental.renter_name,
+                renter_phone: editingRental.renter_phone,
+                renter_email: editingRental.renter_email,
+                pickup_date: editingRental.pickup_date,
+                pickup_time: editingRental.pickup_time,
+                pickup_terminal: editingRental.pickup_method,
+                return_date: editingRental.return_date,
+                return_time: editingRental.return_time,
+                return_terminal: editingRental.return_method,
+                device_category: editingRental.device_category,
+                description: editingRental.description,
+                sd_option: editingRental.sd_option,
+                data_transmission: editingRental.data_transmission,
+              }
+            : null
+        }
+        onSave={async (rental) => {
+          try {
+            const { error } = await supabase
+              .from("rental_reservations")
+              .update({
+                renter_name: rental.renter_name,
+                renter_phone: rental.renter_phone,
+                renter_email: rental.renter_email,
+                pickup_date: rental.pickup_date,
+                pickup_time: rental.pickup_time,
+                pickup_method: rental.pickup_terminal as any,
+                return_date: rental.return_date,
+                return_time: rental.return_time,
+                return_method: rental.return_terminal as any,
+                device_category: rental.device_category,
+                description: rental.description,
+                sd_option: rental.sd_option,
+                data_transmission: rental.data_transmission,
+              })
+              .eq("id", rental.id);
 
-              {/* 이메일 - 1컬럼 */}
-              <div>
-                <label className="text-sm font-medium">
-                  이메일
-                </label>
-                <Input
-                  value={editingRental.renter_email || ""}
-                  onChange={(e) => {
-                    if (editingRental) {
-                      setEditingRental({
-                        ...editingRental,
-                        renter_email: e.target.value,
-                      });
-                    }
-                  }}
-                  className="text-sm"
-                  placeholder="이메일 주소"
-                />
-              </div>
+            if (error) throw error;
 
-              {/* 수령 날짜/시간 - 2컬럼 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">
-                    수령 날짜
-                  </label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal text-sm",
-                          !editingRental.pickup_date &&
-                            "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {editingRental.pickup_date ? (
-                          format(
-                            new Date(editingRental.pickup_date),
-                            "PPP",
-                            { locale: ko }
-                          )
-                        ) : (
-                          <span>수령 날짜를 선택하세요</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="w-auto p-0"
-                      align="start"
-                    >
-                      <Calendar
-                        mode="single"
-                        selected={
-                          editingRental.pickup_date
-                            ? new Date(editingRental.pickup_date)
-                            : undefined
-                        }
-                        onSelect={(date) => {
-                          if (editingRental) {
-                            setEditingRental({
-                              ...editingRental,
-                              pickup_date: date
-                                ? format(date, "yyyy-MM-dd")
-                                : "",
-                            });
-                          }
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">
-                    수령 시간
-                  </label>
-                  <Select
-                    value={
-                      editingRental.pickup_time
-                        ? editingRental.pickup_time.slice(0, 5)
-                        : ""
-                    }
-                    onValueChange={(value) => {
-                      if (editingRental) {
-                        setEditingRental({
-                          ...editingRental,
-                          pickup_time: value,
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="text-sm">
-                      <SelectValue placeholder="수령 시간을 선택하세요">
-                        {editingRental.pickup_time
-                          ? editingRental.pickup_time.slice(0, 5)
-                          : "수령 시간을 선택하세요"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {timeOptions.map((time) => (
-                        <SelectItem
-                          key={`pickup-${time}`}
-                          value={time}
-                        >
-                          {time}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* 반납 날짜/시간 - 2컬럼 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">
-                    반납 날짜
-                  </label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal text-sm",
-                          !editingRental.return_date &&
-                            "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {editingRental.return_date ? (
-                          format(
-                            new Date(editingRental.return_date),
-                            "PPP",
-                            { locale: ko }
-                          )
-                        ) : (
-                          <span>반납 날짜를 선택하세요</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="w-auto p-0"
-                      align="start"
-                    >
-                      <Calendar
-                        mode="single"
-                        selected={
-                          editingRental.return_date
-                            ? new Date(editingRental.return_date)
-                            : undefined
-                        }
-                        onSelect={(date) => {
-                          if (editingRental) {
-                            setEditingRental({
-                              ...editingRental,
-                              return_date: date
-                                ? format(date, "yyyy-MM-dd")
-                                : "",
-                            });
-                          }
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">
-                    반납 시간
-                  </label>
-                  <Select
-                    value={
-                      editingRental.return_time
-                        ? editingRental.return_time.slice(0, 5)
-                        : ""
-                    }
-                    onValueChange={(value) => {
-                      if (editingRental) {
-                        setEditingRental({
-                          ...editingRental,
-                          return_time: value,
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="text-sm">
-                      <SelectValue placeholder="반납 시간을 선택하세요">
-                        {editingRental.return_time
-                          ? editingRental.return_time.slice(0, 5)
-                          : "반납 시간을 선택하세요"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {timeOptions.map((time) => (
-                        <SelectItem
-                          key={`return-${time}`}
-                          value={time}
-                        >
-                          {time}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* 수령/반납 방법 - 2컬럼 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">
-                    수령 방법
-                  </label>
-                  <Select
-                    value={editingRental.pickup_method}
-                    onValueChange={(value) => {
-                      if (editingRental) {
-                        setEditingRental({
-                          ...editingRental,
-                          pickup_method: value as PickupMethod,
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(PICKUP_METHOD_LABELS).map(
-                        ([method, label]) => (
-                          <SelectItem key={method} value={method}>
-                            {label}
-                          </SelectItem>
-                        )
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">
-                    반납 방법
-                  </label>
-                  <Select
-                    value={editingRental.return_method}
-                    onValueChange={(value) => {
-                      if (editingRental) {
-                        setEditingRental({
-                          ...editingRental,
-                          return_method: value as ReturnMethod,
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(RETURN_METHOD_LABELS).map(
-                        ([method, label]) => (
-                          <SelectItem key={method} value={method}>
-                            {label}
-                          </SelectItem>
-                        )
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* 데이터 전송 및 SD 카드 옵션 - 기기 카테고리에 따라 조건부 렌더링 */}
-              {/* 데이터 전송 옵션 (핸드폰 기종일 경우만) */}
-              {DEVICE_FEATURES.PHONE_CATEGORIES.includes(
-                editingRental.device_category
-              ) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">
-                      데이터 전송
-                    </label>
-                    <Select
-                      value={
-                        editingRental.data_transmission
-                          ? "true"
-                          : "false"
-                      }
-                      onValueChange={(value) => {
-                        if (editingRental) {
-                          setEditingRental({
-                            ...editingRental,
-                            data_transmission: value === "true",
-                          });
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="true">예</SelectItem>
-                        <SelectItem value="false">
-                          아니오
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
-
-              {/* SD 카드 옵션 (카메라 기종일 경우만) */}
-              {DEVICE_FEATURES.CAMERA_CATEGORIES.includes(
-                editingRental.device_category
-              ) && (
-                <div>
-                  <label className="text-sm font-medium">
-                    SD 카드 옵션
-                  </label>
-                  <Select
-                    value={editingRental.sd_option || "none"}
-                    onValueChange={(value) => {
-                      if (editingRental) {
-                        setEditingRental({
-                          ...editingRental,
-                          sd_option:
-                            value === "none"
-                              ? undefined
-                              : (value as
-                                  | "대여"
-                                  | "구매"
-                                  | "구매+대여"),
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="선택하세요" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">없음</SelectItem>
-                      <SelectItem value="대여">대여</SelectItem>
-                      <SelectItem value="구매">구매</SelectItem>
-                      <SelectItem value="구매+대여">
-                        구매+대여
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* 주소와 예약사이트 정보 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">
-                    주소
-                  </label>
-                  <Input
-                    value={editingRental.renter_address}
-                    onChange={(e) => {
-                      if (editingRental) {
-                        setEditingRental({
-                          ...editingRental,
-                          renter_address: e.target.value,
-                        });
-                      }
-                    }}
-                    className="text-sm"
-                    placeholder="주소를 입력하세요"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">
-                    예약 사이트
-                  </label>
-                  <Select
-                    value={editingRental.reservation_site}
-                    onValueChange={(value) => {
-                      if (editingRental) {
-                        setEditingRental({
-                          ...editingRental,
-                          reservation_site: value as ReservationSite,
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(RESERVATION_SITE_LABELS).map(
-                        ([site, label]) => (
-                          <SelectItem key={site} value={site}>
-                            {label}
-                          </SelectItem>
-                        )
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">비고</label>
-                <Input
-                  value={editingRental.description || ""}
-                  onChange={(e) => {
-                    if (editingRental) {
-                      setEditingRental({
-                        ...editingRental,
-                        description: e.target.value,
-                      });
-                    }
-                  }}
-                  className="text-sm"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <DialogClose asChild>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setEditingRental(null);
-                      setIsDialogOpen(false);
-                    }}
-                  >
-                    취소
-                  </Button>
-                </DialogClose>
-                <Button
-                  onClick={async () => {
-                    if (!editingRental) return;
-                    
-                    try {
-                      // 예약 정보 업데이트
-                      const { error } = await supabase
-                        .from("rental_reservations")
-                        .update({
-                          renter_name: editingRental.renter_name,
-                          renter_phone: editingRental.renter_phone,
-                          renter_email: editingRental.renter_email,
-                          renter_address: editingRental.renter_address,
-                          pickup_method: editingRental.pickup_method,
-                          pickup_date: editingRental.pickup_date,
-                          pickup_time: editingRental.pickup_time,
-                          return_method: editingRental.return_method,
-                          return_date: editingRental.return_date,
-                          return_time: editingRental.return_time,
-                          reservation_site: editingRental.reservation_site,
-                          data_transmission: editingRental.data_transmission,
-                          sd_option: editingRental.sd_option || null,
-                          description: editingRental.description,
-                        })
-                        .eq("id", editingRental.id);
-
-                      if (error) throw error;
-
-                      toast.success("예약 정보가 수정되었습니다.");
-                      setEditingRental(null);
-                      setIsDialogOpen(false);
-                      onStatusUpdate?.();
-                    } catch (error) {
-                      console.error("예약 수정 실패:", error);
-                      toast.error("예약 수정에 실패했습니다.");
-                    }
-                  }}
-                >
-                  저장
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+            toast.success("예약 정보가 수정되었습니다.");
+            setEditingRental(null);
+            setIsDialogOpen(false);
+            onStatusUpdate?.();
+          } catch (error) {
+            console.error("예약 수정 실패:", error);
+            toast.error("예약 수정에 실패했습니다.");
+          }
+        }}
+      />
+    </>
   );
 }

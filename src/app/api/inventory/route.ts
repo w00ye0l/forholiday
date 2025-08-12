@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { findOptimalDeviceWithTagPriority } from "@/lib/algorithms/auto-assign";
+import { assignDevicesForTimelineDisplayWithHistory } from "@/lib/algorithms/auto-assign";
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,22 +32,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log("🔄 Inventory API 시작:", {
-      startDate,
-      endDate,
-      categories,
-      userId: user.id,
+    // 필수 로그: API 요청 추적
+    console.log("📊 Inventory API:", { 
+      dateRange: `${startDate}~${endDate}`, 
+      categories: categories?.split(',').length || 0 
     });
 
-    // 1. 배치 처리 상수 정의
+    // 1. 배치 처리 상수 정의 (성능 최적화)
     const batchSize = 1000;
+    const startTime = Date.now();
 
     // 2. 모든 기기 정보 가져오기 (배치 처리)
     let allDevicesData: any[] = [];
     let deviceFrom = 0;
     let hasMoreDevices = true;
-
-    console.log("🔄 배치 처리로 기기 데이터 조회 시작");
 
     while (hasMoreDevices) {
       const { data: devicesData, error: devicesError } = await supabase
@@ -73,12 +71,10 @@ export async function GET(request: NextRequest) {
 
       // 안전장치
       if (allDevicesData.length >= 10000) {
-        console.log("⚠️ 기기 최대 제한(1만개)에 도달하여 조회 중단");
+        console.warn("⚠️ 기기 최대 제한에 도달");
         break;
       }
     }
-
-    console.log(`✅ 기기 데이터 조회 완료: 총 ${allDevicesData.length}개`);
 
     // 3. 카테고리 필터링
     const selectedCategories = categories ? categories.split(",") : [];
@@ -89,13 +85,49 @@ export async function GET(request: NextRequest) {
           )
         : allDevicesData;
 
-    // 4. 날짜 범위에 해당하는 예약 데이터 가져오기 (배치 처리로 1000개 제한 해결)
-    // 미반납 예약을 포함하여 모든 관련 예약 조회
+    // 4. 전체 예약 데이터 가져오기 (임시 할당을 위한 기기 사용 이력 파악)
+    let allReservationsForHistory: any[] = [];
+    let historyFrom = 0;
+    let historyHasMore = true;
+
+
+    while (historyHasMore) {
+      const { data: historyData, error: historyError } =
+        await supabase
+          .from("rental_reservations")
+          .select("*")
+          .not("device_tag_name", "is", null) // 할당된 기기가 있는 예약만
+          .range(historyFrom, historyFrom + batchSize - 1);
+
+      if (historyError) {
+        console.error("❌ 전체 예약 데이터 조회 오류:", historyError);
+        return NextResponse.json(
+          { success: false, error: "전체 예약 데이터 조회에 실패했습니다." },
+          { status: 500 }
+        );
+      }
+
+      if (historyData && historyData.length > 0) {
+        allReservationsForHistory = [...allReservationsForHistory, ...historyData];
+        historyFrom += batchSize;
+        historyHasMore = historyData.length === batchSize;
+      } else {
+        historyHasMore = false;
+      }
+
+      // 안전장치
+      if (allReservationsForHistory.length >= 100000) {
+        console.warn("⚠️ 전체 예약 최대 제한에 도달");
+        break;
+      }
+    }
+
+
+    // 5. 날짜 범위에 해당하는 표시용 예약 데이터 가져오기
     let allReservations: any[] = [];
     let from = 0;
     let hasMore = true;
 
-    console.log("🔄 배치 처리로 예약 데이터 조회 시작");
 
     while (hasMore) {
       const { data: reservationsData, error: reservationsError } =
@@ -103,14 +135,15 @@ export async function GET(request: NextRequest) {
           .from("rental_reservations")
           .select("*")
           .or(
-            `and(pickup_date.lte.${endDate},return_date.gte.${startDate}),status.neq.returned`
+            `and(pickup_date.lte.${endDate},return_date.gte.${startDate}),and(pickup_date.gte.${startDate},pickup_date.lte.${endDate}),and(return_date.gte.${startDate},return_date.lte.${endDate})`
           )
           .range(from, from + batchSize - 1);
 
+
       if (reservationsError) {
-        console.error("❌ 예약 데이터 조회 오류:", reservationsError);
+        console.error("❌ 표시용 예약 데이터 조회 오류:", reservationsError);
         return NextResponse.json(
-          { success: false, error: "예약 데이터 조회에 실패했습니다." },
+          { success: false, error: "표시용 예약 데이터 조회에 실패했습니다." },
           { status: 500 }
         );
       }
@@ -119,36 +152,17 @@ export async function GET(request: NextRequest) {
         allReservations = [...allReservations, ...reservationsData];
         from += batchSize;
         hasMore = reservationsData.length === batchSize;
-        console.log(
-          `📊 배치 ${Math.floor(from / batchSize)}: ${
-            reservationsData.length
-          }개 조회됨 (누적: ${allReservations.length}개)`
-        );
       } else {
         hasMore = false;
       }
 
       // 안전장치: 최대 10만개까지만
       if (allReservations.length >= 100000) {
-        console.log("⚠️ 최대 제한(10만개)에 도달하여 조회 중단");
+        console.warn("⚠️ 표시용 예약 최대 제한에 도달");
         break;
       }
     }
 
-    console.log(`✅ 예약 데이터 조회 완료: 총 ${allReservations.length}개`);
-
-    console.log("📅 날짜 필터링된 예약:", {
-      dateRange: `${startDate} ~ ${endDate}`,
-      filteredCount: allReservations?.length || 0,
-      sampleReservation: allReservations?.[0]
-        ? {
-            pickup_date: allReservations[0].pickup_date,
-            return_date: allReservations[0].return_date,
-            device_category: allReservations[0].device_category,
-            status: allReservations[0].status,
-          }
-        : null,
-    });
 
     // 4. 기기 목록과 카테고리 맵 생성
     const devicesList = filteredDevices.map((device) => device.tag_name);
@@ -157,14 +171,18 @@ export async function GET(request: NextRequest) {
     );
 
     // 5. 기기 목록에 해당하는 예약만 선별 (카테고리 기반 필터링 포함)
+
     const filteredReservations = allReservations.filter((reservation) => {
       // 기기 태그가 있으면 해당 기기가 포함되는지 확인
       if (reservation.device_tag_name) {
-        return devicesList.includes(reservation.device_tag_name);
+        const included = devicesList.includes(reservation.device_tag_name);
+        return included;
       }
       // 기기 태그가 없으면 카테고리가 선택된 카테고리에 포함되는지 확인
-      return selectedCategories.includes(reservation.device_category);
+      const included = selectedCategories.includes(reservation.device_category);
+      return included;
     });
+
 
     // 6. 예약 정보 변환
     const rentalReservations = filteredReservations
@@ -217,10 +235,9 @@ export async function GET(request: NextRequest) {
       })
       .filter((r) => r !== null);
 
-    // 6.5. 일관된 기기 할당 (이미 할당된 기기는 유지, 미할당만 최적화)
-    console.log("🔧 일관된 기기 할당 시작");
+    // 6.5. 타임라인 표시용 임시 할당 (실제 DB는 변경하지 않음)
 
-    // 카테고리별로 기기 그룹화
+    // 카테고리별로 기기 그룹화 (이름순 정렬)
     const devicesByCategory = new Map();
     filteredDevices.forEach((device) => {
       if (!devicesByCategory.has(device.category)) {
@@ -229,61 +246,19 @@ export async function GET(request: NextRequest) {
       devicesByCategory.get(device.category).push(device.tag_name);
     });
 
-    // 이미 할당된 기기와 미할당 예약 분리
-    const alreadyAssigned = rentalReservations.filter((r) => r.device_tag_name);
-    const unassignedReservations = rentalReservations.filter(
-      (r) => !r.device_tag_name
+    // 카테고리별로 기기 이름순 정렬
+    devicesByCategory.forEach((devices, category) => {
+      devicesByCategory.set(category, devices.sort());
+    });
+
+
+    // 할당 알고리즘을 사용하여 타임라인 표시용 임시 할당
+    const assignedReservations = assignDevicesForTimelineDisplayWithHistory(
+      rentalReservations,
+      allReservationsForHistory,
+      devicesByCategory
     );
 
-    // 기기 사용 이력 맵 생성 (이미 할당된 예약만 포함)
-    const deviceUsageHistory = new Map();
-    alreadyAssigned.forEach((reservation) => {
-      if (!deviceUsageHistory.has(reservation.device_tag_name)) {
-        deviceUsageHistory.set(reservation.device_tag_name, []);
-      }
-      deviceUsageHistory.get(reservation.device_tag_name).push({
-        pickup_date: reservation.pickup_date,
-        return_date: reservation.return_date,
-      });
-    });
-
-    // 태그 우선 할당 알고리즘 사용
-
-    // 미할당 예약들만 태그 우선 할당 알고리즘으로 할당
-    const newlyAssigned: any[] = [];
-    unassignedReservations.forEach((reservation) => {
-      const availableDevices =
-        devicesByCategory.get(reservation.device_category) || [];
-
-      // 태그 우선 할당 알고리즘 적용
-      const assignmentResult = findOptimalDeviceWithTagPriority(
-        reservation,
-        availableDevices,
-        deviceUsageHistory
-      );
-
-      if (assignmentResult.success && assignmentResult.deviceTag) {
-        // 할당된 기기의 사용 이력 업데이트
-        if (!deviceUsageHistory.has(assignmentResult.deviceTag)) {
-          deviceUsageHistory.set(assignmentResult.deviceTag, []);
-        }
-        deviceUsageHistory.get(assignmentResult.deviceTag).push({
-          pickup_date: reservation.pickup_date,
-          return_date: reservation.return_date,
-        });
-
-        newlyAssigned.push({
-          ...reservation,
-          device_tag_name: assignmentResult.deviceTag,
-        });
-      } else {
-        // 할당 실패한 예약은 그대로 유지
-        newlyAssigned.push(reservation);
-      }
-    });
-
-    // 이미 할당된 예약과 새로 할당된 예약 통합
-    const assignedReservations = [...alreadyAssigned, ...newlyAssigned];
 
     // 7. 날짜별 타임슬롯 생성
     const start = new Date(startDate);
@@ -310,24 +285,19 @@ export async function GET(request: NextRequest) {
         return isInDateRange || isUnreturned;
       });
 
+
       return {
         date: dateStr,
         reservations: slotReservations,
       };
     });
 
-    console.log("✅ Inventory API 완료:", {
-      devicesCount: devicesList.length,
-      reservationsCount: assignedReservations.length,
-      timeSlotsCount: timeSlots.length,
-      slotsWithReservations: timeSlots.filter(
-        (slot) => slot.reservations.length > 0
-      ).length,
-      totalReservationsInSlots: timeSlots.reduce(
-        (sum, slot) => sum + slot.reservations.length,
-        0
-      ),
-    });
+
+    // 성능 로깅 (필요시)
+    const executionTime = Date.now() - startTime;
+    if (executionTime > 1000) { // 1초 이상일 때만 로그
+      console.warn(`⚡ Slow API response: ${executionTime}ms`);
+    }
 
     return NextResponse.json({
       success: true,

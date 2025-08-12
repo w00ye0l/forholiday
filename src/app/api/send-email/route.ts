@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
@@ -137,33 +137,22 @@ export async function POST(request: NextRequest) {
     }
 
     // 환경 변수 검증
-    if (
-      !process.env.SMTP_HOST ||
-      !process.env.SMTP_USER ||
-      !process.env.SMTP_PASS
-    ) {
-      console.error("SMTP configuration missing");
+    if (!process.env.RESEND_API_KEY) {
+      console.error("Resend API key missing");
       return NextResponse.json(
-        { success: false, error: "SMTP 설정이 없습니다." },
+        { success: false, error: "Resend API 키가 없습니다." },
         { status: 500 }
       );
     }
 
-    // Nodemailer transporter 생성
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || "587"),
-      secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    // Resend 클라이언트 생성
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
     // 이메일 옵션
-    const mailOptions = {
-      from: `"포할리데이" <${process.env.SMTP_USER}>`,
-      to: to,
+    const emailOptions = {
+      from: "Forholiday <onboarding@resend.dev>", // Resend 기본 도메인 사용
+      reply_to: "forholidayg@gmail.com", // 답장 받을 실제 Gmail 주소
+      to: [to],
       subject: finalSubject,
       text: finalContent.replace(/<[^>]*>/g, ""), // HTML 태그 제거하여 text 버전 생성
       html:
@@ -175,16 +164,31 @@ export async function POST(request: NextRequest) {
         filename: attachment.filename,
         content: attachment.content,
       })),
+      // 스팸 방지를 위한 헤더 추가
+      headers: {
+        "X-Entity-Ref-ID": `forholiday-${Date.now()}`, // 고유 ID로 스레드 방지
+        "List-Unsubscribe": "<mailto:forholidayg@gmail.com>", // 구독 해제 링크
+        "X-Priority": "3", // 일반 우선순위
+        "X-Mailer": "FORHOLIDAY Email Service v1.0", // 메일러 식별
+      },
     };
 
     // 이메일 전송
-    const info = await transporter.sendMail(mailOptions);
+    const { data, error } = await resend.emails.send(emailOptions);
 
-    console.log("Email sent:", info.messageId);
+    if (error) {
+      console.error("Resend error:", error);
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      );
+    }
+
+    console.log("Email sent:", data?.id);
 
     return NextResponse.json({
       success: true,
-      messageId: info.messageId,
+      messageId: data?.id,
       transferId: transferId,
     });
   } catch (error) {

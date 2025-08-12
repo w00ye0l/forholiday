@@ -23,22 +23,25 @@ export const ROLE_COLORS = {
   staff: 'bg-blue-100 text-blue-800',
 } as const;
 
-// 메뉴 타입 정의
-export type MenuKey = 
-  | 'dashboard'
-  | 'users'
-  | 'rentals'
-  | 'rentals_pending'
-  | 'rentals_pickup'
-  | 'rentals_return'
-  | 'rentals_data'
-  | 'storage'
-  | 'storage_pending'
-  | 'storage_stored'
-  | 'storage_pickup'
-  | 'devices'
-  | 'arrival_checkin_admin'
-  | 'customer_check_reservation'
-  | 'customer_arrival_checkin'
-  | 'data_management';
+// 메뉴 타입 정의 - const assertion으로 최적화
+export const MENU_KEYS = [
+  'dashboard',
+  'users',
+  'rentals',
+  'rentals_pending',
+  'rentals_pickup',
+  'rentals_return',
+  'rentals_data',
+  'storage',
+  'storage_pending',
+  'storage_stored',
+  'storage_pickup',
+  'devices',
+  'arrival_checkin_admin',
+  'customer_check_reservation',
+  'customer_arrival_checkin',
+  'data_management'
+] as const;
+
+export type MenuKey = typeof MENU_KEYS[number];
 

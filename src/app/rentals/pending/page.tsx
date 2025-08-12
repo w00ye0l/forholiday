@@ -47,6 +47,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { RentalEditDialog } from "@/components/rental/RentalEditDialog";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
 
@@ -106,6 +109,9 @@ export default function RentalsPendingPage() {
   const [canceledReservationIds, setCanceledReservationIds] = React.useState<
     Set<string>
   >(new Set());
+  const [showEditDialog, setShowEditDialog] = React.useState(false);
+  const [selectedReservation, setSelectedReservation] =
+    React.useState<any>(null);
 
   // 검색 및 필터 상태
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -234,6 +240,30 @@ export default function RentalsPendingPage() {
     if (selectedRows.size === 0) return;
     setShowCancelDialog(true);
   }, [selectedRows.size]);
+
+  const handleDetailClick = React.useCallback(async (reservation: any) => {
+    try {
+      const supabase = createClient();
+      
+      // 실제 데이터베이스에서 최신 예약 정보 가져오기
+      const { data, error } = await supabase
+        .from("rental_reservations")
+        .select("*")
+        .eq("reservation_id", reservation["예약번호"])
+        .single();
+
+      if (error || !data) {
+        toast.error("예약 정보를 찾을 수 없습니다.");
+        return;
+      }
+
+      setSelectedReservation(data);
+      setShowEditDialog(true);
+    } catch (error) {
+      console.error("예약 정보 로딩 오류:", error);
+      toast.error("예약 정보를 불러오는데 실패했습니다.");
+    }
+  }, []);
 
   // 필터링된 데이터
   const filteredData = React.useMemo(() => {
@@ -635,6 +665,35 @@ export default function RentalsPendingPage() {
             displayValue = highlightText(value.toString(), searchTerm);
           }
 
+          // 예약번호 필드인 경우 두 줄로 표시 (번호 + 뱃지)
+          if (header === "예약번호") {
+            return (
+              <div
+                className={`${isConfirmed ? "font-medium" : ""} ${
+                  isCanceled ? "opacity-50 text-gray-500" : ""
+                }`}
+                style={
+                  isCanceled ? { textDecoration: "line-through" } : undefined
+                }
+              >
+                <div>{displayValue}</div>
+                {isConfirmed && (
+                  <button
+                    onClick={() => handleDetailClick(rowData)}
+                    className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded mt-1 inline-block hover:bg-green-200 transition-colors cursor-pointer"
+                  >
+                    확정됨
+                  </button>
+                )}
+                {isCanceled && (
+                  <div className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded mt-1 inline-block">
+                    취소됨
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           return (
             <span
               className={`${isConfirmed ? "font-medium" : ""} ${
@@ -645,16 +704,6 @@ export default function RentalsPendingPage() {
               }
             >
               {displayValue}
-              {isConfirmed && header === "예약번호" && (
-                <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                  확정됨
-                </span>
-              )}
-              {isCanceled && header === "예약번호" && (
-                <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
-                  취소됨
-                </span>
-              )}
             </span>
           );
         },
@@ -1098,10 +1147,10 @@ export default function RentalsPendingPage() {
                             )
                               ? "bg-red-50 border-red-200 hover:bg-red-100"
                               : confirmedReservationIds.has(
-                                  generateReservationId(row.original)
-                                )
-                              ? "bg-green-50 border-green-200 hover:bg-green-100"
-                              : "hover:bg-gray-50"
+                                    generateReservationId(row.original)
+                                  )
+                                ? "bg-green-50 border-green-200 hover:bg-green-100"
+                                : "hover:bg-gray-50"
                           }
                         >
                           {row.getVisibleCells().map((cell) => (
@@ -1114,10 +1163,10 @@ export default function RentalsPendingPage() {
                                 )
                                   ? "text-red-800"
                                   : confirmedReservationIds.has(
-                                      generateReservationId(row.original)
-                                    )
-                                  ? "text-green-800"
-                                  : ""
+                                        generateReservationId(row.original)
+                                      )
+                                    ? "text-green-800"
+                                    : ""
                               )}
                             >
                               {flexRender(
@@ -1206,6 +1255,69 @@ export default function RentalsPendingPage() {
           </div>
         </>
       )}
+
+      {/* 예약 수정 다이얼로그 */}
+      <RentalEditDialog
+        isOpen={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        rental={
+          selectedReservation
+            ? {
+                id: selectedReservation.id,
+                renter_name: selectedReservation.renter_name,
+                renter_phone: selectedReservation.renter_phone,
+                renter_email: selectedReservation.renter_email,
+                pickup_date: selectedReservation.pickup_date,
+                pickup_time: selectedReservation.pickup_time,
+                pickup_terminal: selectedReservation.pickup_method,
+                return_date: selectedReservation.return_date,
+                return_time: selectedReservation.return_time,
+                return_terminal: selectedReservation.return_method,
+                device_category: selectedReservation.device_category,
+                description: selectedReservation.description,
+                sd_option: selectedReservation.sd_option,
+                data_transmission: selectedReservation.data_transmission,
+              }
+            : null
+        }
+        onSave={async (rental) => {
+          try {
+            const supabase = createClient();
+            
+            // 예약번호로 실제 데이터베이스 예약을 찾아서 수정
+            const { error } = await supabase
+              .from("rental_reservations")
+              .update({
+                renter_name: rental.renter_name,
+                renter_phone: rental.renter_phone,
+                renter_email: rental.renter_email,
+                pickup_date: rental.pickup_date,
+                pickup_time: rental.pickup_time,
+                pickup_method: rental.pickup_terminal as any,
+                return_date: rental.return_date,
+                return_time: rental.return_time,
+                return_method: rental.return_terminal as any,
+                device_category: rental.device_category,
+                description: rental.description,
+                sd_option: rental.sd_option,
+                data_transmission: rental.data_transmission,
+              })
+              .eq("id", rental.id);
+
+            if (error) throw error;
+
+            toast.success("예약 정보가 수정되었습니다.");
+            setShowEditDialog(false);
+            
+            // 데이터 새로고침 - 다른 페이지에도 영향을 줄 수 있으므로 이벤트 발생
+            window.dispatchEvent(new CustomEvent('reservationUpdated'));
+            
+          } catch (error) {
+            console.error('예약 수정 오류:', error);
+            toast.error('예약 수정에 실패했습니다.');
+          }
+        }}
+      />
     </div>
   );
 }

@@ -610,7 +610,7 @@ export default function DataTransferPage() {
                 />
               </TableHead>
               <TableHead className="whitespace-nowrap">대여자</TableHead>
-              <TableHead className="whitespace-nowrap">연락처</TableHead>
+              <TableHead className="whitespace-nowrap w-32">연락처</TableHead>
               <TableHead className="whitespace-nowrap">이메일</TableHead>
               <TableHead className="whitespace-nowrap">기기</TableHead>
               <TableHead className="whitespace-nowrap">반납일자</TableHead>
@@ -652,8 +652,10 @@ export default function DataTransferPage() {
                   <TableCell className="whitespace-nowrap">
                     {transfer.renter_name || "-"}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {transfer.renter_phone || "-"}
+                  <TableCell className="w-32 max-w-32">
+                    <div className="truncate" title={transfer.renter_phone || "-"}>
+                      {transfer.renter_phone || "-"}
+                    </div>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     {transfer.renter_email || "-"}

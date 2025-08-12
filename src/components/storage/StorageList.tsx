@@ -140,10 +140,12 @@ export default function StorageList({
                     : "-"}
                 </TableCell>
                 <TableCell className="whitespace-nowrap">
-                  {storage.pickup_date} {storage.pickup_time.slice(0, 5)}
+                  {storage.pickup_date && storage.pickup_time
+                    ? `${storage.pickup_date} ${storage.pickup_time.slice(0, 5)}`
+                    : "-"}
                 </TableCell>
                 <TableCell className="whitespace-nowrap">
-                  {storage.pickup_location
+                  {storage.pickup_date && storage.pickup_time && storage.pickup_location
                     ? STORAGE_LOCATION_LABELS[storage.pickup_location]
                     : "-"}
                 </TableCell>

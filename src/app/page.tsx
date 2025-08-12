@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { format, addDays } from "date-fns";
 import { ko } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +19,8 @@ import {
   Phone,
   ChevronDown,
   ChevronUp,
+  Edit3,
+  X,
 } from "lucide-react";
 import type { RentalReservation } from "@/types/rental";
 import type { StorageReservation } from "@/types/storage";
@@ -62,6 +64,31 @@ export default function Page() {
     T1: false,
     T2: false,
   });
+  const [editingNotes, setEditingNotes] = useState<{
+    T1: boolean;
+    T2: boolean;
+  }>({
+    T1: false,
+    T2: false,
+  });
+  const [textareaHeights, setTextareaHeights] = useState<{
+    T1: number;
+    T2: number;
+  }>({
+    T1: 120,
+    T2: 120,
+  });
+  const divRefs = useRef<{
+    T1: HTMLDivElement | null;
+    T2: HTMLDivElement | null;
+  }>({
+    T1: null,
+    T2: null,
+  });
+  const [originalNotes, setOriginalNotes] = useState<TerminalNotes>({
+    T1: "",
+    T2: "",
+  });
   const [showZeroCategories, setShowZeroCategories] = useState<{
     today: boolean;
     tomorrow: boolean;
@@ -71,7 +98,10 @@ export default function Page() {
   });
 
   const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
-  const tomorrow = useMemo(() => format(addDays(new Date(), 1), "yyyy-MM-dd"), []);
+  const tomorrow = useMemo(
+    () => format(addDays(new Date(), 1), "yyyy-MM-dd"),
+    []
+  );
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
@@ -158,10 +188,9 @@ export default function Page() {
       }
 
       // 성공 피드백
-      setTimeout(() => {
-        setSavingNotes((prev) => ({ ...prev, [terminal]: false }));
-        toast.success("특이사항이 저장되었습니다.");
-      }, 1000);
+      setSavingNotes((prev) => ({ ...prev, [terminal]: false }));
+      setEditingNotes((prev) => ({ ...prev, [terminal]: false }));
+      toast.success("특이사항이 저장되었습니다.");
     } catch (error) {
       console.error("특이사항 저장 실패:", error);
       alert("특이사항 저장에 실패했습니다.");
@@ -169,60 +198,86 @@ export default function Page() {
     }
   };
 
-  const handleNotesChange = useCallback((terminal: "T1" | "T2", value: string) => {
-    setTerminalNotes((prev) => ({
-      ...prev,
-      [terminal]: value,
-    }));
-  }, []);
+  const handleNotesChange = useCallback(
+    (terminal: "T1" | "T2", value: string) => {
+      setTerminalNotes((prev) => ({
+        ...prev,
+        [terminal]: value,
+      }));
+    },
+    []
+  );
+
+  const handleEditToggle = (terminal: "T1" | "T2") => {
+    if (!editingNotes[terminal]) {
+      // 편집 모드로 전환할 때 원본 텍스트 저장
+      setOriginalNotes((prev) => ({ ...prev, [terminal]: terminalNotes[terminal] }));
+      
+      // div의 높이를 측정
+      const divElement = divRefs.current[terminal];
+      if (divElement) {
+        const height = Math.max(divElement.offsetHeight, 120); // 최소 120px
+        setTextareaHeights((prev) => ({ ...prev, [terminal]: height }));
+      }
+    }
+    setEditingNotes((prev) => ({ ...prev, [terminal]: !prev[terminal] }));
+  };
+
+  const handleCancelEdit = (terminal: "T1" | "T2") => {
+    // 원본 텍스트로 되돌리기
+    setTerminalNotes((prev) => ({ ...prev, [terminal]: originalNotes[terminal] }));
+    setEditingNotes((prev) => ({ ...prev, [terminal]: false }));
+  };
 
   // T1, T2별 렌탈 필터링 함수 - useCallback으로 최적화
-  const getRentalsByTerminal = useCallback((
-    rentals: RentalReservation[],
-    terminal: "T1" | "T2"
-  ) => rentals.filter((rental) => rental.pickup_method === terminal), []);
+  const getRentalsByTerminal = useCallback(
+    (rentals: RentalReservation[], terminal: "T1" | "T2") =>
+      rentals.filter((rental) => rental.pickup_method === terminal),
+    []
+  );
 
   // 카테고리별 그룹화 함수 - useMemo로 최적화
-  const groupRentalsByCategory = useCallback((
-    rentals: RentalReservation[]
-  ): CategoryGroup[] => {
-    const categoryMap = new Map<string, RentalReservation[]>();
+  const groupRentalsByCategory = useCallback(
+    (rentals: RentalReservation[]): CategoryGroup[] => {
+      const categoryMap = new Map<string, RentalReservation[]>();
 
-    // 모든 가능한 카테고리를 0으로 초기화
-    Object.keys(DEVICE_CATEGORY_LABELS).forEach((category) => {
-      categoryMap.set(category, []);
-    });
-
-    // 실제 렌탈 데이터로 카운트 업데이트
-    rentals.forEach((rental) => {
-      const category = rental.device_category;
-      if (!categoryMap.has(category)) {
+      // 모든 가능한 카테고리를 0으로 초기화
+      Object.keys(DEVICE_CATEGORY_LABELS).forEach((category) => {
         categoryMap.set(category, []);
-      }
-      categoryMap.get(category)!.push(rental);
-    });
-
-    return Array.from(categoryMap.entries())
-      .map(([category, categoryRentals]) => ({
-        category,
-        categoryLabel:
-          DEVICE_CATEGORY_LABELS[
-            category as keyof typeof DEVICE_CATEGORY_LABELS
-          ] || category,
-        count: categoryRentals.length,
-        rentals: categoryRentals.sort((a, b) =>
-          a.pickup_time.localeCompare(b.pickup_time)
-        ),
-      }))
-      .sort((a, b) => {
-        // 0건인 항목들은 마지막에, 나머지는 수량 많은 순으로 정렬
-        if (a.count === 0 && b.count === 0)
-          return a.categoryLabel.localeCompare(b.categoryLabel);
-        if (a.count === 0) return 1;
-        if (b.count === 0) return -1;
-        return b.count - a.count;
       });
-  }, []);
+
+      // 실제 렌탈 데이터로 카운트 업데이트
+      rentals.forEach((rental) => {
+        const category = rental.device_category;
+        if (!categoryMap.has(category)) {
+          categoryMap.set(category, []);
+        }
+        categoryMap.get(category)!.push(rental);
+      });
+
+      return Array.from(categoryMap.entries())
+        .map(([category, categoryRentals]) => ({
+          category,
+          categoryLabel:
+            DEVICE_CATEGORY_LABELS[
+              category as keyof typeof DEVICE_CATEGORY_LABELS
+            ] || category,
+          count: categoryRentals.length,
+          rentals: categoryRentals.sort((a, b) =>
+            a.pickup_time.localeCompare(b.pickup_time)
+          ),
+        }))
+        .sort((a, b) => {
+          // 0건인 항목들은 마지막에, 나머지는 수량 많은 순으로 정렬
+          if (a.count === 0 && b.count === 0)
+            return a.categoryLabel.localeCompare(b.categoryLabel);
+          if (a.count === 0) return 1;
+          if (b.count === 0) return -1;
+          return b.count - a.count;
+        });
+    },
+    []
+  );
 
   // 카테고리 그룹 데이터 미리 계산
   const todayCategoryGroups = useMemo(() => {
@@ -268,16 +323,16 @@ export default function Page() {
     }
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         {categoryGroups.map((group) => (
           <div
             key={group.category}
-            className={`p-3 ${bgColorClass} border ${colorClass.replace(
+            className={`p-2 ${bgColorClass} border ${colorClass.replace(
               "text-",
               "border-"
             )} rounded-lg`}
           >
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <div
                 className={`font-semibold ${colorClass} flex items-center gap-2 text-sm`}
               >
@@ -304,7 +359,7 @@ export default function Page() {
             </div>
 
             {/* 카테고리별 간단 요약 */}
-            <div className="flex items-center justify-between mb-3 text-xs text-gray-600">
+            <div className="flex items-center justify-between mb-2 text-xs text-gray-600">
               <div className="flex gap-4">
                 <span>
                   수령전:{" "}
@@ -319,20 +374,28 @@ export default function Page() {
               <div className="text-gray-500">
                 {group.rentals.length > 0 && (
                   <>
-                    {group.rentals[0].pickup_time} ~{" "}
-                    {group.rentals[group.rentals.length - 1].pickup_time}
+                    {group.rentals[0].pickup_time.length > 5
+                      ? group.rentals[0].pickup_time.slice(0, 5)
+                      : group.rentals[0].pickup_time}{" "}
+                    ~{" "}
+                    {group.rentals[group.rentals.length - 1].pickup_time
+                      .length > 5
+                      ? group.rentals[
+                          group.rentals.length - 1
+                        ].pickup_time.slice(0, 5)
+                      : group.rentals[group.rentals.length - 1].pickup_time}
                   </>
                 )}
               </div>
             </div>
 
-            <div className="grid gap-2">
+            <div className="space-y-2">
               {group.rentals.map((rental) => (
                 <div
                   key={rental.id}
-                  className="bg-white/70 p-3 rounded-lg text-xs border shadow-sm"
+                  className="text-xs bg-white/90 rounded-lg p-2 shadow-sm border border-gray-200"
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1">
                     <div className="font-semibold text-gray-900 flex items-center gap-1">
                       <User className="w-3 h-3" />
                       {rental.renter_name}
@@ -348,23 +411,21 @@ export default function Page() {
                   </div>
 
                   {/* 기본 정보 */}
-                  <div className="space-y-1 mb-2">
+                  <div className="space-y-1 mb-1">
                     <div className="flex items-center justify-between text-gray-600">
                       <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         <span className="font-medium">픽업시간:</span>
-                        {rental.pickup_time}
+                        {rental.pickup_time.length > 5
+                          ? rental.pickup_time.slice(0, 5)
+                          : rental.pickup_time}
                       </div>
                       <div className="flex items-center gap-1">
                         <Phone className="w-3 h-3" />
-                        {rental.renter_phone}
+                        <span className="text-xs w-24 truncate">
+                          {rental.renter_phone}
+                        </span>
                       </div>
-                    </div>
-
-                    {/* 예약 ID */}
-                    <div className="flex items-center gap-1 text-gray-500">
-                      <span className="font-medium">예약번호:</span>
-                      <span className="font-mono text-xs">{rental.id}</span>
                     </div>
 
                     {/* 반납 예정일 */}
@@ -372,66 +433,59 @@ export default function Page() {
                       <div className="flex items-center gap-1 text-gray-500">
                         <Calendar className="w-3 h-3" />
                         <span className="font-medium">반납예정:</span>
-                        {rental.return_date} {rental.return_time}
-                      </div>
-                    )}
-
-                    {/* 예약 생성일 */}
-                    {rental.created_at && (
-                      <div className="flex items-center gap-1 text-gray-400">
-                        <span className="font-medium">예약일:</span>
-                        {format(new Date(rental.created_at), "MM/dd HH:mm")}
+                        {rental.return_date}{" "}
+                        {rental.return_time && rental.return_time.length > 5
+                          ? rental.return_time.slice(0, 5)
+                          : rental.return_time}
                       </div>
                     )}
                   </div>
 
                   {/* 설명 */}
                   {rental.description && (
-                    <div className="mt-2 p-2 bg-gray-50 rounded text-gray-600 italic text-xs">
+                    <div className="mt-1 p-1 bg-gray-50 rounded text-gray-600 italic text-xs">
                       <span className="font-medium">요청사항:</span>{" "}
                       {rental.description}
                     </div>
                   )}
 
                   {/* 추가 정보 */}
-                  <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
+                  <div className="mt-1 pt-1 border-t border-gray-200">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">예약 사이트:</span>
-                      <Badge variant="outline" className="text-xs">
-                        {rental.reservation_site === "naver"
-                          ? "네이버"
-                          : rental.reservation_site === "forholiday"
-                          ? "포할리데이"
-                          : rental.reservation_site}
-                      </Badge>
+                      {/* 좌측: 옵션들 */}
+                      <div className="flex items-center gap-2">
+                        {rental.data_transmission && (
+                          <Badge
+                            variant="default"
+                            className="text-xs bg-green-500"
+                          >
+                            데이터전송
+                          </Badge>
+                        )}
+                        {rental.sd_option && (
+                          <Badge variant="secondary" className="text-xs">
+                            SD카드 {rental.sd_option}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* 우측: 할당 기기 */}
+                      <div className="flex items-center gap-1">
+                        {rental.device_tag_name ? (
+                          <>
+                            <span className="text-gray-600">기기:</span>
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-mono font-bold border-blue-500 text-blue-700 bg-blue-50"
+                            >
+                              {rental.device_tag_name}
+                            </Badge>
+                          </>
+                        ) : (
+                          <span className="text-gray-400 text-xs">미할당</span>
+                        )}
+                      </div>
                     </div>
-                    {rental.data_transmission && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-600">데이터 전송:</span>
-                        <Badge
-                          variant="default"
-                          className="text-xs bg-green-500"
-                        >
-                          필요
-                        </Badge>
-                      </div>
-                    )}
-                    {rental.sd_option && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-600">SD카드:</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {rental.sd_option}
-                        </Badge>
-                      </div>
-                    )}
-                    {rental.device_tag_name && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-600">할당기기:</span>
-                        <span className="font-mono text-xs font-medium">
-                          {rental.device_tag_name}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
@@ -462,14 +516,10 @@ export default function Page() {
                 내일 출고: {stats.tomorrowRentals.length}건
               </Badge>
             </div>
-            <div className="flex items-center gap-1">
-              <Badge variant="default" className="text-xs bg-green-500">
-                이용가능: {stats.totalDevicesAvailable}대
-              </Badge>
-            </div>
           </div>
         </div>
       </div>
+
       {/* 요약 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-2 md:gap-4">
         {/* 오늘 출고 예정 - 카테고리별 */}
@@ -479,9 +529,7 @@ export default function Page() {
               <CardTitle className="text-sm font-medium text-blue-600">
                 오늘 출고 예정
               </CardTitle>
-              {todayCategoryGroups.some(
-                (g) => g.count === 0
-              ) && (
+              {todayCategoryGroups.some((g) => g.count === 0) && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -495,13 +543,13 @@ export default function Page() {
                 >
                   {showZeroCategories.today ? (
                     <>
-                      <ChevronUp className="w-3 h-3 mr-1" />
-                      접기
+                      <ChevronUp className="w-3 h-3 md:mr-1" />
+                      <p className="hidden md:block">접기</p>
                     </>
                   ) : (
                     <>
-                      <ChevronDown className="w-3 h-3 mr-1" />
-                      전체보기
+                      <ChevronDown className="w-3 h-3 md:mr-1" />
+                      <p className="hidden md:block">전체보기</p>
                     </>
                   )}
                 </Button>
@@ -509,7 +557,7 @@ export default function Page() {
             </div>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <div className="text-2xl font-bold mb-4">
+            <div className="text-xl md:text-2xl font-bold mb-4">
               총 {stats.todayRentals.length}건
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-2 gap-y-1">
@@ -554,9 +602,7 @@ export default function Page() {
               <CardTitle className="text-sm font-medium text-orange-600">
                 내일 출고 예정
               </CardTitle>
-              {tomorrowCategoryGroups.some(
-                (g) => g.count === 0
-              ) && (
+              {tomorrowCategoryGroups.some((g) => g.count === 0) && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -570,13 +616,13 @@ export default function Page() {
                 >
                   {showZeroCategories.tomorrow ? (
                     <>
-                      <ChevronUp className="w-3 h-3 mr-1" />
-                      접기
+                      <ChevronUp className="w-3 h-3 md:mr-1" />
+                      <p className="hidden md:block">접기</p>
                     </>
                   ) : (
                     <>
-                      <ChevronDown className="w-3 h-3 mr-1" />
-                      전체보기
+                      <ChevronDown className="w-3 h-3 md:mr-1" />
+                      <p className="hidden md:block">전체보기</p>
                     </>
                   )}
                 </Button>
@@ -584,7 +630,7 @@ export default function Page() {
             </div>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <div className="text-2xl font-bold mb-4">
+            <div className="text-xl md:text-2xl font-bold mb-4">
               총 {stats.tomorrowRentals.length}건
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-2 gap-y-1">
@@ -632,7 +678,7 @@ export default function Page() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <div className="text-2xl font-bold mb-2">
+            <div className="text-xl md:text-2xl font-bold mb-2">
               {stats.todayStorage.length}건
             </div>
             <div className="space-y-1">
@@ -641,7 +687,9 @@ export default function Page() {
                 <Badge variant="outline" className="text-xs">
                   {
                     stats.todayStorage.filter(
-                      (s) => (s as any).drop_off_location === "T1" || (s as any).pickup_location === "T1"
+                      (s) =>
+                        (s as any).drop_off_location === "T1" ||
+                        (s as any).pickup_location === "T1"
                     ).length
                   }
                 </Badge>
@@ -651,7 +699,9 @@ export default function Page() {
                 <Badge variant="outline" className="text-xs">
                   {
                     stats.todayStorage.filter(
-                      (s) => (s as any).drop_off_location === "T2" || (s as any).pickup_location === "T2"
+                      (s) =>
+                        (s as any).drop_off_location === "T2" ||
+                        (s as any).pickup_location === "T2"
                     ).length
                   }
                 </Badge>
@@ -669,7 +719,7 @@ export default function Page() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <div className="text-2xl font-bold mb-2">
+            <div className="text-xl md:text-2xl font-bold mb-2">
               {stats.totalDevicesAvailable}대
             </div>
             <div className="space-y-1">
@@ -703,29 +753,66 @@ export default function Page() {
                 <MapPin className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
                 T1 터미널 특이사항
               </CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleSaveNotes("T1")}
-                disabled={savingNotes.T1}
-                className="text-xs px-2 py-1 md:px-3 md:py-2"
-              >
-                {savingNotes.T1 ? (
-                  <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-spin" />
+              <div className="flex gap-2">
+                {editingNotes.T1 ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSaveNotes("T1")}
+                      disabled={savingNotes.T1}
+                      className="text-xs px-2 py-1 md:px-3 md:py-2"
+                    >
+                      {savingNotes.T1 ? (
+                        <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                      )}
+                      저장
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCancelEdit("T1")}
+                      disabled={savingNotes.T1}
+                      className="text-xs px-2 py-1 md:px-3 md:py-2"
+                    >
+                      <X className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                      취소
+                    </Button>
+                  </>
                 ) : (
-                  <Save className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleEditToggle("T1")}
+                    className="text-xs px-2 py-1 md:px-3 md:py-2"
+                  >
+                    <Edit3 className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                    수정
+                  </Button>
                 )}
-                저장
-              </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <Textarea
-              placeholder="T1 터미널의 특이사항이나 중요한 공지사항을 입력하세요..."
-              value={terminalNotes.T1}
-              onChange={(e) => handleNotesChange("T1", e.target.value)}
-              className="min-h-[120px] resize-none"
-            />
+            {editingNotes.T1 ? (
+              <Textarea
+                placeholder="T1 터미널의 특이사항이나 중요한 공지사항을 입력하세요..."
+                value={terminalNotes.T1}
+                onChange={(e) => handleNotesChange("T1", e.target.value)}
+                style={{ height: `${textareaHeights.T1}px` }}
+                className="resize-none"
+                autoFocus
+              />
+            ) : (
+              <div
+                ref={(el) => { divRefs.current.T1 = el; }}
+                className="min-h-[120px] p-3 border border-input bg-background rounded-md text-sm whitespace-pre-wrap"
+              >
+                {terminalNotes.T1 || "특이사항이 없습니다."}
+              </div>
+            )}
             <div className="text-xs text-gray-500 mt-2">
               모든 직원이 공유 가능한 특이사항
             </div>
@@ -740,29 +827,66 @@ export default function Page() {
                 <MapPin className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
                 T2 터미널 특이사항
               </CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleSaveNotes("T2")}
-                disabled={savingNotes.T2}
-                className="text-xs px-2 py-1 md:px-3 md:py-2"
-              >
-                {savingNotes.T2 ? (
-                  <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-spin" />
+              <div className="flex gap-2">
+                {editingNotes.T2 ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSaveNotes("T2")}
+                      disabled={savingNotes.T2}
+                      className="text-xs px-2 py-1 md:px-3 md:py-2"
+                    >
+                      {savingNotes.T2 ? (
+                        <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                      )}
+                      저장
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCancelEdit("T2")}
+                      disabled={savingNotes.T2}
+                      className="text-xs px-2 py-1 md:px-3 md:py-2"
+                    >
+                      <X className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                      취소
+                    </Button>
+                  </>
                 ) : (
-                  <Save className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleEditToggle("T2")}
+                    className="text-xs px-2 py-1 md:px-3 md:py-2"
+                  >
+                    <Edit3 className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                    수정
+                  </Button>
                 )}
-                저장
-              </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-            <Textarea
-              placeholder="T2 터미널의 특이사항이나 중요한 공지사항을 입력하세요..."
-              value={terminalNotes.T2}
-              onChange={(e) => handleNotesChange("T2", e.target.value)}
-              className="min-h-[120px] resize-none"
-            />
+            {editingNotes.T2 ? (
+              <Textarea
+                placeholder="T2 터미널의 특이사항이나 중요한 공지사항을 입력하세요..."
+                value={terminalNotes.T2}
+                onChange={(e) => handleNotesChange("T2", e.target.value)}
+                style={{ height: `${textareaHeights.T2}px` }}
+                className="resize-none"
+                autoFocus
+              />
+            ) : (
+              <div
+                ref={(el) => { divRefs.current.T2 = el; }}
+                className="min-h-[120px] p-3 border border-input bg-background rounded-md text-sm whitespace-pre-wrap"
+              >
+                {terminalNotes.T2 || "특이사항이 없습니다."}
+              </div>
+            )}
             <div className="text-xs text-gray-500 mt-2">
               모든 직원이 공유 가능한 특이사항
             </div>
@@ -785,8 +909,7 @@ export default function Page() {
               <div>
                 <h3 className="font-semibold text-blue-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  T1 터미널 (
-                  {terminalData.todayT1.length}건)
+                  T1 터미널 ({terminalData.todayT1.length}건)
                 </h3>
                 {renderTerminalCategories(
                   stats.todayRentals,
@@ -800,8 +923,7 @@ export default function Page() {
               <div>
                 <h3 className="font-semibold text-green-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  T2 터미널 (
-                  {terminalData.todayT2.length}건)
+                  T2 터미널 ({terminalData.todayT2.length}건)
                 </h3>
                 {renderTerminalCategories(
                   stats.todayRentals,
@@ -828,8 +950,7 @@ export default function Page() {
               <div>
                 <h3 className="font-semibold text-blue-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  T1 터미널 (
-                  {terminalData.tomorrowT1.length}
+                  T1 터미널 ({terminalData.tomorrowT1.length}
                   건)
                 </h3>
                 {renderTerminalCategories(
@@ -844,8 +965,7 @@ export default function Page() {
               <div>
                 <h3 className="font-semibold text-green-600 mb-4 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  T2 터미널 (
-                  {terminalData.tomorrowT2.length}
+                  T2 터미널 ({terminalData.tomorrowT2.length}
                   건)
                 </h3>
                 {renderTerminalCategories(
