@@ -218,19 +218,6 @@ export default function StorageLogisticsList({
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "pending":
-        return <Clock className="w-5 h-5 text-gray-500" />;
-      case "stored":
-        return <Package className="w-5 h-5 text-blue-500" />;
-      case "retrieved":
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
-      default:
-        return <Clock className="w-5 h-5 text-gray-500" />;
-    }
-  };
-
   const getActionButtonColor = () => {
     return type === "drop-off"
       ? "bg-blue-600 hover:bg-blue-700"
@@ -319,7 +306,6 @@ export default function StorageLogisticsList({
             <CardHeader className="p-2 md:p-3 pb-0">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  {getStatusIcon(storage.status)}
                   {isEditing ? (
                     <Input
                       value={getCurrentEditValue(
@@ -566,7 +552,8 @@ export default function StorageLogisticsList({
                     <div className="flex items-center flex-1">
                       <span className="font-medium text-blue-600">
                         맡기는: {storage.drop_off_date}{" "}
-                        {storage.drop_off_time.slice(0, 5)}
+                        {storage.drop_off_time.slice(0, 5)}{" "}
+                        ({storage.drop_off_location || "-"})
                       </span>
                     </div>
                   )}
@@ -574,7 +561,7 @@ export default function StorageLogisticsList({
 
                 {/* 찾는 날짜/시간 */}
                 <div className="flex items-center gap-1.5 text-sm">
-                  <CalendarIcon className="w-3 h-3 md:w-4 md:h-4 text-green-500" />
+                  <CalendarIcon className="w-3 h-3 md:w-4 md:h-4 text-gray-500" />
                   {isEditing ? (
                     <div className="flex gap-1 flex-1">
                       <Popover>
@@ -668,7 +655,8 @@ export default function StorageLogisticsList({
                       {storage.pickup_date && storage.pickup_time ? (
                         <span className="font-medium text-green-600">
                           찾는: {storage.pickup_date}{" "}
-                          {storage.pickup_time.slice(0, 5)}
+                          {storage.pickup_time.slice(0, 5)}{" "}
+                          ({storage.pickup_location || "-"})
                         </span>
                       ) : (
                         <span className="text-gray-400 text-sm">
@@ -783,12 +771,11 @@ export default function StorageLogisticsList({
                     </div>
                   ) : (
                     <span className="text-xs md:text-sm">
-                      {(type === "drop-off" && storage.status === "stored") 
+                      {type === "drop-off" && storage.status === "stored"
                         ? "보관 완료됨"
-                        : (type === "pick-up" && storage.status === "retrieved")
-                        ? "픽업 완료됨"
-                        : getActionButtonText()
-                      }
+                        : type === "pick-up" && storage.status === "retrieved"
+                          ? "픽업 완료됨"
+                          : getActionButtonText()}
                     </span>
                   )}
                 </Button>
