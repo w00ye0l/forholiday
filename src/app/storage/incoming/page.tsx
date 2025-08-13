@@ -382,6 +382,8 @@ export default function StorageIncomingPage() {
           storages={filteredStorages}
           type="drop-off"
           onStatusUpdate={loadData}
+          searchTerm={searchTerm}
+          loading={loading}
         />
       )}
     </div>

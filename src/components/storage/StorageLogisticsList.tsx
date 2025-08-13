@@ -1,11 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -13,790 +9,466 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import {
-  CheckCircle,
-  Package,
-  Clock,
-  Phone,
-  Calendar as CalendarIcon,
-  FileText,
-  Tag,
-  Edit2,
-  Save,
-  X,
+  CalendarIcon,
+  PencilIcon,
+  PhoneIcon,
+  EditIcon,
+  TagIcon,
+  PackageIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { StorageReservation, STORAGE_STATUS_LABELS } from "@/types/storage";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { StorageReservation, StorageStatus } from "@/types/storage";
+import { toast } from "sonner";
 
 interface StorageLogisticsListProps {
   storages: StorageReservation[];
   type: "drop-off" | "pick-up";
   onStatusUpdate?: () => void;
+  searchTerm?: string;
+  loading?: boolean;
 }
 
-interface EditingState {
-  [storageId: string]: {
-    isEditing: boolean;
-  };
-}
+// 검색어 하이라이트 함수
+const highlightText = (text: string, searchTerm: string = "") => {
+  if (!searchTerm.trim()) return text;
+
+  const regex = new RegExp(
+    `(${searchTerm.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")})`,
+    "gi"
+  );
+  const parts = text.split(regex);
+
+  return parts.map((part, index) =>
+    regex.test(part) ? (
+      <span key={index} className="bg-yellow-200 font-semibold">
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  );
+};
 
 export default function StorageLogisticsList({
-  storages,
+  storages: initialStorages,
   type,
   onStatusUpdate,
+  searchTerm = "",
+  loading = false,
 }: StorageLogisticsListProps) {
-  const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
-  const [editingState, setEditingState] = useState<EditingState>({});
-  const [editValues, setEditValues] = useState<Record<string, any>>({});
+  const [storages, setStorages] = useState(initialStorages);
+  const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+  const totalPages = Math.ceil(storages.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedStorages = storages.slice(startIndex, endIndex);
+
   const supabase = createClient();
 
-  // 전체 편집 모드 토글
-  const toggleEditMode = (storageId: string) => {
-    setEditingState((prev) => ({
-      ...prev,
-      [storageId]: {
-        isEditing: !prev[storageId]?.isEditing,
-      },
-    }));
+  // 페이지 번호 생성
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
 
-    // 편집 모드 진입 시 현재 값들을 editValues에 설정
-    if (!editingState[storageId]?.isEditing) {
-      const storage = storages.find((s) => s.id === storageId);
-      if (storage) {
-        setEditValues((prev) => ({
-          ...prev,
-          [`${storageId}_customerName`]: storage.customer_name,
-          [`${storageId}_phoneNumber`]: storage.phone_number,
-          [`${storageId}_itemsDescription`]: storage.items_description,
-          [`${storageId}_quantity`]: storage.quantity,
-          [`${storageId}_tagNumber`]: storage.tag_number || "",
-          [`${storageId}_status`]: storage.status,
-          [`${storageId}_notes`]: storage.notes || "",
-          [`${storageId}_dropOffDate`]: storage.drop_off_date,
-          [`${storageId}_dropOffTime`]: storage.drop_off_time,
-          [`${storageId}_pickupDate`]: storage.pickup_date,
-          [`${storageId}_pickupTime`]: storage.pickup_time,
-        }));
-      }
-    }
-  };
-
-  // 편집 값 변경
-  const handleEditChange = (storageId: string, field: string, value: any) => {
-    setEditValues((prev) => ({
-      ...prev,
-      [`${storageId}_${field}`]: value,
-    }));
-  };
-
-  // 전체 필드 저장
-  const saveAllFields = async (storage: StorageReservation) => {
-    setUpdatingIds((prev) => new Set(prev).add(storage.id));
-
-    try {
-      const updateData: any = {};
-
-      // 모든 편집된 값들을 업데이트 데이터에 포함
-      const getValue = (field: string) => editValues[`${storage.id}_${field}`];
-
-      updateData.customer_name = getValue("customerName");
-      updateData.phone_number = getValue("phoneNumber");
-      updateData.items_description = getValue("itemsDescription");
-      updateData.quantity = getValue("quantity");
-      updateData.tag_number = getValue("tagNumber") || null;
-      updateData.status = getValue("status");
-      updateData.notes = getValue("notes") || null;
-      updateData.drop_off_date = getValue("dropOffDate");
-      updateData.drop_off_time = getValue("dropOffTime");
-      updateData.pickup_date = getValue("pickupDate");
-      updateData.pickup_time = getValue("pickupTime");
-
-      const { error } = await supabase
-        .from("storage_reservations")
-        .update(updateData)
-        .eq("id", storage.id);
-
-      if (error) {
-        alert("업데이트 실패: " + error.message);
-      } else {
-        // 편집 모드 해제
-        toggleEditMode(storage.id);
-        // 편집 값 제거
-        Object.keys(editValues).forEach((key) => {
-          if (key.startsWith(`${storage.id}_`)) {
-            setEditValues((prev) => {
-              const newValues = { ...prev };
-              delete newValues[key];
-              return newValues;
-            });
-          }
-        });
-        onStatusUpdate?.();
-      }
-    } catch (error) {
-      alert("업데이트 중 오류가 발생했습니다.");
-    } finally {
-      setUpdatingIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(storage.id);
-        return newSet;
-      });
-    }
-  };
-
-  // 편집 취소
-  const cancelEdit = (storageId: string) => {
-    toggleEditMode(storageId);
-    // 편집 값 제거
-    Object.keys(editValues).forEach((key) => {
-      if (key.startsWith(`${storageId}_`)) {
-        setEditValues((prev) => {
-          const newValues = { ...prev };
-          delete newValues[key];
-          return newValues;
-        });
-      }
-    });
-  };
-
-  // 빠른 상태 업데이트 (기존 기능 유지)
-  const handleStatusUpdate = async (storage: StorageReservation) => {
-    setUpdatingIds((prev) => new Set(prev).add(storage.id));
-
-    try {
-      let newStatus: string;
-      let updateData: any = {};
-
-      if (type === "drop-off") {
-        newStatus = "stored";
-        updateData.status = newStatus;
-      } else {
-        newStatus = "retrieved";
-        updateData.status = newStatus;
-      }
-
-      const { error } = await supabase
-        .from("storage_reservations")
-        .update(updateData)
-        .eq("id", storage.id);
-
-      if (error) {
-        alert("상태 업데이트 실패: " + error.message);
-      } else {
-        onStatusUpdate?.();
-      }
-    } catch (error) {
-      alert("업데이트 중 오류가 발생했습니다.");
-    } finally {
-      setUpdatingIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(storage.id);
-        return newSet;
-      });
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "border-gray-200 bg-gray-50";
-      case "stored":
-        return "border-blue-200 bg-blue-50";
-      case "retrieved":
-        return "border-green-200 bg-green-50";
-      default:
-        return "border-gray-200 bg-gray-50";
-    }
-  };
-
-  const getActionButtonColor = () => {
-    return type === "drop-off"
-      ? "bg-blue-600 hover:bg-blue-700"
-      : "bg-green-600 hover:bg-green-700";
-  };
-
-  const getActionButtonText = () => {
-    return type === "drop-off" ? "보관 완료" : "픽업 완료";
-  };
-
-  const getStatusLabel = (status: string) => {
-    if (type === "drop-off") {
-      switch (status) {
-        case "pending":
-          return "보관 전";
-        case "stored":
-          return "보관 완료";
-        case "retrieved":
-          return "찾아감";
-        default:
-          return (
-            STORAGE_STATUS_LABELS[
-              status as keyof typeof STORAGE_STATUS_LABELS
-            ] || status
-          );
+    if (totalPages <= maxPagesToShow) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
       }
     } else {
-      switch (status) {
-        case "pending":
-          return "대기중";
-        case "stored":
-          return "픽업 대기";
-        case "retrieved":
-          return "픽업 완료";
-        default:
-          return (
-            STORAGE_STATUS_LABELS[
-              status as keyof typeof STORAGE_STATUS_LABELS
-            ] || status
-          );
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push("...");
+        for (let i = totalPages - 3; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        pages.push(1);
+        pages.push("...");
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(totalPages);
       }
+    }
+
+    return pages;
+  };
+
+  // 상태별 카드 스타일 반환
+  const getCardStyle = (status: string) => {
+    const baseClasses = "p-3 shadow-sm border-l-4";
+
+    switch (status) {
+      case "pending":
+        // 대기중 - 회색
+        return `${baseClasses} bg-white border-l-gray-400`;
+      case "stored":
+        // 보관중 - 파란색
+        return `${baseClasses} bg-blue-50 border-l-blue-500`;
+      case "retrieved":
+        // 픽업완료 - 초록색
+        return `${baseClasses} bg-green-50 border-l-green-500`;
+      default:
+        return `${baseClasses} bg-white border-l-gray-400`;
     }
   };
 
-  // 현재 편집 값 가져오기
-  const getCurrentEditValue = (
-    storageId: string,
-    field: string,
-    originalValue: any
-  ) => {
-    const key = `${storageId}_${field}`;
-    return editValues[key] !== undefined ? editValues[key] : originalValue;
-  };
+  // props가 변경될 때 내부 상태 업데이트
+  useEffect(() => {
+    setStorages(initialStorages);
+    setCurrentPage(1);
+  }, [initialStorages]);
 
-  // 시간 옵션 생성
-  const generateTimeOptions = () => {
-    const times = [];
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const timeString = `${hour.toString().padStart(2, "0")}:${minute
-          .toString()
-          .padStart(2, "0")}:00`;
-        const displayString = `${hour.toString().padStart(2, "0")}:${minute
-          .toString()
-          .padStart(2, "0")}`;
-        times.push({ value: timeString, label: displayString });
-      }
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    try {
+      setIsUpdating((prev) => ({ ...prev, [id]: true }));
+
+      const { error } = await supabase
+        .from("storage_reservations")
+        .update({ status: newStatus })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setStorages((prev) =>
+        prev.map((storage) =>
+          storage.id === id
+            ? { ...storage, status: newStatus as StorageStatus }
+            : storage
+        )
+      );
+
+      toast.success("상태가 업데이트되었습니다.");
+      onStatusUpdate?.();
+    } catch (error) {
+      console.error("상태 업데이트 실패:", error);
+      toast.error("상태 업데이트에 실패했습니다.");
+    } finally {
+      setIsUpdating((prev) => ({ ...prev, [id]: false }));
     }
-    return times;
   };
 
-  const timeOptions = generateTimeOptions();
+  const handleNotesUpdate = async (id: string) => {
+    try {
+      const noteText = notes[id] || "";
+
+      const { error } = await supabase
+        .from("storage_reservations")
+        .update({ notes: noteText })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setStorages((prev) =>
+        prev.map((storage) =>
+          storage.id === id ? { ...storage, notes: noteText } : storage
+        )
+      );
+
+      setEditingNotes((prev) => ({ ...prev, [id]: false }));
+      toast.success("메모가 업데이트되었습니다.");
+    } catch (error) {
+      console.error("메모 업데이트 실패:", error);
+      toast.error("메모 업데이트에 실패했습니다.");
+    }
+  };
+
+  const startEditingNotes = (id: string, currentNotes?: string) => {
+    setEditingNotes((prev) => ({ ...prev, [id]: true }));
+    setNotes((prev) => ({ ...prev, [id]: currentNotes || "" }));
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <div className="text-center py-8 text-gray-500">로딩 중...</div>
+      </div>
+    );
+  }
+
+  if (storages.length === 0) {
+    return (
+      <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <div className="text-gray-500 text-center py-8">
+          {searchTerm.trim()
+            ? `'${searchTerm}' 검색 결과가 없습니다.`
+            : "등록된 예약이 없습니다."}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="grid gap-2 md:gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {storages.map((storage) => {
-        const isEditing = editingState[storage.id]?.isEditing;
+    <>
+      <div className="grid gap-2 md:gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {paginatedStorages.map((storage) => (
+          <Card key={storage.id} className={getCardStyle(storage.status)}>
+            <div className="flex flex-col gap-2 text-sm">
+              <div className="flex gap-2 justify-between">
+                {/* 메인 정보 */}
+                <div className="flex flex-col justify-between gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-base">
+                      {highlightText(storage.customer_name, searchTerm)}
+                    </span>
+                  </div>
 
-        return (
-          <Card
-            key={storage.id}
-            className={`${getStatusColor(
-              storage.status
-            )} border-2 hover:shadow-lg transition-all duration-200`}
-          >
-            <CardHeader className="p-2 md:p-3 pb-0">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  {isEditing ? (
-                    <Input
-                      value={getCurrentEditValue(
-                        storage.id,
-                        "customerName",
-                        storage.customer_name
-                      )}
-                      onChange={(e) =>
-                        handleEditChange(
-                          storage.id,
-                          "customerName",
-                          e.target.value
-                        )
-                      }
-                      className="text-base md:text-lg font-bold h-8"
-                    />
-                  ) : (
-                    <CardTitle className="text-base md:text-lg font-bold text-gray-800">
-                      {storage.customer_name}
-                    </CardTitle>
+                  {/* 맡기는 일시 */}
+                  <div className="text-xs text-gray-600 flex gap-2 items-center">
+                    <CalendarIcon className="w-3 h-3" />
+                    <span className="text-blue-600">
+                      맡기는: {storage.drop_off_date}{" "}
+                      {storage.drop_off_time?.slice(0, 5)}
+                      {storage.drop_off_location &&
+                        ` (${storage.drop_off_location})`}
+                    </span>
+                  </div>
+
+                  {/* 찾는 일시 */}
+                  <div className="text-xs text-gray-600 flex gap-2 items-center">
+                    <CalendarIcon className="w-3 h-3" />
+                    {storage.pickup_date && storage.pickup_time ? (
+                      <span className="text-green-600">
+                        찾는: {storage.pickup_date}{" "}
+                        {storage.pickup_time.slice(0, 5)}
+                        {storage.pickup_location &&
+                          ` (${storage.pickup_location})`}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">픽업 정보 없음</span>
+                    )}
+                  </div>
+
+                  {/* 연락처 */}
+                  <div className="text-xs text-gray-600 flex gap-2 items-center">
+                    <PhoneIcon className="min-w-3 min-h-3 w-3 h-3" />
+                    <span className="text-xs text-gray-600 break-all">
+                      {highlightText(storage.phone_number, searchTerm)}
+                    </span>
+                  </div>
+
+                  {/* 태그번호 */}
+                  {storage.tag_number && (
+                    <div className="text-xs text-gray-600 flex gap-2 items-center">
+                      <TagIcon className="min-w-3 min-h-3 w-3 h-3 text-blue-600" />
+                      <span className="font-bold font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded-md border border-blue-200">
+                        #{storage.tag_number}
+                      </span>
+                    </div>
                   )}
+
+                  {/* 물품 정보 */}
+                  <div className="text-xs text-gray-600 flex gap-2 items-center">
+                    <PackageIcon className="min-w-3 min-h-3 w-3 h-3" />
+                    <span className="text-xs text-gray-600 break-all">
+                      {highlightText(storage.items_description, searchTerm)}
+                      {storage.quantity && ` (${storage.quantity}개)`}
+                    </span>
+                  </div>
                 </div>
 
-                {/* 편집/상태 영역 */}
-                <div className="flex items-center gap-2">
-                  {isEditing ? (
-                    <Select
-                      value={getCurrentEditValue(
-                        storage.id,
-                        "status",
-                        storage.status
-                      )}
-                      onValueChange={(value) =>
-                        handleEditChange(storage.id, "status", value)
-                      }
+                <div className="flex flex-col items-end gap-2 text-sm">
+                  {/* 수정 버튼 */}
+                  <div className="w-24 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => {
+                        // TODO: 편집 다이얼로그 구현
+                        toast.info("편집 기능은 곧 추가될 예정입니다.");
+                      }}
                     >
-                      <SelectTrigger className="w-24 h-8 text-sm">
+                      <EditIcon className="w-3 h-3" />
+                    </Button>
+                  </div>
+
+                  {/* 상태 표시/변경 */}
+                  <div className="w-24">
+                    <Select
+                      value={storage.status}
+                      onValueChange={(value) =>
+                        handleStatusChange(storage.id, value)
+                      }
+                      disabled={isUpdating[storage.id]}
+                    >
+                      <SelectTrigger className="h-6 text-xs bg-white border-gray-300">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">보관 전</SelectItem>
+                        <SelectItem value="pending">대기중</SelectItem>
                         <SelectItem value="stored">보관중</SelectItem>
-                        <SelectItem value="retrieved">찾아감</SelectItem>
+                        <SelectItem value="retrieved">픽업완료</SelectItem>
                       </SelectContent>
                     </Select>
-                  ) : (
-                    <Badge
-                      variant="outline"
-                      className="text-sm font-medium border-2 bg-white"
-                    >
-                      {getStatusLabel(storage.status)}
-                    </Badge>
-                  )}
+                  </div>
 
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0"
-                    onClick={() => toggleEditMode(storage.id)}
-                  >
-                    <Edit2 className="w-3 h-3 text-gray-500" />
-                  </Button>
+                  {/* 액션 버튼 */}
+                  {type === "drop-off" && storage.status === "pending" && (
+                    <Button
+                      onClick={() => handleStatusChange(storage.id, "stored")}
+                      disabled={isUpdating[storage.id]}
+                      size="sm"
+                      className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700"
+                    >
+                      {isUpdating[storage.id] ? (
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        "보관완료"
+                      )}
+                    </Button>
+                  )}
+                  {type === "pick-up" && storage.status === "stored" && (
+                    <Button
+                      onClick={() =>
+                        handleStatusChange(storage.id, "retrieved")
+                      }
+                      disabled={isUpdating[storage.id]}
+                      size="sm"
+                      className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700"
+                    >
+                      {isUpdating[storage.id] ? (
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        "픽업완료"
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
 
-              {/* 핵심 정보 */}
-              <div className="space-y-1">
-                {/* 태그 번호 */}
-                <div className="flex items-center gap-1.5 text-xs md:text-sm">
-                  <Tag className="w-3 h-3 md:w-4 md:h-4 text-blue-500" />
-                  {isEditing ? (
+              {/* 메모 */}
+              <div className="flex items-center gap-1">
+                {editingNotes[storage.id] ? (
+                  <>
                     <Input
-                      placeholder="태그 번호"
-                      value={getCurrentEditValue(
-                        storage.id,
-                        "tagNumber",
-                        storage.tag_number || ""
-                      )}
+                      value={notes[storage.id] || ""}
                       onChange={(e) =>
-                        handleEditChange(
-                          storage.id,
-                          "tagNumber",
-                          e.target.value
-                        )
+                        setNotes((prev) => ({
+                          ...prev,
+                          [storage.id]: e.target.value,
+                        }))
                       }
-                      className="text-sm h-8 flex-1"
+                      placeholder="메모"
+                      className="h-7 text-sm flex-1 min-w-0 bg-white border-gray-400"
                     />
-                  ) : (
-                    <div className="flex-1">
-                      {storage.tag_number ? (
-                        <span className="font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded text-xs">
-                          {storage.tag_number}
-                        </span>
-                      ) : (
-                        <span className="text-gray-500 text-xs">태그 없음</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* 물품 정보 */}
-                <div className="flex items-center gap-1.5 text-sm">
-                  <Package className="w-3 h-3 md:w-4 md:h-4 text-gray-500" />
-                  {isEditing ? (
-                    <div className="flex gap-1 flex-1">
-                      <Input
-                        placeholder="물품 설명"
-                        value={getCurrentEditValue(
-                          storage.id,
-                          "itemsDescription",
-                          storage.items_description
-                        )}
-                        onChange={(e) =>
-                          handleEditChange(
-                            storage.id,
-                            "itemsDescription",
-                            e.target.value
-                          )
-                        }
-                        className="text-sm h-8 flex-1"
-                      />
-                      <Input
-                        type="text"
-                        placeholder="개수"
-                        value={getCurrentEditValue(
-                          storage.id,
-                          "quantity",
-                          storage.quantity
-                        )}
-                        onChange={(e) =>
-                          handleEditChange(
-                            storage.id,
-                            "quantity",
-                            parseInt(e.target.value) || 0
-                          )
-                        }
-                        className="text-sm h-8 w-16 flex-1"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex items-center flex-1">
-                      <span className="text-gray-700 truncate max-w-[120px] md:max-w-none">
-                        {storage.items_description}
-                      </span>
-                      <span className="text-gray-800 ml-2">
-                        {storage.quantity}개
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* 맡기는 날짜/시간 */}
-                <div className="flex items-center gap-1.5 text-sm">
-                  <CalendarIcon className="w-3 h-3 md:w-4 md:h-4 text-gray-500" />
-                  {isEditing ? (
-                    <div className="flex gap-1 flex-1">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "text-sm h-8 flex-1 justify-start text-left font-normal",
-                              !getCurrentEditValue(
-                                storage.id,
-                                "dropOffDate",
-                                storage.drop_off_date
-                              ) && "text-muted-foreground"
-                            )}
-                          >
-                            {getCurrentEditValue(
-                              storage.id,
-                              "dropOffDate",
-                              storage.drop_off_date
-                            )
-                              ? format(
-                                  new Date(
-                                    getCurrentEditValue(
-                                      storage.id,
-                                      "dropOffDate",
-                                      storage.drop_off_date
-                                    )
-                                  ),
-                                  "yyyy-MM-dd",
-                                  { locale: ko }
-                                )
-                              : "날짜 선택"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={
-                              getCurrentEditValue(
-                                storage.id,
-                                "dropOffDate",
-                                storage.drop_off_date
-                              )
-                                ? new Date(
-                                    getCurrentEditValue(
-                                      storage.id,
-                                      "dropOffDate",
-                                      storage.drop_off_date
-                                    )
-                                  )
-                                : undefined
-                            }
-                            onSelect={(date) => {
-                              if (date) {
-                                handleEditChange(
-                                  storage.id,
-                                  "dropOffDate",
-                                  format(date, "yyyy-MM-dd")
-                                );
-                              }
-                            }}
-                            locale={ko}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <Select
-                        value={getCurrentEditValue(
-                          storage.id,
-                          "dropOffTime",
-                          storage.drop_off_time
-                        )}
-                        onValueChange={(value) =>
-                          handleEditChange(storage.id, "dropOffTime", value)
-                        }
-                      >
-                        <SelectTrigger className="w-20 h-8 text-sm flex-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {timeOptions.map((time) => (
-                            <SelectItem key={time.value} value={time.value}>
-                              {time.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : (
-                    <div className="flex items-center flex-1">
-                      <span className="font-medium text-blue-600">
-                        맡기는: {storage.drop_off_date}{" "}
-                        {storage.drop_off_time.slice(0, 5)}{" "}
-                        ({storage.drop_off_location || "-"})
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* 찾는 날짜/시간 */}
-                <div className="flex items-center gap-1.5 text-sm">
-                  <CalendarIcon className="w-3 h-3 md:w-4 md:h-4 text-gray-500" />
-                  {isEditing ? (
-                    <div className="flex gap-1 flex-1">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "text-sm h-8 flex-1 justify-start text-left font-normal",
-                              !getCurrentEditValue(
-                                storage.id,
-                                "pickupDate",
-                                storage.pickup_date
-                              ) && "text-muted-foreground"
-                            )}
-                          >
-                            {getCurrentEditValue(
-                              storage.id,
-                              "pickupDate",
-                              storage.pickup_date
-                            )
-                              ? format(
-                                  new Date(
-                                    getCurrentEditValue(
-                                      storage.id,
-                                      "pickupDate",
-                                      storage.pickup_date
-                                    )
-                                  ),
-                                  "yyyy-MM-dd",
-                                  { locale: ko }
-                                )
-                              : "날짜 선택"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={
-                              getCurrentEditValue(
-                                storage.id,
-                                "pickupDate",
-                                storage.pickup_date
-                              )
-                                ? new Date(
-                                    getCurrentEditValue(
-                                      storage.id,
-                                      "pickupDate",
-                                      storage.pickup_date
-                                    )
-                                  )
-                                : undefined
-                            }
-                            onSelect={(date) => {
-                              if (date) {
-                                handleEditChange(
-                                  storage.id,
-                                  "pickupDate",
-                                  format(date, "yyyy-MM-dd")
-                                );
-                              }
-                            }}
-                            locale={ko}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <Select
-                        value={getCurrentEditValue(
-                          storage.id,
-                          "pickupTime",
-                          storage.pickup_time
-                        )}
-                        onValueChange={(value) =>
-                          handleEditChange(storage.id, "pickupTime", value)
-                        }
-                      >
-                        <SelectTrigger className="w-20 h-8 text-sm flex-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {timeOptions.map((time) => (
-                            <SelectItem key={time.value} value={time.value}>
-                              {time.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : (
-                    <div className="flex items-center flex-1">
-                      {storage.pickup_date && storage.pickup_time ? (
-                        <span className="font-medium text-green-600">
-                          찾는: {storage.pickup_date}{" "}
-                          {storage.pickup_time.slice(0, 5)}{" "}
-                          ({storage.pickup_location || "-"})
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 text-sm">
-                          픽업 정보 없음
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* 전화번호 */}
-                <div className="flex items-center gap-1.5 text-sm">
-                  <Phone className="w-3 h-3 md:w-4 md:h-4 text-gray-500" />
-                  {isEditing ? (
-                    <Input
-                      placeholder="전화번호"
-                      value={getCurrentEditValue(
-                        storage.id,
-                        "phoneNumber",
-                        storage.phone_number
-                      )}
-                      onChange={(e) =>
-                        handleEditChange(
-                          storage.id,
-                          "phoneNumber",
-                          e.target.value
-                        )
+                    <Button
+                      size="sm"
+                      onClick={() => handleNotesUpdate(storage.id)}
+                      className="h-7 w-7 p-0 text-xs flex-shrink-0"
+                    >
+                      ✓
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p
+                      className="text-sm text-gray-600 break-all min-w-0"
+                      title={storage.notes || "메모 없음"}
+                    >
+                      메모: {storage.notes || "메모 없음"}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        startEditingNotes(storage.id, storage.notes)
                       }
-                      className="text-sm h-8 flex-1"
-                    />
-                  ) : (
-                    <span className="text-gray-600 text-sm">
-                      {storage.phone_number}
-                    </span>
-                  )}
-                </div>
+                      className="h-7 w-7 p-0 text-xs flex-shrink-0"
+                    >
+                      <PencilIcon className="w-3 h-3" />
+                    </Button>
+                  </>
+                )}
 
-                {/* 메모 (편집 모드에서만) */}
-                {isEditing && (
-                  <div className="flex items-start gap-1.5 text-sm">
-                    <FileText className="w-3 h-3 md:w-4 md:h-4 text-gray-500 mt-1" />
-                    <Textarea
-                      placeholder="메모 (선택사항)"
-                      value={getCurrentEditValue(
-                        storage.id,
-                        "notes",
-                        storage.notes || ""
-                      )}
-                      onChange={(e) =>
-                        handleEditChange(storage.id, "notes", e.target.value)
-                      }
-                      className="text-sm min-h-[60px] flex-1"
-                    />
-                  </div>
+                {isUpdating[storage.id] && (
+                  <div className="animate-spin h-3 w-3 border border-blue-500 border-t-transparent rounded-full ml-1 flex-shrink-0"></div>
                 )}
               </div>
-            </CardHeader>
-
-            <CardContent className="p-2 md:p-3 space-y-2">
-              {isEditing ? (
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => saveAllFields(storage)}
-                    disabled={updatingIds.has(storage.id)}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                    size="sm"
-                  >
-                    {updatingIds.has(storage.id) ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span className="text-xs">저장중...</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Save className="w-3 h-3" />
-                        <span className="text-xs">저장</span>
-                      </div>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={() => cancelEdit(storage.id)}
-                    variant="outline"
-                    className="flex-1"
-                    size="sm"
-                  >
-                    <div className="flex items-center gap-2">
-                      <X className="w-3 h-3" />
-                      <span className="text-xs">취소</span>
-                    </div>
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  onClick={() => handleStatusUpdate(storage)}
-                  disabled={
-                    updatingIds.has(storage.id) ||
-                    (type === "drop-off" && storage.status === "stored") ||
-                    (type === "pick-up" && storage.status === "retrieved")
-                  }
-                  className={`w-full py-2 md:py-3 font-semibold ${
-                    (type === "drop-off" && storage.status === "stored") ||
-                    (type === "pick-up" && storage.status === "retrieved")
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : `text-white ${getActionButtonColor()}`
-                  }`}
-                  size="sm"
-                >
-                  {updatingIds.has(storage.id) ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 md:w-4 md:h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span className="text-xs md:text-sm">처리중...</span>
-                    </div>
-                  ) : (
-                    <span className="text-xs md:text-sm">
-                      {type === "drop-off" && storage.status === "stored"
-                        ? "보관 완료됨"
-                        : type === "pick-up" && storage.status === "retrieved"
-                          ? "픽업 완료됨"
-                          : getActionButtonText()}
-                    </span>
-                  )}
-                </Button>
-              )}
-            </CardContent>
+            </div>
           </Card>
-        );
-      })}
+        ))}
 
-      {storages.length === 0 && (
-        <div className="col-span-full">
-          <div className="flex flex-col items-center justify-center py-8 md:py-12">
-            <Package className="w-8 h-8 md:w-12 md:h-12 text-gray-400 mb-2 md:mb-4" />
-            <h3 className="text-base md:text-lg font-medium text-gray-500 mb-1 md:mb-2">
-              {type === "drop-off"
-                ? "입고할 짐이 없습니다"
-                : "픽업할 짐이 없습니다"}
-            </h3>
+        {storages.length === 0 && (
+          <div className="col-span-full text-center py-6 text-gray-500 text-sm">
+            {type === "drop-off" ? "입고할" : "출고할"} 예약이 없습니다.
           </div>
+        )}
+      </div>
+
+      {/* 페이지네이션 */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  className={
+                    currentPage === 1
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+
+              {getPageNumbers().map((page, index) => (
+                <PaginationItem key={index}>
+                  {page === "..." ? (
+                    <PaginationEllipsis />
+                  ) : (
+                    <PaginationLink
+                      onClick={() => setCurrentPage(page as number)}
+                      isActive={currentPage === page}
+                      className="cursor-pointer"
+                    >
+                      {page}
+                    </PaginationLink>
+                  )}
+                </PaginationItem>
+              ))}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() =>
+                    setCurrentPage(Math.min(totalPages, currentPage + 1))
+                  }
+                  className={
+                    currentPage === totalPages
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
-    </div>
+    </>
   );
 }
