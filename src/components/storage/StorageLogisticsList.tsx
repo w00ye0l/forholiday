@@ -665,10 +665,16 @@ export default function StorageLogisticsList({
                     </div>
                   ) : (
                     <div className="flex items-center flex-1">
-                      <span className="font-medium text-green-600">
-                        찾는: {storage.pickup_date}{" "}
-                        {storage.pickup_time.slice(0, 5)}
-                      </span>
+                      {storage.pickup_date && storage.pickup_time ? (
+                        <span className="font-medium text-green-600">
+                          찾는: {storage.pickup_date}{" "}
+                          {storage.pickup_time.slice(0, 5)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-sm">
+                          픽업 정보 없음
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
