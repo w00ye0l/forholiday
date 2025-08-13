@@ -383,6 +383,8 @@ export default function StorageOutgoingPage() {
           storages={filteredStorages}
           type="pick-up"
           onStatusUpdate={loadData}
+          searchTerm={searchTerm}
+          loading={loading}
         />
       )}
     </div>
