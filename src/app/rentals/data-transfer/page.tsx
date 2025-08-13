@@ -101,7 +101,7 @@ export default function DataTransferPage() {
         .select("*")
         .eq("data_transmission", true)
         .is("cancelled_at", null)
-        .order("created_at", { ascending: false });
+        .order("return_date", { ascending: false });
 
       if (error) throw error;
 
