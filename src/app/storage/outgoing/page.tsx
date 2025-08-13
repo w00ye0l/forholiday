@@ -11,12 +11,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  SearchIcon,
-  RefreshCwIcon,
-  CalendarIcon,
-  ArrowUpIcon,
-} from "lucide-react";
+import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -40,7 +35,6 @@ export default function StorageOutgoingPage() {
     from: today,
     to: today,
   });
-  const [showAllDates, setShowAllDates] = useState(false); // 전체 날짜 보기 여부
 
   const loadData = async () => {
     setLoading(true);
@@ -89,6 +83,11 @@ export default function StorageOutgoingPage() {
     const today = format(new Date(), "yyyy-MM-dd");
 
     return storages.sort((a, b) => {
+      // 날짜가 없는 경우
+      if (!a.pickup_date && !b.pickup_date) return 0;
+      if (!a.pickup_date) return 1;
+      if (!b.pickup_date) return -1;
+
       // 오늘 날짜인지 확인
       const aIsToday = a.pickup_date === today;
       const bIsToday = b.pickup_date === today;
@@ -102,8 +101,13 @@ export default function StorageOutgoingPage() {
         return a.pickup_date.localeCompare(b.pickup_date);
       }
 
-      // 같은 날짜면 시간순 정렬
-      return a.pickup_time.localeCompare(b.pickup_time);
+      // 같은 날짜면 시간순 정렬 (시간이 있는 경우만)
+      if (a.pickup_time && b.pickup_time) {
+        return a.pickup_time.localeCompare(b.pickup_time);
+      }
+      if (!a.pickup_time && !b.pickup_time) return 0;
+      if (!a.pickup_time) return 1;
+      return -1;
     });
   };
 
@@ -116,14 +120,16 @@ export default function StorageOutgoingPage() {
   // 상태별 개수 계산 (날짜 필터 반영, stored+retrieved만)
   const getStatusTabCount = (status: string) => {
     let base = getActiveStorages();
-    // 날짜 필터 적용
-    if (!showAllDates && dateRange) {
-      const fromStr = format(dateRange.from!, "yyyy-MM-dd");
-      const toStr = format(dateRange.to!, "yyyy-MM-dd");
+    // 날짜 필터 적용 (날짜 범위가 선택된 경우에만)
+    if (dateRange?.from && dateRange?.to) {
+      const fromStr = format(dateRange.from, "yyyy-MM-dd");
+      const toStr = format(dateRange.to, "yyyy-MM-dd");
       base = base.filter(
-        (s) => s.pickup_date >= fromStr && s.pickup_date <= toStr
+        (s) =>
+          s.pickup_date && s.pickup_date >= fromStr && s.pickup_date <= toStr
       );
     }
+    // 날짜 범위가 선택되지 않은 경우 = 전체 기간이므로 날짜가 없는 항목도 포함
     if (status === "all") return base.length;
     if (status === "stored")
       return base.filter((s) => s.status === "stored").length;
@@ -142,14 +148,16 @@ export default function StorageOutgoingPage() {
         return true;
       });
     }
-    // 날짜 필터
-    if (!showAllDates && dateRange) {
-      const fromStr = format(dateRange.from!, "yyyy-MM-dd");
-      const toStr = format(dateRange.to!, "yyyy-MM-dd");
+    // 날짜 필터 (날짜 범위가 선택된 경우에만)
+    if (dateRange?.from && dateRange?.to) {
+      const fromStr = format(dateRange.from, "yyyy-MM-dd");
+      const toStr = format(dateRange.to, "yyyy-MM-dd");
       base = base.filter(
-        (s) => s.pickup_date >= fromStr && s.pickup_date <= toStr
+        (s) =>
+          s.pickup_date && s.pickup_date >= fromStr && s.pickup_date <= toStr
       );
     }
+    // 날짜 범위가 선택되지 않은 경우 = 전체 기간이므로 날짜가 없는 항목도 포함
     if (location === "all") return base.length;
     return base.filter((s) => getLocationFromReservation(s) === location)
       .length;
@@ -173,15 +181,18 @@ export default function StorageOutgoingPage() {
         return location === locationTab;
       });
     }
-    // 기간(범위) 필터 (전체 날짜 보기가 아닌 경우)
-    if (!showAllDates && dateRange) {
-      const fromStr = format(dateRange.from!, "yyyy-MM-dd");
-      const toStr = format(dateRange.to!, "yyyy-MM-dd");
+    // 기간(범위) 필터 (날짜 범위가 선택된 경우에만)
+    if (dateRange?.from && dateRange?.to) {
+      const fromStr = format(dateRange.from, "yyyy-MM-dd");
+      const toStr = format(dateRange.to, "yyyy-MM-dd");
       filtered = filtered.filter(
         (storage) =>
-          storage.pickup_date >= fromStr && storage.pickup_date <= toStr
+          storage.pickup_date && // 날짜가 있는 경우만
+          storage.pickup_date >= fromStr &&
+          storage.pickup_date <= toStr
       );
     }
+    // 날짜 범위가 선택되지 않은 경우 = 전체 기간이므로 날짜가 없는 항목도 포함
     // 검색 필터
     if (searchTerm && searchTerm.trim() !== "") {
       const term = searchTerm.toLowerCase().trim();
@@ -198,14 +209,7 @@ export default function StorageOutgoingPage() {
     // 오늘 기준 우선 정렬 적용
     filtered = sortByTodayFirst(filtered);
     setFilteredStorages(filtered);
-  }, [
-    allStorages,
-    searchTerm,
-    dateRange,
-    locationTab,
-    statusTab,
-    showAllDates,
-  ]);
+  }, [allStorages, searchTerm, dateRange, locationTab, statusTab]);
 
   useEffect(() => {
     loadData();
@@ -217,7 +221,6 @@ export default function StorageOutgoingPage() {
       from: today,
       to: today,
     });
-    setShowAllDates(false);
   };
 
   return (
@@ -243,37 +246,34 @@ export default function StorageOutgoingPage() {
             />
           </div>
           {/* 날짜 필터 */}
-          {!showAllDates && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "justify-start text-left font-normal",
-                    !dateRange && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange?.from && dateRange?.to
-                    ? `${format(dateRange.from, "yyyy-MM-dd", {
-                        locale: ko,
-                      })} ~ ${format(dateRange.to, "yyyy-MM-dd", {
-                        locale: ko,
-                      })}`
-                    : "픽업 기간 선택"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="range"
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  locale={ko}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          )}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "justify-start text-left font-normal",
+                  !dateRange && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from && dateRange?.to
+                  ? `${format(dateRange.from, "yyyy-MM-dd", {
+                      locale: ko,
+                    })} ~ ${format(dateRange.to, "yyyy-MM-dd", {
+                      locale: ko,
+                    })}`
+                  : "전체 기간"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                locale={ko}
+              />
+            </PopoverContent>
+          </Popover>
           {/* 초기화 버튼 */}
           <Button
             variant="outline"
