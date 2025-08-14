@@ -31,6 +31,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { StorageReservation, StorageStatus } from "@/types/storage";
 import { toast } from "sonner";
+import { StorageEditDialog } from "./StorageEditDialog";
 
 interface StorageLogisticsListProps {
   storages: StorageReservation[];
@@ -72,6 +73,9 @@ export default function StorageLogisticsList({
   const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedStorage, setSelectedStorage] = useState<StorageReservation | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -203,6 +207,55 @@ export default function StorageLogisticsList({
     setNotes((prev) => ({ ...prev, [id]: currentNotes || "" }));
   };
 
+  const handleEditClick = (storage: StorageReservation) => {
+    setSelectedStorage(storage);
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async (updatedStorage: StorageReservation) => {
+    try {
+      setIsSavingEdit(true);
+      
+      const { error } = await supabase
+        .from("storage_reservations")
+        .update({
+          customer_name: updatedStorage.customer_name,
+          phone_number: updatedStorage.phone_number,
+          customer_email: updatedStorage.customer_email,
+          items_description: updatedStorage.items_description,
+          quantity: updatedStorage.quantity,
+          tag_number: updatedStorage.tag_number,
+          drop_off_date: updatedStorage.drop_off_date,
+          drop_off_time: updatedStorage.drop_off_time,
+          drop_off_location: updatedStorage.drop_off_location,
+          pickup_date: updatedStorage.pickup_date,
+          pickup_time: updatedStorage.pickup_time,
+          pickup_location: updatedStorage.pickup_location,
+          reservation_site: updatedStorage.reservation_site,
+          notes: updatedStorage.notes,
+        })
+        .eq("id", updatedStorage.id);
+
+      if (error) throw error;
+
+      // 로컬 상태 업데이트
+      setStorages((prev) =>
+        prev.map((storage) =>
+          storage.id === updatedStorage.id ? updatedStorage : storage
+        )
+      );
+
+      toast.success("예약 정보가 업데이트되었습니다.");
+      setEditDialogOpen(false);
+      onStatusUpdate?.();
+    } catch (error) {
+      console.error("예약 정보 업데이트 실패:", error);
+      toast.error("예약 정보 업데이트에 실패했습니다.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="bg-white p-6 rounded-lg border border-gray-200">
@@ -299,10 +352,7 @@ export default function StorageLogisticsList({
                       variant="outline"
                       size="sm"
                       className="h-7 w-7 p-0"
-                      onClick={() => {
-                        // TODO: 편집 다이얼로그 구현
-                        toast.info("편집 기능은 곧 추가될 예정입니다.");
-                      }}
+                      onClick={() => handleEditClick(storage)}
                     >
                       <EditIcon className="w-3 h-3" />
                     </Button>
@@ -469,6 +519,15 @@ export default function StorageLogisticsList({
           </Pagination>
         </div>
       )}
+
+      {/* 수정 다이얼로그 */}
+      <StorageEditDialog
+        isOpen={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        storage={selectedStorage}
+        onSave={handleSaveEdit}
+        isSaving={isSavingEdit}
+      />
     </>
   );
 }

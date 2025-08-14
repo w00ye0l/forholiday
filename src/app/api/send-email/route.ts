@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
@@ -137,22 +137,30 @@ export async function POST(request: NextRequest) {
     }
 
     // 환경 변수 검증
-    if (!process.env.RESEND_API_KEY) {
-      console.error("Resend API key missing");
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.error("SMTP credentials missing");
       return NextResponse.json(
-        { success: false, error: "Resend API 키가 없습니다." },
+        { success: false, error: "SMTP 인증 정보가 없습니다." },
         { status: 500 }
       );
     }
 
-    // Resend 클라이언트 생성
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    // Nodemailer transporter 생성 (Gmail SMTP 사용)
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: parseInt(process.env.SMTP_PORT || "587"),
+      secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
 
     // 이메일 옵션
     const emailOptions = {
-      from: "Forholiday <onboarding@resend.dev>", // Resend 기본 도메인 사용
-      reply_to: "forholidayg@gmail.com", // 답장 받을 실제 Gmail 주소
-      to: [to],
+      from: `"FORHOLIDAY" <${process.env.SMTP_USER}>`, // SMTP 계정 사용
+      replyTo: "forholidayg@gmail.com", // 답장 받을 주소
+      to: to,
       subject: finalSubject,
       text: finalContent.replace(/<[^>]*>/g, ""), // HTML 태그 제거하여 text 버전 생성
       html:
@@ -174,23 +182,22 @@ export async function POST(request: NextRequest) {
     };
 
     // 이메일 전송
-    const { data, error } = await resend.emails.send(emailOptions);
+    try {
+      const info = await transporter.sendMail(emailOptions);
+      console.log("Email sent:", info.messageId);
 
-    if (error) {
-      console.error("Resend error:", error);
+      return NextResponse.json({
+        success: true,
+        messageId: info.messageId,
+        transferId: transferId,
+      });
+    } catch (sendError: any) {
+      console.error("Nodemailer error:", sendError);
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: sendError.message },
         { status: 500 }
       );
     }
-
-    console.log("Email sent:", data?.id);
-
-    return NextResponse.json({
-      success: true,
-      messageId: data?.id,
-      transferId: transferId,
-    });
   } catch (error) {
     console.error("Error sending email:", error);
 
@@ -204,84 +211,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 데이터베이스 템플릿 처리 함수
-function processEmailTemplate(template: any, reservation: any) {
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  const locationLabels: Record<string, string> = {
-    T1: "제1터미널",
-    T2: "제2터미널",
-    office: "사무실",
-  };
-
-  // 템플릿 변수 매핑
-  const templateVariables: Record<string, any> = {
-    reservation_id: reservation.reservation_id,
-    customer_name: reservation.customer_name,
-    phone_number: reservation.phone_number,
-    items_description: reservation.items_description,
-    quantity: reservation.quantity,
-    tag_number: reservation.tag_number || "",
-    drop_off_date_formatted: formatDate(reservation.drop_off_date),
-    drop_off_time: reservation.drop_off_time,
-    drop_off_location_label: locationLabels[reservation.drop_off_location],
-    pickup_date_formatted: formatDate(reservation.pickup_date),
-    pickup_time: reservation.pickup_time,
-    pickup_location_label: locationLabels[reservation.pickup_location],
-    notes: reservation.notes || "",
-  };
-
-  // 제목 템플릿 처리
-  let processedSubject = template.subject_template;
-  Object.keys(templateVariables).forEach((key) => {
-    const regex = new RegExp(`\\{\\{${key}\\}\\}`, "g");
-    processedSubject = processedSubject.replace(regex, templateVariables[key]);
-  });
-
-  // HTML 템플릿 처리
-  let processedHtml = template.html_template;
-  Object.keys(templateVariables).forEach((key) => {
-    const regex = new RegExp(`\\{\\{${key}\\}\\}`, "g");
-    processedHtml = processedHtml.replace(regex, templateVariables[key]);
-  });
-
-  // 조건부 블록 처리 ({{#if tag_number}} ... {{/if}})
-  if (reservation.tag_number) {
-    processedHtml = processedHtml.replace(
-      /\{\{#if tag_number\}\}([\s\S]*?)\{\{\/if\}\}/g,
-      "$1"
-    );
-  } else {
-    processedHtml = processedHtml.replace(
-      /\{\{#if tag_number\}\}([\s\S]*?)\{\{\/if\}\}/g,
-      ""
-    );
-  }
-
-  if (reservation.notes) {
-    processedHtml = processedHtml.replace(
-      /\{\{#if notes\}\}([\s\S]*?)\{\{\/if\}\}/g,
-      "$1"
-    );
-  } else {
-    processedHtml = processedHtml.replace(
-      /\{\{#if notes\}\}([\s\S]*?)\{\{\/if\}\}/g,
-      ""
-    );
-  }
-
-  return {
-    subject: processedSubject,
-    html: processedHtml,
-  };
-}
 
 // 데이터 전송 완료 이메일 템플릿 생성 함수 (언어별)
 function generateDataTransferTemplate(
