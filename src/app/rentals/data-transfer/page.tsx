@@ -37,6 +37,7 @@ import { useKoreanInput } from "@/hooks/useKoreanInput";
 import { Input } from "@/components/ui/input";
 import { RefreshCwIcon, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HighlightedText } from "@/components/ui/HighlightedText";
 
 const statusOptions: { value: DataTransferProcessStatus; label: string }[] = [
   { value: "PENDING_UPLOAD", label: "업로드 대기" },
@@ -54,11 +55,11 @@ export default function DataTransferPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  // 한글 검색 - 직접 구현
+  // 한글 검색 - 검색 시 날짜 범위를 전체 기간으로 설정
   const searchInput = useKoreanInput({
     delay: 200,
-    enableChoseongSearch: false
-    // 검색 시 날짜 범위 초기화하지 않음 (기존 로직 유지)
+    enableChoseongSearch: false,
+    onValueChange: () => setDateRange(undefined) // 검색 시 날짜 범위를 전체 기간으로 설정
   });
   const today = new Date();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -641,20 +642,30 @@ export default function DataTransferPage() {
                     />
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {transfer.renter_name || "-"}
+                    <HighlightedText 
+                      text={transfer.renter_name || "-"} 
+                      searchTerm={searchInput.debouncedValue}
+                    />
                   </TableCell>
                   <TableCell className="w-32 max-w-32">
                     <div className="truncate" title={transfer.renter_phone || "-"}>
-                      {transfer.renter_phone || "-"}
+                      <HighlightedText 
+                        text={transfer.renter_phone || "-"} 
+                        searchTerm={searchInput.debouncedValue}
+                      />
                     </div>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {transfer.renter_email || "-"}
+                    <HighlightedText 
+                      text={transfer.renter_email || "-"} 
+                      searchTerm={searchInput.debouncedValue}
+                    />
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {transfer.device_tag_name ||
-                      transfer.device_category ||
-                      "-"}
+                    <HighlightedText 
+                      text={transfer.device_tag_name || transfer.device_category || "-"} 
+                      searchTerm={searchInput.debouncedValue}
+                    />
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     {transfer.return_date
