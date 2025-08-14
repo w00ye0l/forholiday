@@ -162,7 +162,7 @@ export default function RentalReturnPage() {
       filtered = searchInput.search(
         filtered,
         (rental) =>
-          `${rental.renter_name} ${rental.device_category} ${rental.reservation_id} ${rental.device_tag_name || ""}`
+          `${rental.renter_name} ${rental.renter_phone} ${rental.reservation_id} ${rental.device_tag_name || ""}`
       );
     }
 
@@ -222,7 +222,7 @@ export default function RentalReturnPage() {
       baseFiltered = searchInput.search(
         baseFiltered,
         (rental) =>
-          `${rental.renter_name} ${rental.device_category} ${rental.reservation_id} ${rental.device_tag_name || ""}`
+          `${rental.renter_name} ${rental.renter_phone} ${rental.reservation_id} ${rental.device_tag_name || ""}`
       );
     }
 
@@ -334,7 +334,7 @@ export default function RentalReturnPage() {
           {/* 한글 검색 입력 */}
           <div className="relative">
             <Input
-              placeholder="이름, 기기명 또는 예약번호 검색"
+              placeholder="고객명, 전화번호, 예약번호, 기기명 검색"
               {...searchInput.inputProps}
               className="pl-3"
             />

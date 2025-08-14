@@ -20,21 +20,18 @@ import {
   ReservationStatus,
   STATUS_MAP,
   PICKUP_METHOD_LABELS,
-  RETURN_METHOD_LABELS,
-  RESERVATION_SITE_LABELS,
-  PickupMethod,
-  ReturnMethod,
-  ReservationSite,
 } from "@/types/rental";
-import {
-  Device,
-  DEVICE_CATEGORY_LABELS,
-  DEVICE_FEATURES,
-} from "@/types/device";
+import { Device, DEVICE_CATEGORY_LABELS } from "@/types/device";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { CalendarIcon, PencilIcon, PhoneIcon, MapPinIcon, EditIcon, Map } from "lucide-react";
+import {
+  CalendarIcon,
+  PencilIcon,
+  PhoneIcon,
+  MapPinIcon,
+  EditIcon,
+  Map,
+} from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -79,6 +76,8 @@ export const OutgoingList = memo<OutgoingListProps>(function OutgoingList({
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const paginatedRentals = rentals.slice(startIndex, endIndex);
 
+  const supabase = createClient();
+
   // 페이지 번호 생성 (예약 목록과 동일한 로직)
   const getPageNumbers = () => {
     const pages = [];
@@ -114,24 +113,6 @@ export const OutgoingList = memo<OutgoingListProps>(function OutgoingList({
 
     return pages;
   };
-
-  const supabase = createClient();
-
-  // 30분 단위 시간 옵션 생성
-  const generateTimeOptions = () => {
-    const times = [];
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const timeString = `${hour.toString().padStart(2, "0")}:${minute
-          .toString()
-          .padStart(2, "0")}`;
-        times.push(timeString);
-      }
-    }
-    return times;
-  };
-
-  const timeOptions = generateTimeOptions();
 
   // 상태별 카드 스타일 반환
   const getCardStyle = (

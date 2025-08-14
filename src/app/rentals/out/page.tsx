@@ -396,8 +396,8 @@ export default function RentalOutPage() {
             onClick={() => setSelectedStatus("pending")}
             className={`h-6 px-2 py-1 text-xs ${
               selectedStatus === "pending"
-                ? STATUS_MAP.pending.button
-                : STATUS_MAP.pending.badge
+                ? "bg-gray-200 border-2 border-gray-400 text-gray-800"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-800"
             }`}
           >
             {STATUS_MAP.pending.label}: {statusCounts.pending}건
@@ -408,8 +408,8 @@ export default function RentalOutPage() {
             onClick={() => setSelectedStatus("picked_up")}
             className={`h-6 px-2 py-1 text-xs ${
               selectedStatus === "picked_up"
-                ? STATUS_MAP.picked_up.button
-                : STATUS_MAP.picked_up.badge
+                ? "bg-blue-200 border-2 border-blue-400 text-blue-800"
+                : "bg-blue-100 hover:bg-blue-200 text-blue-800"
             }`}
           >
             {STATUS_MAP.picked_up.label}: {statusCounts.picked_up}건
@@ -420,8 +420,8 @@ export default function RentalOutPage() {
             onClick={() => setSelectedStatus("not_picked_up")}
             className={`h-6 px-2 py-1 text-xs ${
               selectedStatus === "not_picked_up"
-                ? STATUS_MAP.not_picked_up.button
-                : STATUS_MAP.not_picked_up.badge
+                ? "bg-red-200 border-2 border-red-400 text-red-800"
+                : "bg-red-100 hover:bg-red-200 text-red-800"
             }`}
           >
             {STATUS_MAP.not_picked_up.label}: {statusCounts.not_picked_up}건

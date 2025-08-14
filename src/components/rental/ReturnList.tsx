@@ -73,6 +73,8 @@ export const ReturnList = memo<ReturnListProps>(function ReturnList({
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const paginatedRentals = rentals.slice(startIndex, endIndex);
 
+  const supabase = createClient();
+
   // 페이지 번호 생성 (예약 목록과 동일한 로직)
   const getPageNumbers = () => {
     const pages = [];
@@ -108,10 +110,6 @@ export const ReturnList = memo<ReturnListProps>(function ReturnList({
 
     return pages;
   };
-
-
-
-  const supabase = createClient();
 
   // 상태별 카드 스타일 반환
   const getCardStyle = (status: DisplayStatus) => {
