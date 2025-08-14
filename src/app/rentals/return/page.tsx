@@ -29,9 +29,9 @@ export default function RentalReturnPage() {
 
   // 한글 검색 - 직접 구현 (빠른 반응을 위해 delay 감소)
   const searchInput = useKoreanInput({
-    delay: 150, // 더 빠른 반응을 위해 150ms로 감소
+    delay: 200, // 더 빠른 반응을 위해 150ms로 감소
     enableChoseongSearch: false,
-    onValueChange: () => setDateRange(undefined)
+    onValueChange: () => setDateRange(undefined),
   });
   const today = new Date();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -118,7 +118,12 @@ export default function RentalReturnPage() {
 
   // 기본 필터링된 데이터 (성능 최적화)
   const baseFilteredRentals = useMemo(() => {
-    return rentals.filter(r => ["picked_up", "not_picked_up", "returned", "problem"].includes(r.status) && !r.cancelled_at);
+    return rentals.filter(
+      (r) =>
+        ["picked_up", "not_picked_up", "returned", "problem"].includes(
+          r.status
+        ) && !r.cancelled_at
+    );
   }, [rentals]);
 
   // 검색 및 필터링 로직 - 성능 최적화
@@ -154,8 +159,10 @@ export default function RentalReturnPage() {
 
     // 검색 필터링 (가장 마지막에 적용)
     if (searchInput.debouncedValue.trim()) {
-      filtered = searchInput.search(filtered, (rental) => 
-        `${rental.renter_name} ${rental.device_category} ${rental.reservation_id} ${rental.device_tag_name || ''}`
+      filtered = searchInput.search(
+        filtered,
+        (rental) =>
+          `${rental.renter_name} ${rental.device_category} ${rental.reservation_id} ${rental.device_tag_name || ""}`
       );
     }
 
@@ -167,15 +174,25 @@ export default function RentalReturnPage() {
       const bReturnDate = new Date(`${b.return_date} ${b.return_time}`);
 
       // 지연반납만 맨 위로
-      if (aDisplayStatus === "overdue" && bDisplayStatus !== "overdue") return -1;
-      if (aDisplayStatus !== "overdue" && bDisplayStatus === "overdue") return 1;
+      if (aDisplayStatus === "overdue" && bDisplayStatus !== "overdue")
+        return -1;
+      if (aDisplayStatus !== "overdue" && bDisplayStatus === "overdue")
+        return 1;
 
       // 나머지는 반납 시간순 정렬
       return aReturnDate.getTime() - bReturnDate.getTime();
     });
 
     return filtered;
-  }, [baseFilteredRentals, searchInput.debouncedValue, dateRange, activeLocationTab, activeStatusFilter, searchInput, getDisplayStatus]);
+  }, [
+    baseFilteredRentals,
+    searchInput.debouncedValue,
+    dateRange,
+    activeLocationTab,
+    activeStatusFilter,
+    searchInput,
+    getDisplayStatus,
+  ]);
 
   useEffect(() => {
     loadData();
@@ -202,8 +219,10 @@ export default function RentalReturnPage() {
 
     // 검색 필터링
     if (searchInput.debouncedValue.trim()) {
-      baseFiltered = searchInput.search(baseFiltered, (rental) => 
-        `${rental.renter_name} ${rental.device_category} ${rental.reservation_id} ${rental.device_tag_name || ''}`
+      baseFiltered = searchInput.search(
+        baseFiltered,
+        (rental) =>
+          `${rental.renter_name} ${rental.device_category} ${rental.reservation_id} ${rental.device_tag_name || ""}`
       );
     }
 
@@ -222,7 +241,13 @@ export default function RentalReturnPage() {
     }
 
     return baseFiltered;
-  }, [baseFilteredRentals, searchInput.debouncedValue, dateRange, searchInput, getDisplayStatus]);
+  }, [
+    baseFilteredRentals,
+    searchInput.debouncedValue,
+    dateRange,
+    searchInput,
+    getDisplayStatus,
+  ]);
 
   // 장소별 개수 계산 - 최적화된 버전
   const getLocationCounts = useMemo(() => {
@@ -424,8 +449,8 @@ export default function RentalReturnPage() {
                 {activeStatusFilter === "picked_up"
                   ? "수령완료"
                   : activeStatusFilter === "overdue"
-                  ? "지연 반납"
-                  : "반납완료"}{" "}
+                    ? "지연 반납"
+                    : "반납완료"}{" "}
                 항목만 표시)
               </span>
             )}

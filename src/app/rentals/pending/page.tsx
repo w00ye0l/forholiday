@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, type ReactNode } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  type ReactNode,
+} from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -97,9 +103,7 @@ export default function RentalsPendingPage() {
     pageIndex: 0,
     pageSize: 20,
   });
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(
-    new Set()
-  );
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmedReservationIds, setConfirmedReservationIds] = useState<
     Set<string>
@@ -111,12 +115,11 @@ export default function RentalsPendingPage() {
     Set<string>
   >(new Set());
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [selectedReservation, setSelectedReservation] =
-    useState<any>(null);
+  const [selectedReservation, setSelectedReservation] = useState<any>(null);
 
   // 검색 및 필터 상태 - 한글 입력 처리
   const searchInput = useKoreanInput({
-    delay: 300,
+    delay: 200,
     enableChoseongSearch: false, // 초성 검색 비활성화
   });
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -124,59 +127,44 @@ export default function RentalsPendingPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
 
   // 카테고리 매핑 함수 - Google Sheets 데이터를 표준 카테고리로 변환
-  const mapCategoryToStandard = useCallback(
-    (rawCategory: string): string => {
-      if (!rawCategory) return rawCategory;
+  const mapCategoryToStandard = useCallback((rawCategory: string): string => {
+    if (!rawCategory) return rawCategory;
 
-      const categoryUpper = rawCategory.toUpperCase().trim();
+    const categoryUpper = rawCategory.toUpperCase().trim();
 
-      // 직접 매칭
-      if (categoryUpper in DEVICE_CATEGORY_LABELS) {
-        return DEVICE_CATEGORY_LABELS[categoryUpper as DeviceCategory];
-      }
+    // 직접 매칭
+    if (categoryUpper in DEVICE_CATEGORY_LABELS) {
+      return DEVICE_CATEGORY_LABELS[categoryUpper as DeviceCategory];
+    }
 
-      // 패턴 매칭
-      if (categoryUpper.includes("GP13")) return DEVICE_CATEGORY_LABELS.GP13;
-      if (categoryUpper.includes("GP12")) return DEVICE_CATEGORY_LABELS.GP12;
-      if (categoryUpper.includes("GP11")) return DEVICE_CATEGORY_LABELS.GP11;
-      if (categoryUpper.includes("GP10")) return DEVICE_CATEGORY_LABELS.GP10;
-      if (categoryUpper.includes("POCKET") || categoryUpper.includes("포켓"))
-        return DEVICE_CATEGORY_LABELS.POCKET3;
-      if (categoryUpper.includes("ACTION") || categoryUpper.includes("액션"))
-        return DEVICE_CATEGORY_LABELS.ACTION5;
-      if (categoryUpper.includes("S23")) return DEVICE_CATEGORY_LABELS.S23;
-      if (categoryUpper.includes("S24")) return DEVICE_CATEGORY_LABELS.S24;
-      if (categoryUpper.includes("S25")) return DEVICE_CATEGORY_LABELS.S25;
-      if (categoryUpper.includes("PS5")) return DEVICE_CATEGORY_LABELS.PS5;
-      if (categoryUpper.includes("GLAMPAM") || categoryUpper.includes("글램팜"))
-        return DEVICE_CATEGORY_LABELS.GLAMPAM;
-      if (categoryUpper.includes("AIRWRAP") || categoryUpper.includes("에어랩"))
-        return DEVICE_CATEGORY_LABELS.AIRWRAP;
-      if (
-        categoryUpper.includes("INSTA360") ||
-        categoryUpper.includes("인스타")
-      )
-        return DEVICE_CATEGORY_LABELS.INSTA360;
-      if (
-        categoryUpper.includes("STROLLER") ||
-        categoryUpper.includes("유모차")
-      )
-        return DEVICE_CATEGORY_LABELS.STROLLER;
-      if (
-        categoryUpper.includes("MINIEVO") ||
-        categoryUpper.includes("미니에보")
-      )
-        return DEVICE_CATEGORY_LABELS.MINIEVO;
-      if (
-        categoryUpper.includes("OJM360") ||
-        categoryUpper.includes("오즈모360")
-      )
-        return DEVICE_CATEGORY_LABELS.OJM360;
-      // 매칭되지 않으면 기타로 분류
-      return DEVICE_CATEGORY_LABELS.ETC;
-    },
-    []
-  );
+    // 패턴 매칭
+    if (categoryUpper.includes("GP13")) return DEVICE_CATEGORY_LABELS.GP13;
+    if (categoryUpper.includes("GP12")) return DEVICE_CATEGORY_LABELS.GP12;
+    if (categoryUpper.includes("GP11")) return DEVICE_CATEGORY_LABELS.GP11;
+    if (categoryUpper.includes("GP10")) return DEVICE_CATEGORY_LABELS.GP10;
+    if (categoryUpper.includes("POCKET") || categoryUpper.includes("포켓"))
+      return DEVICE_CATEGORY_LABELS.POCKET3;
+    if (categoryUpper.includes("ACTION") || categoryUpper.includes("액션"))
+      return DEVICE_CATEGORY_LABELS.ACTION5;
+    if (categoryUpper.includes("S23")) return DEVICE_CATEGORY_LABELS.S23;
+    if (categoryUpper.includes("S24")) return DEVICE_CATEGORY_LABELS.S24;
+    if (categoryUpper.includes("S25")) return DEVICE_CATEGORY_LABELS.S25;
+    if (categoryUpper.includes("PS5")) return DEVICE_CATEGORY_LABELS.PS5;
+    if (categoryUpper.includes("GLAMPAM") || categoryUpper.includes("글램팜"))
+      return DEVICE_CATEGORY_LABELS.GLAMPAM;
+    if (categoryUpper.includes("AIRWRAP") || categoryUpper.includes("에어랩"))
+      return DEVICE_CATEGORY_LABELS.AIRWRAP;
+    if (categoryUpper.includes("INSTA360") || categoryUpper.includes("인스타"))
+      return DEVICE_CATEGORY_LABELS.INSTA360;
+    if (categoryUpper.includes("STROLLER") || categoryUpper.includes("유모차"))
+      return DEVICE_CATEGORY_LABELS.STROLLER;
+    if (categoryUpper.includes("MINIEVO") || categoryUpper.includes("미니에보"))
+      return DEVICE_CATEGORY_LABELS.MINIEVO;
+    if (categoryUpper.includes("OJM360") || categoryUpper.includes("오즈모360"))
+      return DEVICE_CATEGORY_LABELS.OJM360;
+    // 매칭되지 않으면 기타로 분류
+    return DEVICE_CATEGORY_LABELS.ETC;
+  }, []);
 
   // 검색어 하이라이트 함수 - 디바운스된 값 사용
   const highlightText = useCallback(
@@ -220,20 +208,17 @@ export default function RentalsPendingPage() {
     []
   );
 
-  const handleRowSelect = useCallback(
-    (index: number, checked: boolean) => {
-      setSelectedRows((prev) => {
-        const newSet = new Set(prev);
-        if (checked) {
-          newSet.add(index);
-        } else {
-          newSet.delete(index);
-        }
-        return newSet;
-      });
-    },
-    []
-  );
+  const handleRowSelect = useCallback((index: number, checked: boolean) => {
+    setSelectedRows((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(index);
+      } else {
+        newSet.delete(index);
+      }
+      return newSet;
+    });
+  }, []);
 
   const handleConfirmClick = useCallback(() => {
     if (selectedRows.size === 0) return;
@@ -248,7 +233,7 @@ export default function RentalsPendingPage() {
   const handleDetailClick = useCallback(async (reservation: any) => {
     try {
       const supabase = createClient();
-      
+
       // 실제 데이터베이스에서 최신 예약 정보 가져오기
       const { data, error } = await supabase
         .from("rental_reservations")
@@ -274,13 +259,14 @@ export default function RentalsPendingPage() {
     // 먼저 검색어로 필터링 (es-hangul 기반)
     let searchFiltered = data;
     if (searchInput.debouncedValue.trim()) {
-      searchFiltered = searchInput.search(data, (item) => 
-        `${item["이름"] || ''} ${item["예약번호"] || ''} ${item["이메일"] || ''}`
+      searchFiltered = searchInput.search(
+        data,
+        (item) =>
+          `${item["이름"] || ""} ${item["예약번호"] || ""} ${item["이메일"] || ""}`
       );
     }
 
     return searchFiltered.filter((item) => {
-
       // 예약 사이트 필터
       const matchesSite =
         selectedSite === "all" || item["예약사이트"] === selectedSite;
@@ -327,9 +313,7 @@ export default function RentalsPendingPage() {
           }
         })();
 
-      return (
-        matchesSite && matchesCategory && matchesDateRange
-      );
+      return matchesSite && matchesCategory && matchesDateRange;
     });
   }, [
     data,
@@ -644,7 +628,9 @@ export default function RentalsPendingPage() {
                   isCanceled ? { textDecoration: "line-through" } : undefined
                 }
               >
-                {shouldHighlight ? highlightText(value, searchInput.debouncedValue) : value}
+                {shouldHighlight
+                  ? highlightText(value, searchInput.debouncedValue)
+                  : value}
               </a>
             );
           }
@@ -659,7 +645,10 @@ export default function RentalsPendingPage() {
               ? highlightText(standardizedCategory, searchInput.debouncedValue)
               : standardizedCategory;
           } else if (shouldHighlight && value) {
-            displayValue = highlightText(value.toString(), searchInput.debouncedValue);
+            displayValue = highlightText(
+              value.toString(),
+              searchInput.debouncedValue
+            );
           }
 
           // 예약번호 필드인 경우 두 줄로 표시 (번호 + 뱃지)
@@ -1279,7 +1268,7 @@ export default function RentalsPendingPage() {
         onSave={async (rental) => {
           try {
             const supabase = createClient();
-            
+
             // 예약번호로 실제 데이터베이스 예약을 찾아서 수정
             const { error } = await supabase
               .from("rental_reservations")
@@ -1304,13 +1293,12 @@ export default function RentalsPendingPage() {
 
             toast.success("예약 정보가 수정되었습니다.");
             setShowEditDialog(false);
-            
+
             // 데이터 새로고침 - 다른 페이지에도 영향을 줄 수 있으므로 이벤트 발생
-            window.dispatchEvent(new CustomEvent('reservationUpdated'));
-            
+            window.dispatchEvent(new CustomEvent("reservationUpdated"));
           } catch (error) {
-            console.error('예약 수정 오류:', error);
-            toast.error('예약 수정에 실패했습니다.');
+            console.error("예약 수정 오류:", error);
+            toast.error("예약 수정에 실패했습니다.");
           }
         }}
       />
