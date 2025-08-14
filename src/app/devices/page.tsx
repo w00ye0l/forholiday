@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { useKoreanInput } from "@/hooks/useKoreanInput";
+import { Input } from "@/components/ui/input";
 import { Device, DEVICE_CATEGORY_LABELS, DeviceCategory } from "@/types/device";
 import DeviceManager from "@/components/device/DeviceManager";
 import DeviceCreateForm from "@/components/device/DeviceCreateForm";
@@ -8,7 +10,6 @@ import DeviceEditModal from "@/components/device/DeviceEditModal";
 import { InventoryDashboard } from "@/components/device/InventoryDashboard";
 import { createClient } from "@/lib/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -17,16 +18,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchIcon, RefreshCwIcon } from "lucide-react";
+import { RefreshCwIcon } from "lucide-react";
 
 export default function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
-  const [filteredDevices, setFilteredDevices] = useState<Device[]>([]);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  
+  // 한글 검색 - 직접 구현
+  const searchInput = useKoreanInput({
+    delay: 200,
+    enableChoseongSearch: false,
+  });
 
   // 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,19 +46,15 @@ export default function DevicesPage() {
       .select("*")
       .order("tag_name", { ascending: true });
     setDevices(data || []);
-    setFilteredDevices(data || []);
   };
 
   // 검색 및 필터링 로직
-  useEffect(() => {
+  const filteredDevices = useMemo(() => {
     let filtered = [...devices];
 
-    // 검색 필터링 (태그명으로 검색)
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter((device) =>
-        device.tag_name?.toLowerCase().includes(searchLower)
-      );
+    // 검색 필터링
+    if (searchInput.debouncedValue.trim()) {
+      filtered = searchInput.search(filtered, (device) => device.tag_name || '');
     }
 
     // 카테고리 필터링
@@ -68,9 +69,13 @@ export default function DevicesPage() {
       filtered = filtered.filter((device) => device.status === selectedStatus);
     }
 
-    setFilteredDevices(filtered);
-    setCurrentPage(1); // 필터 변경 시 첫 페이지로 이동
-  }, [devices, searchTerm, selectedCategory, selectedStatus]);
+    return filtered;
+  }, [devices, searchInput.debouncedValue, selectedCategory, selectedStatus, searchInput]);
+
+  // 필터 변경 시 첫 페이지로 이동
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredDevices]);
 
   useEffect(() => {
     fetchDevices();
@@ -93,7 +98,7 @@ export default function DevicesPage() {
   };
 
   const handleReset = () => {
-    setSearchTerm("");
+    searchInput.clear();
     setSelectedCategory("all");
     setSelectedStatus("all");
     setCurrentPage(1);
@@ -104,11 +109,8 @@ export default function DevicesPage() {
     let filtered = [...devices];
 
     // 검색 필터링
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter((device) =>
-        device.tag_name?.toLowerCase().includes(searchLower)
-      );
+    if (searchInput.debouncedValue.trim()) {
+      filtered = searchInput.search(filtered, (device) => device.tag_name || '');
     }
 
     // 카테고리 필터링
@@ -171,12 +173,10 @@ export default function DevicesPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {/* 태그명 검색 */}
               <div className="relative">
-                <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
                 <Input
-                  placeholder="태그명으로 검색..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="text-sm pl-9"
+                  placeholder="기기 태그명 검색"
+                  {...searchInput.inputProps}
+                  className="pl-3"
                 />
               </div>
 

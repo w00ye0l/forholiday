@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -60,9 +60,9 @@ export function StorageEditDialog({
   isSaving = false,
 }: StorageEditDialogProps) {
   const [editingStorage, setEditingStorage] =
-    React.useState<StorageReservation | null>(null);
+    useState<StorageReservation | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setEditingStorage(storage);
   }, [storage]);
 

@@ -17,7 +17,7 @@ import {
   STORAGE_STATUS_LABELS,
   STORAGE_LOCATION_LABELS,
 } from "@/types/storage";
-import React from "react";
+import { type ReactNode, Fragment } from "react";
 import EmailSendButton from "./EmailSendButton";
 
 interface StorageListProps {
@@ -27,7 +27,7 @@ interface StorageListProps {
 }
 
 // 텍스트 하이라이트 함수
-const highlightText = (text: string, searchTerm: string): React.ReactNode => {
+const highlightText = (text: string, searchTerm: string): ReactNode => {
   if (!searchTerm.trim()) return text;
 
   const regex = new RegExp(
@@ -109,7 +109,7 @@ export default function StorageList({
         </TableHeader>
         <TableBody>
           {storages.map((storage) => (
-            <React.Fragment key={storage.id}>
+            <Fragment key={storage.id}>
               <TableRow>
                 <TableCell className="font-medium whitespace-nowrap">
                   <Link
@@ -191,7 +191,7 @@ export default function StorageList({
                   </div>
                 </TableCell>
               </TableRow>
-            </React.Fragment>
+            </Fragment>
           ))}
           {storages.length === 0 && (
             <TableRow>

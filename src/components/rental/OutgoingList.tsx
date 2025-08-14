@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -44,18 +44,21 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { HighlightedText } from "@/components/ui/HighlightedText";
 
 interface OutgoingListProps {
   rentals: RentalReservation[];
   devices: Device[];
   onStatusUpdate?: () => void;
+  searchTerm?: string; // 검색어 하이라이트를 위한 prop 추가
 }
 
-export function OutgoingList({
+export const OutgoingList = memo<OutgoingListProps>(function OutgoingList({
   rentals: initialRentals,
   devices,
   onStatusUpdate,
-}: OutgoingListProps) {
+  searchTerm = "", // 기본값 설정
+}) {
   const [rentals, setRentals] = useState(initialRentals);
   const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -303,9 +306,18 @@ export function OutgoingList({
                 {/* 메인 정보 (이름, 연락처, 시간) */}
                 <div className="flex flex-col justify-between gap-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-base">
-                      {rental.renter_name}
-                    </span>
+                    <HighlightedText
+                      text={rental.renter_name}
+                      searchTerm={searchTerm}
+                      className="font-bold text-base"
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    <HighlightedText
+                      text={rental.reservation_id}
+                      searchTerm={searchTerm}
+                      className="font-mono"
+                    />
                   </div>
                   <div className="text-xs text-gray-600 flex gap-2 items-center">
                     <CalendarIcon className="w-3 h-3" />
@@ -331,9 +343,11 @@ export function OutgoingList({
                     )}
                   <div className="text-xs text-gray-600 flex gap-2 items-center">
                     <PhoneIcon className="min-w-3 min-h-3 w-3 h-3" />
-                    <span className="text-xs text-gray-600 break-all">
-                      {rental.renter_phone}
-                    </span>
+                    <HighlightedText
+                      text={rental.renter_phone}
+                      searchTerm={searchTerm}
+                      className="text-xs text-gray-600 break-all"
+                    />
                   </div>
                 </div>
 
@@ -418,7 +432,15 @@ export function OutgoingList({
                             : "bg-white text-gray-800"
                         }`}
                       >
-                        {rental.device_tag_name || rental.device_category}
+                        {rental.device_tag_name ? (
+                          <HighlightedText
+                            text={rental.device_tag_name}
+                            searchTerm={searchTerm}
+                            className=""
+                          />
+                        ) : (
+                          rental.device_category
+                        )}
                       </div>
                     )}
                   </div>
@@ -631,4 +653,4 @@ export function OutgoingList({
       />
     </>
   );
-}
+});

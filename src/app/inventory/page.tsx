@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, lazy } from "react";
+import { Suspense, lazy, memo, useEffect, useCallback } from "react";
 import { InventoryErrorBoundary } from "@/components/inventory/ErrorBoundary";
 import { InventoryLoadingSkeleton } from "@/components/inventory/LoadingSkeleton";
 import { useInventoryData } from "@/hooks/useInventoryData";
@@ -34,7 +34,7 @@ const InventoryNotes = lazy(() =>
 const DAYS_TO_SHOW = 14; // 과거/미래로 보여줄 날짜 수
 
 // 인벤토리 대시보드 컴포넌트
-const InventoryDashboard = React.memo(() => {
+const InventoryDashboard = memo(() => {
   const { loading, error, handleLoadMore } = useInventoryData({
     daysToShow: DAYS_TO_SHOW,
   });
@@ -46,7 +46,7 @@ const InventoryDashboard = React.memo(() => {
   const { state } = useSidebar();
 
   // PC 뷰에서 사이드바 상태에 따른 너비 계산
-  const getContainerWidth = React.useCallback(() => {
+  const getContainerWidth = useCallback(() => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       return "w-full"; // 모바일에서는 전체 너비
     }
@@ -58,13 +58,13 @@ const InventoryDashboard = React.memo(() => {
   }, [state]);
 
   // 스킵 링크 추가
-  React.useEffect(() => {
+  useEffect(() => {
     addSkipLink("main-timeline", "메인 타임라인으로 이동");
     addSkipLink("device-filter", "기기 필터로 이동");
   }, [addSkipLink]);
 
   // 로딩 상태 변경 시 스크린 리더 알림
-  React.useEffect(() => {
+  useEffect(() => {
     if (loading) {
       announceToScreenReader("인벤토리 데이터를 로딩하고 있습니다.", "polite");
     } else {

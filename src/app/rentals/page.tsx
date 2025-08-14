@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useKoreanInput } from "@/hooks/useKoreanInput";
+import { Input } from "@/components/ui/input";
 import { RentalList } from "@/components/rental/RentalList";
 import { RentalStatistics } from "@/components/rental/RentalStatistics";
 import { createClient } from "@/lib/supabase/client";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -32,7 +33,6 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import {
-  SearchIcon,
   RefreshCwIcon,
   ListIcon,
   BarChart3Icon,
@@ -83,7 +83,12 @@ export default function RentalsPage() {
     []
   );
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  // 한글 검색 - 직접 구현
+  const searchInput = useKoreanInput({
+    delay: 200,
+    enableChoseongSearch: false,
+    onValueChange: () => setDateRange(undefined)
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedPickupMethod, setSelectedPickupMethod] =
@@ -126,8 +131,8 @@ export default function RentalsPage() {
         });
 
         // 필터 조건들 추가
-        if (searchTerm.trim()) {
-          params.append("search", searchTerm.trim());
+        if (searchInput.debouncedValue.trim()) {
+          params.append("search", searchInput.debouncedValue.trim());
         }
         if (dateRange?.from && dateRange?.to) {
           params.append("dateFrom", format(dateRange.from, "yyyy-MM-dd"));
@@ -205,7 +210,7 @@ export default function RentalsPage() {
   // 페이지네이션 계산
   const hasActiveFilters = () => {
     return (
-      searchTerm.trim() !== "" ||
+      searchInput.debouncedValue.trim() !== "" ||
       dateRange !== undefined ||
       selectedCategory !== "all" ||
       selectedStatus !== "all" ||
@@ -262,7 +267,7 @@ export default function RentalsPage() {
       fetchRentals(1);
     }
   }, [
-    searchTerm,
+    searchInput.debouncedValue,
     dateRange,
     selectedCategory,
     selectedStatus,
@@ -283,7 +288,7 @@ export default function RentalsPage() {
       updatePage(1);
     }
   }, [
-    searchTerm,
+    searchInput.debouncedValue,
     dateRange,
     selectedCategory,
     selectedStatus,
@@ -320,7 +325,7 @@ export default function RentalsPage() {
   }, [currentPage]);
 
   const handleReset = () => {
-    setSearchTerm("");
+    searchInput.clear();
     setDateRange(undefined);
     setSelectedCategory("all");
     setSelectedStatus("all");
@@ -337,8 +342,8 @@ export default function RentalsPage() {
 
       // 검색 조건 생성
       const searchConditions = [];
-      if (searchTerm.trim()) {
-        searchConditions.push(`검색어: ${searchTerm}`);
+      if (searchInput.debouncedValue.trim()) {
+        searchConditions.push(`검색어: ${searchInput.debouncedValue}`);
       }
       if (dateRange?.from && dateRange?.to) {
         searchConditions.push(
@@ -395,19 +400,7 @@ export default function RentalsPage() {
     // 상태 필터를 제외한 다른 필터들만 적용된 결과
     let filtered = [...rentals];
 
-    // 텍스트 검색 필터링
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter((rental) => {
-        return (
-          rental.renter_name.toLowerCase().includes(term) ||
-          rental.renter_phone.includes(term) ||
-          rental.reservation_id.toLowerCase().includes(term) ||
-          (rental.device_tag_name &&
-            rental.device_tag_name.toLowerCase().includes(term))
-        );
-      });
-    }
+    // 텍스트 검색은 이미 koreanSearch에서 처리됨
 
     // 날짜 범위 필터링 (수령일 기준)
     if (dateRange?.from && dateRange?.to) {
@@ -511,14 +504,12 @@ export default function RentalsPage() {
             {/* 검색 및 필터 */}
             <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-2">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                {/* 이름/기기명 검색 */}
+                {/* 한글 검색 입력 */}
                 <div className="relative">
-                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
                   <Input
-                    placeholder="고객명, 전화번호, 예약번호, 기기명으로 검색..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="text-sm pl-9"
+                    placeholder="고객명, 전화번호, 예약번호, 기기명 검색"
+                    {...searchInput.inputProps}
+                    className="pl-3"
                   />
                 </div>
 
@@ -723,7 +714,7 @@ export default function RentalsPage() {
             <RentalList
               rentals={paginatedRentals}
               loading={loading}
-              searchTerm={searchTerm}
+              searchTerm={searchInput.debouncedValue}
             />
 
             {/* 페이지네이션 */}

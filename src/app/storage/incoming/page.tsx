@@ -1,7 +1,6 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -12,12 +11,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  SearchIcon,
   RefreshCwIcon,
   CalendarIcon,
   ArrowDownIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { useKoreanInput } from "@/hooks/useKoreanInput";
+import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import type { StorageReservation } from "@/types/storage";
@@ -26,15 +26,17 @@ import { cn } from "@/lib/utils";
 
 export default function StorageIncomingPage() {
   const [allStorages, setAllStorages] = useState<StorageReservation[]>([]);
-  const [filteredStorages, setFilteredStorages] = useState<
-    StorageReservation[]
-  >([]);
   const [loading, setLoading] = useState(true);
   const [statusTab, setStatusTab] = useState("pending");
   const [locationTab, setLocationTab] = useState("all");
 
-  // 검색 상태
-  const [searchTerm, setSearchTerm] = useState("");
+  // 한글 검색 - 직접 구현
+  const searchInput = useKoreanInput({
+    delay: 200,
+    enableChoseongSearch: false,
+    onValueChange: () => setDateRange(undefined)
+    }
+  );
   const today = new Date();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: today,
@@ -153,9 +155,17 @@ export default function StorageIncomingPage() {
       .length;
   };
 
-  // 검색 필터링 로직
-  useEffect(() => {
-    let filtered = getActiveStorages();
+  // 검색 및 필터링 로직 - 새로운 구조
+  const filteredStorages = useMemo(() => {
+    let filtered = [...allStorages.filter((s) => s.status === "pending" || s.status === "stored")];
+
+    // 검색 필터링
+    if (searchInput.debouncedValue.trim()) {
+      filtered = searchInput.search(filtered, (storage) => 
+        `${storage.customer_name} ${storage.reservation_id} ${storage.items_description} ${storage.tag_number || ''} ${storage.notes || ''}`
+      );
+    }
+
     // 상태별 필터링
     if (statusTab !== "all") {
       filtered = filtered.filter((storage) => {
@@ -164,6 +174,7 @@ export default function StorageIncomingPage() {
         return true;
       });
     }
+
     // 위치별 필터링
     if (locationTab !== "all") {
       filtered = filtered.filter((storage) => {
@@ -171,6 +182,7 @@ export default function StorageIncomingPage() {
         return location === locationTab;
       });
     }
+
     // 기간(범위) 필터 (전체 날짜 보기가 아닌 경우)
     if (!showAllDates && dateRange?.from && dateRange?.to) {
       const fromStr = format(dateRange.from, "yyyy-MM-dd");
@@ -180,37 +192,17 @@ export default function StorageIncomingPage() {
           storage.drop_off_date >= fromStr && storage.drop_off_date <= toStr
       );
     }
-    // 검색 필터
-    if (searchTerm && searchTerm.trim() !== "") {
-      const term = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter(
-        (storage) =>
-          storage.customer_name.toLowerCase().includes(term) ||
-          storage.reservation_id.toLowerCase().includes(term) ||
-          storage.items_description.toLowerCase().includes(term) ||
-          (storage.tag_number &&
-            storage.tag_number.toLowerCase().includes(term)) ||
-          (storage.notes && storage.notes.toLowerCase().includes(term))
-      );
-    }
+
     // 오늘 기준 우선 정렬 적용
-    filtered = sortByTodayFirst(filtered);
-    setFilteredStorages(filtered);
-  }, [
-    allStorages,
-    searchTerm,
-    dateRange,
-    locationTab,
-    statusTab,
-    showAllDates,
-  ]);
+    return sortByTodayFirst(filtered);
+  }, [allStorages, searchInput.debouncedValue, statusTab, locationTab, dateRange, showAllDates, searchInput]);
 
   useEffect(() => {
     loadData();
   }, []);
 
   const handleReset = () => {
-    setSearchTerm("");
+    searchInput.clear();
     setDateRange({
       from: today,
       to: today,
@@ -227,17 +219,12 @@ export default function StorageIncomingPage() {
       {/* 검색 및 필터 */}
       <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          {/* 이름/기기명 검색 */}
+          {/* 한글 검색 입력 */}
           <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
             <Input
               placeholder="고객명, 예약번호, 물품명, 태그번호 검색"
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setDateRange(undefined);
-              }}
-              className="text-sm pl-9"
+              {...searchInput.inputProps}
+              className="pl-3"
             />
           </div>
           {/* 날짜 필터 */}
@@ -382,7 +369,7 @@ export default function StorageIncomingPage() {
           storages={filteredStorages}
           type="drop-off"
           onStatusUpdate={loadData}
-          searchTerm={searchTerm}
+          searchTerm={searchInput.debouncedValue}
           loading={loading}
         />
       )}

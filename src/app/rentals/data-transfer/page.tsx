@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { RentalReservation, DataTransferProcessStatus } from "@/types/rental";
 import { Card } from "@/components/ui/card";
 import {
@@ -19,7 +19,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -34,7 +33,9 @@ import { DropboxCredentialsModal } from "@/components/admin/DropboxCredentialsMo
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
+import { useKoreanInput } from "@/hooks/useKoreanInput";
+import { Input } from "@/components/ui/input";
+import { RefreshCwIcon, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const statusOptions: { value: DataTransferProcessStatus; label: string }[] = [
@@ -53,8 +54,12 @@ export default function DataTransferPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  // 검색 및 필터 상태
-  const [searchTerm, setSearchTerm] = useState("");
+  // 한글 검색 - 직접 구현
+  const searchInput = useKoreanInput({
+    delay: 200,
+    enableChoseongSearch: false
+    // 검색 시 날짜 범위 초기화하지 않음 (기존 로직 유지)
+  });
   const today = new Date();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: today,
@@ -171,43 +176,39 @@ export default function DataTransferPage() {
     }
   };
 
-  // 검색 필터링 로직
-  const filteredTransfers = transfers.filter((transfer) => {
-    // 상태 필터링
-    if (
-      selectedStatus !== "ALL" &&
-      transfer.data_transfer_process_status !== selectedStatus
-    ) {
-      return false;
+  // 검색 및 필터링 로직
+  const filteredTransfers = useMemo(() => {
+    let filtered = [...transfers];
+
+    // 검색 필터링
+    if (searchInput.debouncedValue.trim()) {
+      filtered = searchInput.search(filtered, (transfer) => 
+        `${transfer.renter_name || ''} ${transfer.renter_phone || ''} ${transfer.renter_email || ''} ${transfer.device_tag_name || ''} ${transfer.device_category || ''}`
+      );
     }
 
-    // 텍스트 검색 필터링
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase().trim();
-      const matchesSearch =
-        transfer.renter_name?.toLowerCase().includes(term) ||
-        transfer.renter_phone?.includes(term) ||
-        transfer.renter_email?.toLowerCase().includes(term) ||
-        transfer.device_tag_name?.toLowerCase().includes(term) ||
-        transfer.device_category?.toLowerCase().includes(term);
-
-      if (!matchesSearch) return false;
+    // 상태 필터링
+    if (selectedStatus !== "ALL") {
+      filtered = filtered.filter((transfer) => 
+        transfer.data_transfer_process_status === selectedStatus
+      );
     }
 
     // 날짜 필터링 (기간 설정)
-    if (dateRange?.from && dateRange?.to && transfer.return_date) {
+    if (dateRange?.from && dateRange?.to) {
       const fromStr = format(dateRange.from, "yyyy-MM-dd");
       const toStr = format(dateRange.to, "yyyy-MM-dd");
-      if (transfer.return_date < fromStr || transfer.return_date > toStr) {
-        return false;
-      }
+      filtered = filtered.filter((transfer) => {
+        if (!transfer.return_date) return false;
+        return transfer.return_date >= fromStr && transfer.return_date <= toStr;
+      });
     }
 
-    return true;
-  });
+    return filtered;
+  }, [transfers, searchInput.debouncedValue, selectedStatus, dateRange, searchInput]);
 
   const handleReset = () => {
-    setSearchTerm("");
+    searchInput.clear();
     setDateRange({
       from: today,
       to: today,
@@ -219,31 +220,23 @@ export default function DataTransferPage() {
   // 상태별 개수 계산
   const getStatusCounts = () => {
     // 상태 필터를 제외한 다른 필터들만 적용된 결과
-    const baseFiltered = transfers.filter((transfer) => {
-      // 텍스트 검색 필터링
-      if (searchTerm.trim()) {
-        const term = searchTerm.toLowerCase().trim();
-        const matchesSearch =
-          transfer.renter_name?.toLowerCase().includes(term) ||
-          transfer.renter_phone?.includes(term) ||
-          transfer.renter_email?.toLowerCase().includes(term) ||
-          transfer.device_tag_name?.toLowerCase().includes(term) ||
-          transfer.device_category?.toLowerCase().includes(term);
+    let baseFiltered = [...transfers];
+    // 검색 필터링
+    if (searchInput.debouncedValue.trim()) {
+      baseFiltered = searchInput.search(baseFiltered, (transfer) => 
+        `${transfer.renter_name || ''} ${transfer.renter_phone || ''} ${transfer.renter_email || ''} ${transfer.device_tag_name || ''} ${transfer.device_category || ''}`
+      );
+    }
 
-        if (!matchesSearch) return false;
-      }
-
-      // 날짜 필터링 (기간 설정)
-      if (dateRange?.from && dateRange?.to && transfer.return_date) {
-        const fromStr = format(dateRange.from, "yyyy-MM-dd");
-        const toStr = format(dateRange.to, "yyyy-MM-dd");
-        if (transfer.return_date < fromStr || transfer.return_date > toStr) {
-          return false;
-        }
-      }
-
-      return true;
-    });
+    // 날짜 필터링 적용
+    if (dateRange?.from && dateRange?.to) {
+      const fromStr = format(dateRange.from, "yyyy-MM-dd");
+      const toStr = format(dateRange.to, "yyyy-MM-dd");
+      baseFiltered = baseFiltered.filter((transfer) => {
+        if (!transfer.return_date) return false;
+        return transfer.return_date >= fromStr && transfer.return_date <= toStr;
+      });
+    }
 
     return {
       all: baseFiltered.length,
@@ -440,14 +433,12 @@ export default function DataTransferPage() {
       {/* 검색 및 필터 */}
       <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          {/* 이름/기기명 검색 */}
+          {/* 한글 검색 입력 */}
           <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
             <Input
-              placeholder="이름, 연락처, 이메일, 기기명으로 검색..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="text-sm pl-9"
+              placeholder="이름, 연락처, 이메일, 기기명 검색"
+              {...searchInput.inputProps}
+              className="pl-3"
             />
           </div>
 

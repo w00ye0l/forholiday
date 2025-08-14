@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -72,11 +72,11 @@ export function RentalEditDialog({
   onSave,
   isSaving = false,
 }: RentalEditDialogProps) {
-  const [editingRental, setEditingRental] = React.useState<RentalData | null>(
+  const [editingRental, setEditingRental] = useState<RentalData | null>(
     null
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     setEditingRental(rental);
   }, [rental]);
 
