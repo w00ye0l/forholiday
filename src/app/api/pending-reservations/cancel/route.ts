@@ -50,18 +50,14 @@ export async function POST(req: Request) {
 
         if (statusData && !statusError) {
           // 확정된 예약인 경우
-          // 2. rental_reservations 테이블에서 해당 예약 취소 처리
-          const { error: cancelError } = await supabase
+          // 2. rental_reservations 테이블에서 해당 예약 삭제
+          const { error: deleteError } = await supabase
             .from("rental_reservations")
-            .update({
-              cancelled_at: new Date().toISOString(),
-              cancel_reason: "관리자 취소",
-              updated_at: new Date().toISOString(),
-            })
+            .delete()
             .eq("reservation_id", statusData.rental_reservation_id);
 
-          if (cancelError) {
-            throw cancelError;
+          if (deleteError) {
+            throw deleteError;
           }
 
           // 3. pending_reservations_status에서 상태를 canceled로 업데이트
