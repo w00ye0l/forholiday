@@ -217,19 +217,12 @@ export const ReturnList = memo<ReturnListProps>(function ReturnList({
             <div className="flex flex-col gap-2 text-sm">
               <div className="flex gap-2 justify-between">
                 {/* 메인 정보 (이름, 연락처, 시간) */}
-                <div className="flex flex-col justify-between gap-1">
+                <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
                     <HighlightedText
                       text={rental.renter_name}
                       searchTerm={searchTerm}
                       className="font-bold text-sm md:text-base"
-                    />
-                  </div>
-                  <div className="text-xs text-gray-500 mb-1">
-                    <HighlightedText
-                      text={rental.reservation_id}
-                      searchTerm={searchTerm}
-                      className="font-mono"
                     />
                   </div>
                   <div className="text-xs text-gray-600 flex gap-2 items-center">
