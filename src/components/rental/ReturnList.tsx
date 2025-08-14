@@ -226,48 +226,6 @@ export const ReturnList = memo<ReturnListProps>(function ReturnList({
                       searchTerm={searchTerm}
                       className="font-bold text-sm md:text-base"
                     />
-                    <Badge
-                      variant="outline"
-                      className={`
-                        ${
-                          getDisplayStatus(rental) === "pending"
-                            ? "bg-gray-100 text-gray-800 border-gray-300"
-                            : ""
-                        }
-                        ${
-                          getDisplayStatus(rental) === "picked_up"
-                            ? "bg-blue-100 text-blue-800 border-blue-300"
-                            : ""
-                        }
-                        ${
-                          getDisplayStatus(rental) === "not_picked_up"
-                            ? "bg-red-100 text-red-800 border-red-300"
-                            : ""
-                        }
-                        ${
-                          getDisplayStatus(rental) === "returned"
-                            ? "bg-green-100 text-green-800 border-green-300"
-                            : ""
-                        }
-                        ${
-                          getDisplayStatus(rental) === "overdue"
-                            ? "bg-yellow-100 text-yellow-800 border-yellow-300"
-                            : ""
-                        }
-                        ${
-                          getDisplayStatus(rental) === "problem"
-                            ? "bg-red-100 text-red-800 border-red-300"
-                            : ""
-                        }
-                      `}
-                    >
-                      {getDisplayStatus(rental) === "pending" && "수령전"}
-                      {getDisplayStatus(rental) === "picked_up" && "수령완료"}
-                      {getDisplayStatus(rental) === "not_picked_up" && "미수령"}
-                      {getDisplayStatus(rental) === "returned" && "반납완료"}
-                      {getDisplayStatus(rental) === "overdue" && "지연 반납"}
-                      {getDisplayStatus(rental) === "problem" && "문제있음"}
-                    </Badge>
                   </div>
                   <div className="text-xs text-gray-500 mb-1">
                     <HighlightedText
@@ -300,8 +258,16 @@ export const ReturnList = memo<ReturnListProps>(function ReturnList({
                 </div>
 
                 <div className="flex flex-col items-end gap-2 text-sm">
-                  {/* 수정 버튼 */}
-                  <div className="w-36 flex justify-end">
+                  {/* 지연반납 뱃지와 수정 버튼 */}
+                  <div className="w-36 flex items-center justify-end gap-2">
+                    {getDisplayStatus(rental) === "overdue" && (
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-yellow-100 text-yellow-800 border-yellow-300"
+                      >
+                        지연 반납
+                      </Badge>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
