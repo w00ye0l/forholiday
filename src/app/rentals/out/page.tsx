@@ -19,7 +19,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCwIcon, CalendarIcon } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useKoreanInput } from "@/hooks/useKoreanInput";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
@@ -41,11 +41,11 @@ export default function RentalOutPage() {
     PickupMethod | "all"
   >("all");
 
-  // 한글 검색 - 직접 구현 (빠른 반응을 위해 delay 감소)
+  // 한글 검색 - 최적화된 설정
   const searchInput = useKoreanInput({
-    delay: 150, // 더 빠른 반응을 위해 150ms로 감소
+    delay: 200,
     enableChoseongSearch: false,
-    onValueChange: () => setDateRange(undefined)
+    onValueChange: () => setDateRange(undefined),
   });
   const today = new Date();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -53,7 +53,7 @@ export default function RentalOutPage() {
     to: today,
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
 
@@ -77,17 +77,23 @@ export default function RentalOutPage() {
     setRentals(rentalsData || []);
     setDevices(devicesData || []);
     setLoading(false);
-  };
+  }, []);
 
   // 상태 업데이트 콜백 함수
-  const handleStatusUpdate = () => {
+  const handleStatusUpdate = useCallback(() => {
     loadData();
-  };
+  }, [loadData]);
 
   // 기본 필터링된 데이터 (성능 최적화)
   const baseFilteredRentals = useMemo(() => {
-    return rentals.filter(r => r.status !== "returned" && !r.cancelled_at);
+    return rentals.filter((r) => r.status !== "returned" && !r.cancelled_at);
   }, [rentals]);
+
+  // 검색 텍스트 추출 함수 - 메모이제이션으로 성능 향상
+  const getSearchText = useMemo(() => {
+    return (rental: RentalReservation) =>
+      `${rental.renter_name} ${rental.renter_phone} ${rental.reservation_id} ${rental.device_tag_name || ""}`;
+  }, []);
 
   // 검색 및 필터링 로직 - 성능 최적화
   const filteredRentals = useMemo(() => {
@@ -114,21 +120,27 @@ export default function RentalOutPage() {
       );
     }
 
-    // 검색 필터링 (가장 마지막에 적용)
+    // 검색 필터링 (가장 마지막에 적용) - searchInput 의존성 제거
     if (searchInput.debouncedValue.trim()) {
-      filtered = searchInput.search(filtered, (rental) => 
-        `${rental.renter_name} ${rental.renter_phone} ${rental.reservation_id} ${rental.device_tag_name || ''}`
-      );
+      filtered = searchInput.search(filtered, getSearchText);
     }
 
     return filtered;
-  }, [baseFilteredRentals, searchInput.debouncedValue, dateRange, selectedPickupMethod, selectedStatus, searchInput]);
+  }, [
+    baseFilteredRentals,
+    searchInput.debouncedValue,
+    dateRange,
+    selectedPickupMethod,
+    selectedStatus,
+    searchInput.search,
+    getSearchText,
+  ]);
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     searchInput.clear();
     setDateRange({
       from: today,
@@ -136,7 +148,7 @@ export default function RentalOutPage() {
     });
     setSelectedPickupMethod("all");
     setSelectedStatus("all");
-  };
+  }, [searchInput]);
 
   // 상태를 제외한 기본 필터링 (상태별 개수 계산용)
   const baseFilteredForCounts = useMemo(() => {
@@ -158,15 +170,20 @@ export default function RentalOutPage() {
       );
     }
 
-    // 검색 필터링
+    // 검색 필터링 - 최적화된 함수 사용
     if (searchInput.debouncedValue.trim()) {
-      filtered = searchInput.search(filtered, (rental) => 
-        `${rental.renter_name} ${rental.renter_phone} ${rental.reservation_id} ${rental.device_tag_name || ''}`
-      );
+      filtered = searchInput.search(filtered, getSearchText);
     }
 
     return filtered;
-  }, [baseFilteredRentals, searchInput.debouncedValue, dateRange, selectedPickupMethod, searchInput]);
+  }, [
+    baseFilteredRentals,
+    searchInput.debouncedValue,
+    dateRange,
+    selectedPickupMethod,
+    searchInput.search,
+    getSearchText,
+  ]);
 
   // 상태별 개수 계산 - 최적화된 버전
   const statusCounts = useMemo(() => {
@@ -213,15 +230,20 @@ export default function RentalOutPage() {
       );
     }
 
-    // 검색 필터링
+    // 검색 필터링 - 최적화된 함수 사용
     if (searchInput.debouncedValue.trim()) {
-      filtered = searchInput.search(filtered, (rental) => 
-        `${rental.renter_name} ${rental.renter_phone} ${rental.reservation_id} ${rental.device_tag_name || ''}`
-      );
+      filtered = searchInput.search(filtered, getSearchText);
     }
 
     return filtered;
-  }, [baseFilteredRentals, searchInput.debouncedValue, dateRange, selectedStatus, searchInput]);
+  }, [
+    baseFilteredRentals,
+    searchInput.debouncedValue,
+    dateRange,
+    selectedStatus,
+    searchInput.search,
+    getSearchText,
+  ]);
 
   // 수령 방법별 개수 계산 - 최적화된 버전
   const pickupMethodCounts = useMemo(() => {
@@ -258,8 +280,8 @@ export default function RentalOutPage() {
     return counts;
   }, [baseFilteredForMethodCounts]);
 
-  // 필터 조건 표시 함수
-  const getFilterDescription = () => {
+  // 필터 조건 표시 함수 - 메모이제이션으로 성능 최적화
+  const getFilterDescription = useMemo(() => {
     const conditions = [];
 
     if (searchInput.debouncedValue.trim()) {
@@ -289,7 +311,12 @@ export default function RentalOutPage() {
     }
 
     return conditions.length > 0 ? conditions.join(" | ") : null;
-  };
+  }, [
+    searchInput.debouncedValue,
+    dateRange,
+    selectedPickupMethod,
+    selectedStatus,
+  ]);
 
   return (
     <div className="container mx-auto py-8">
@@ -419,8 +446,8 @@ export default function RentalOutPage() {
                 {selectedStatus === "pending"
                   ? "수령전"
                   : selectedStatus === "picked_up"
-                  ? "수령완료"
-                  : "미수령"}{" "}
+                    ? "수령완료"
+                    : "미수령"}{" "}
                 항목만 표시)
               </span>
             )}
