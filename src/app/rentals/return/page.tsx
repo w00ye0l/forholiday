@@ -2,7 +2,6 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { ReturnList } from "@/components/rental/ReturnList";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -11,8 +10,10 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
-import { SearchIcon, RefreshCwIcon, CalendarIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { RefreshCwIcon, CalendarIcon } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { useKoreanInput } from "@/hooks/useKoreanInput";
+import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import type {
@@ -24,13 +25,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function RentalReturnPage() {
   const [rentals, setRentals] = useState<RentalReservation[]>([]);
-  const [filteredRentals, setFilteredRentals] = useState<RentalReservation[]>(
-    []
-  );
   const [loading, setLoading] = useState(true);
 
-  // 검색 상태 - 오늘 날짜를 기본값으로 설정
-  const [searchTerm, setSearchTerm] = useState("");
+  // 한글 검색 - 직접 구현 (빠른 반응을 위해 delay 감소)
+  const searchInput = useKoreanInput({
+    delay: 200, // 더 빠른 반응을 위해 150ms로 감소
+    enableChoseongSearch: false,
+    onValueChange: () => setDateRange(undefined),
+  });
   const today = new Date();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: today,
@@ -114,9 +116,33 @@ export default function RentalReturnPage() {
     return rental.status;
   };
 
-  // 검색 필터링 로직
-  useEffect(() => {
-    let filtered = rentals;
+  // 기본 필터링된 데이터 (성능 최적화)
+  const baseFilteredRentals = useMemo(() => {
+    return rentals.filter(
+      (r) =>
+        ["picked_up", "not_picked_up", "returned", "problem"].includes(
+          r.status
+        ) && !r.cancelled_at
+    );
+  }, [rentals]);
+
+  // 검색 및 필터링 로직 - 성능 최적화
+  const filteredRentals = useMemo(() => {
+    let filtered = baseFilteredRentals;
+
+    // 상태별 필터 (가장 선택적인 필터 먼저)
+    if (activeStatusFilter !== "all") {
+      filtered = filtered.filter(
+        (rental) => getDisplayStatus(rental) === activeStatusFilter
+      );
+    }
+
+    // 장소별 필터 (반납 방법 기준)
+    if (activeLocationTab !== "all") {
+      filtered = filtered.filter(
+        (rental) => rental.return_method === activeLocationTab
+      );
+    }
 
     // 기간(범위) 필터 (반납일 기준) - 지연 반납은 제외
     if (dateRange?.from && dateRange?.to) {
@@ -131,30 +157,12 @@ export default function RentalReturnPage() {
       });
     }
 
-    // 장소별 필터 (반납 방법 기준)
-    if (activeLocationTab !== "all") {
-      filtered = filtered.filter(
-        (rental) => rental.return_method === activeLocationTab
-      );
-    }
-
-    // 상태별 필터
-    if (activeStatusFilter !== "all") {
-      filtered = filtered.filter(
-        (rental) => getDisplayStatus(rental) === activeStatusFilter
-      );
-    }
-
-    // 이름/기기명/예약번호 검색
-    if (searchTerm && searchTerm.trim() !== "") {
-      const term = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter(
+    // 검색 필터링 (가장 마지막에 적용)
+    if (searchInput.debouncedValue.trim()) {
+      filtered = searchInput.search(
+        filtered,
         (rental) =>
-          rental.renter_name.toLowerCase().includes(term) ||
-          rental.device_category.toLowerCase().includes(term) ||
-          rental.reservation_id.toLowerCase().includes(term) ||
-          (rental.device_tag_name &&
-            rental.device_tag_name.toLowerCase().includes(term))
+          `${rental.renter_name} ${rental.renter_phone} ${rental.reservation_id} ${rental.device_tag_name || ""}`
       );
     }
 
@@ -166,22 +174,32 @@ export default function RentalReturnPage() {
       const bReturnDate = new Date(`${b.return_date} ${b.return_time}`);
 
       // 지연반납만 맨 위로
-      if (aDisplayStatus === "overdue" && bDisplayStatus !== "overdue") return -1;
-      if (aDisplayStatus !== "overdue" && bDisplayStatus === "overdue") return 1;
+      if (aDisplayStatus === "overdue" && bDisplayStatus !== "overdue")
+        return -1;
+      if (aDisplayStatus !== "overdue" && bDisplayStatus === "overdue")
+        return 1;
 
       // 나머지는 반납 시간순 정렬
       return aReturnDate.getTime() - bReturnDate.getTime();
     });
 
-    setFilteredRentals(filtered);
-  }, [rentals, searchTerm, dateRange, activeLocationTab, activeStatusFilter]);
+    return filtered;
+  }, [
+    baseFilteredRentals,
+    searchInput.debouncedValue,
+    dateRange,
+    activeLocationTab,
+    activeStatusFilter,
+    searchInput,
+    getDisplayStatus,
+  ]);
 
   useEffect(() => {
     loadData();
   }, []);
 
   const handleReset = () => {
-    setSearchTerm("");
+    searchInput.clear();
     setDateRange({
       from: today,
       to: today,
@@ -195,9 +213,18 @@ export default function RentalReturnPage() {
     loadData();
   };
 
-  // 기본 필터링 (검색, 날짜만 적용하고 장소/상태 필터는 제외)
-  const getBaseFilteredRentals = () => {
-    let baseFiltered = rentals;
+  // 기본 필터링 (검색, 날짜만 적용하고 장소/상태 필터는 제외) - 최적화
+  const baseFilteredForCounts = useMemo(() => {
+    let baseFiltered = baseFilteredRentals;
+
+    // 검색 필터링
+    if (searchInput.debouncedValue.trim()) {
+      baseFiltered = searchInput.search(
+        baseFiltered,
+        (rental) =>
+          `${rental.renter_name} ${rental.renter_phone} ${rental.reservation_id} ${rental.device_tag_name || ""}`
+      );
+    }
 
     // 날짜 필터 적용 - 지연 반납은 제외
     if (dateRange?.from && dateRange?.to) {
@@ -213,57 +240,77 @@ export default function RentalReturnPage() {
       });
     }
 
-    // 검색 필터 적용
-    if (searchTerm && searchTerm.trim() !== "") {
-      const term = searchTerm.toLowerCase().trim();
-      baseFiltered = baseFiltered.filter(
-        (rental) =>
-          rental.renter_name.toLowerCase().includes(term) ||
-          rental.device_category.toLowerCase().includes(term) ||
-          rental.reservation_id.toLowerCase().includes(term) ||
-          (rental.device_tag_name &&
-            rental.device_tag_name.toLowerCase().includes(term))
-      );
-    }
-
     return baseFiltered;
-  };
+  }, [
+    baseFilteredRentals,
+    searchInput.debouncedValue,
+    dateRange,
+    searchInput,
+    getDisplayStatus,
+  ]);
 
-  // 장소별 개수 계산 (검색과 날짜 필터만 적용, 장소 필터는 제외)
-  const getLocationCounts = () => {
-    const baseFiltered = getBaseFilteredRentals();
-
-    return {
-      all: baseFiltered.length,
-      T1: baseFiltered.filter((rental) => rental.return_method === "T1").length,
-      T2: baseFiltered.filter((rental) => rental.return_method === "T2").length,
-      delivery: baseFiltered.filter(
-        (rental) => rental.return_method === "delivery"
-      ).length,
-      office: baseFiltered.filter((rental) => rental.return_method === "office")
-        .length,
-      hotel: baseFiltered.filter((rental) => rental.return_method === "hotel")
-        .length,
+  // 장소별 개수 계산 - 최적화된 버전
+  const getLocationCounts = useMemo(() => {
+    const counts = {
+      all: baseFilteredForCounts.length,
+      T1: 0,
+      T2: 0,
+      delivery: 0,
+      office: 0,
+      hotel: 0,
     };
-  };
 
-  // 상태별 개수 계산 (검색과 날짜 필터만 적용, 상태 필터는 제외)
-  const getStatusCounts = () => {
-    const baseFiltered = getBaseFilteredRentals();
+    // 한번의 순회로 모든 장소별 개수 계산
+    baseFilteredForCounts.forEach((rental) => {
+      switch (rental.return_method) {
+        case "T1":
+          counts.T1++;
+          break;
+        case "T2":
+          counts.T2++;
+          break;
+        case "delivery":
+          counts.delivery++;
+          break;
+        case "office":
+          counts.office++;
+          break;
+        case "hotel":
+          counts.hotel++;
+          break;
+      }
+    });
 
-    return {
-      all: baseFiltered.length,
-      picked_up: baseFiltered.filter(
-        (rental) => getDisplayStatus(rental) === "picked_up"
-      ).length,
-      overdue: baseFiltered.filter(
-        (rental) => getDisplayStatus(rental) === "overdue"
-      ).length,
-      returned: baseFiltered.filter(
-        (rental) => getDisplayStatus(rental) === "returned"
-      ).length,
+    return counts;
+  }, [baseFilteredForCounts]);
+
+  // 상태별 개수 계산 - 최적화된 버전
+  const getStatusCounts = useMemo(() => {
+    const counts = {
+      all: baseFilteredForCounts.length,
+      picked_up: 0,
+      overdue: 0,
+      returned: 0,
     };
-  };
+
+    // 한번의 순회로 모든 상태별 개수 계삸
+    baseFilteredForCounts.forEach((rental) => {
+      const displayStatus = getDisplayStatus(rental);
+      switch (displayStatus) {
+        case "picked_up":
+          counts.picked_up++;
+          break;
+        case "overdue":
+          counts.overdue++;
+          break;
+        case "returned":
+          counts.returned++;
+          break;
+      }
+    });
+
+    return counts;
+  }, [baseFilteredForCounts, getDisplayStatus]);
 
   // 장소별 라벨 매핑
   const LOCATION_LABELS = {
@@ -284,17 +331,12 @@ export default function RentalReturnPage() {
       {/* 검색 필터 */}
       <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          {/* 이름/기기명/예약번호 검색 */}
+          {/* 한글 검색 입력 */}
           <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
             <Input
-              placeholder="이름, 기기명 또는 예약번호 검색"
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setDateRange(undefined);
-              }}
-              className="text-sm pl-9"
+              placeholder="고객명, 전화번호, 예약번호, 기기명 검색"
+              {...searchInput.inputProps}
+              className="pl-3"
             />
           </div>
 
@@ -349,7 +391,7 @@ export default function RentalReturnPage() {
                 : "bg-gray-100 hover:bg-gray-200"
             }`}
           >
-            전체: {getStatusCounts().all}건
+            전체: {getStatusCounts.all}건
           </Button>
           <Button
             variant="ghost"
@@ -361,7 +403,7 @@ export default function RentalReturnPage() {
                 : "bg-blue-100 hover:bg-blue-200 text-blue-800"
             }`}
           >
-            수령완료: {getStatusCounts().picked_up}건
+            수령완료: {getStatusCounts.picked_up}건
           </Button>
           <Button
             variant="ghost"
@@ -373,7 +415,7 @@ export default function RentalReturnPage() {
                 : "bg-yellow-100 hover:bg-yellow-200 text-yellow-800"
             }`}
           >
-            지연 반납: {getStatusCounts().overdue}건
+            지연 반납: {getStatusCounts.overdue}건
           </Button>
           <Button
             variant="ghost"
@@ -385,7 +427,7 @@ export default function RentalReturnPage() {
                 : "bg-green-100 hover:bg-green-200 text-green-800"
             }`}
           >
-            반납완료: {getStatusCounts().returned}건
+            반납완료: {getStatusCounts.returned}건
           </Button>
         </div>
 
@@ -407,8 +449,8 @@ export default function RentalReturnPage() {
                 {activeStatusFilter === "picked_up"
                   ? "수령완료"
                   : activeStatusFilter === "overdue"
-                  ? "지연 반납"
-                  : "반납완료"}{" "}
+                    ? "지연 반납"
+                    : "반납완료"}{" "}
                 항목만 표시)
               </span>
             )}
@@ -427,7 +469,7 @@ export default function RentalReturnPage() {
           <TabsList className="grid w-full h-auto grid-cols-3 md:grid-cols-6">
             {Object.entries(LOCATION_LABELS).map(([key, label]) => {
               const count =
-                getLocationCounts()[key as keyof typeof LOCATION_LABELS];
+                getLocationCounts[key as keyof typeof LOCATION_LABELS];
               return (
                 <TabsTrigger key={key} value={key} className="text-sm">
                   <span className="font-medium text-center leading-tight">
@@ -447,6 +489,7 @@ export default function RentalReturnPage() {
           rentals={filteredRentals}
           onStatusUpdate={handleStatusUpdate}
           getDisplayStatus={getDisplayStatus}
+          searchTerm={searchInput.debouncedValue}
         />
       )}
     </div>

@@ -37,6 +37,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "es-hangul": "^2.3.5",
     "google-auth-library": "^10.1.0",
     "googleapis": "^150.0.1",
     "lucide-react": "^0.511.0",

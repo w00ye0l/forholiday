@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -101,20 +101,36 @@ const formSchema = z.object({
   data_transmission: z.enum(["필요없음", "필요"] as const).default("필요없음"),
   sd_option: z.enum(["대여", "구매", "구매+대여"] as const).optional(),
   reservation_site: z.enum(reservationSites),
-  order_number: z.string().min(1, "주문번호는 필수입니다"),
+  order_number: z.string().optional(),
   description: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 interface RentalFormProps {
-  onSubmit: (data: CreateRentalReservationDto) => Promise<void>;
+  onSubmit?: (data: CreateRentalReservationDto) => Promise<void>;
+  onDataChange?: (data: FormValues & { contactImage?: File | null }) => void;
   isSubmitting?: boolean;
+  showSubmitButton?: boolean;
+  formId?: string;
+  onFormReady?: (
+    formId: string,
+    triggerValidation: () => Promise<boolean>,
+    getFormData: () => any,
+    getContactImage: () => File | null
+  ) => void;
 }
 
 // 모든 라벨 매핑은 이제 @/types/rental에서 import됨
 
-export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
+export function RentalForm({
+  onSubmit,
+  onDataChange,
+  isSubmitting,
+  showSubmitButton = true,
+  formId,
+  onFormReady,
+}: RentalFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const router = useRouter();
@@ -168,7 +184,31 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
     watchedDeviceCategory &&
     DEVICE_FEATURES.CAMERA_CATEGORIES.includes(watchedDeviceCategory);
 
+  // 상위 컴포넌트에 폼 메서드들 전달
+  useEffect(() => {
+    if (onFormReady && formId) {
+      onFormReady(
+        formId,
+        () => form.trigger(), // 유효성 검사 실행
+        () => form.getValues(), // 폼 데이터 가져오기
+        () => contactImage // 연락처 이미지 가져오기
+      );
+    }
+  }, [onFormReady, formId, form, contactImage]);
+
   const handleSubmit = async (data: FormValues) => {
+    // 만약 onDataChange가 있다면 (다중 폼 모드) 데이터만 전달
+    if (onDataChange) {
+      onDataChange({
+        ...data,
+        contactImage: contactImage,
+      });
+      return;
+    }
+
+    // 기존 단일 폼 제출 로직
+    if (!onSubmit) return;
+
     console.log("click");
     try {
       setIsLoading(true);
@@ -714,19 +754,21 @@ export function RentalForm({ onSubmit, isSubmitting }: RentalFormProps) {
           )}
         />
 
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" asChild className="flex-1">
-            <Link href="/rentals">취소</Link>
-          </Button>
+        {showSubmitButton && (
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" asChild className="flex-1">
+              <Link href="/rentals">취소</Link>
+            </Button>
 
-          <Button
-            type="submit"
-            className="flex-1"
-            disabled={isLoading || isSubmitting}
-          >
-            {isLoading || isSubmitting ? "처리중..." : "예약 생성"}
-          </Button>
-        </div>
+            <Button
+              type="submit"
+              className="flex-1"
+              disabled={isLoading || isSubmitting}
+            >
+              {isLoading || isSubmitting ? "처리중..." : "예약 생성"}
+            </Button>
+          </div>
+        )}
       </form>
     </Form>
   );

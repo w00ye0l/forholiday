@@ -21,7 +21,6 @@ interface InventoryState {
   endDate: Date;
 
   // 필터
-  searchTerm: string;
   selectedCategories: DeviceCategory[];
 
   // 액션
@@ -29,7 +28,6 @@ interface InventoryState {
   setTimeSlots: (timeSlots: TimeSlot[]) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  setSearchTerm: (term: string) => void;
   setSelectedCategories: (categories: DeviceCategory[]) => void;
   setStartDate: (date: Date) => void;
   setEndDate: (date: Date) => void;
@@ -38,8 +36,6 @@ interface InventoryState {
   extendPastDays: (days: number) => Date;
   extendFutureDays: (days: number) => Date;
 
-  // 필터링된 데이터 getter
-  getFilteredDevices: () => string[];
 }
 
 export const useInventoryStore = create<InventoryState>()((set, get) => ({
@@ -48,7 +44,6 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   timeSlots: [],
   loading: false,
   error: null,
-  searchTerm: "",
   selectedCategories: Object.keys(DEVICE_CATEGORY_LABELS) as DeviceCategory[],
   startDate: startOfDay(new Date()),
   endDate: startOfDay(addDays(new Date(), 1)),
@@ -58,7 +53,6 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   setTimeSlots: (timeSlots: TimeSlot[]) => set({ timeSlots }),
   setLoading: (loading: boolean) => set({ loading }),
   setError: (error: string | null) => set({ error }),
-  setSearchTerm: (searchTerm: string) => set({ searchTerm }),
   setSelectedCategories: (selectedCategories: DeviceCategory[]) =>
     set({ selectedCategories }),
   setStartDate: (date: Date) => set({ startDate: date }),
@@ -79,15 +73,4 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     return newEndDate;
   },
 
-  // 필터링된 데이터 getter
-  getFilteredDevices: () => {
-    const { devices, searchTerm } = get();
-
-    if (!searchTerm) {
-      return devices;
-    }
-
-    const term = searchTerm.toLowerCase();
-    return devices.filter((device) => device.toLowerCase().includes(term));
-  },
 }));

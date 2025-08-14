@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useMemo } from "react";
+import { useRef, useMemo, useState, memo } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { TimeSlot } from "@/lib/inventory-state";
@@ -51,13 +51,13 @@ export const TimelineView = function TimelineView({
   const timelineRef = useRef<HTMLDivElement>(null);
   const headerRowRef = useRef<HTMLDivElement>(null);
   const dateColumnRef = useRef<HTMLDivElement>(null);
-  const [loadingPrevious, setLoadingPrevious] = React.useState(false);
-  const [loadingNext, setLoadingNext] = React.useState(false);
+  const [loadingPrevious, setLoadingPrevious] = useState(false);
+  const [loadingNext, setLoadingNext] = useState(false);
 
   // 예약 상세 모달 상태
   const [selectedReservation, setSelectedReservation] =
-    React.useState<RentalReservation | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+    useState<RentalReservation | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // 예약 클릭 핸들러
   const handleReservationClick = (reservation: RentalReservation) => {
@@ -681,4 +681,4 @@ export const TimelineView = function TimelineView({
   );
 };
 
-export default React.memo(TimelineView);
+export default memo(TimelineView);

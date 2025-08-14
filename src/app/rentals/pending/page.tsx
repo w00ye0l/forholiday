@@ -1,6 +1,12 @@
 "use client";
 
-import * as React from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  type ReactNode,
+} from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -36,6 +42,7 @@ import { ko } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
+import { useKoreanInput } from "@/hooks/useKoreanInput";
 import { DEVICE_CATEGORY_LABELS, DeviceCategory } from "@/types/device";
 import {
   Dialog,
@@ -90,93 +97,78 @@ const COLUMN_WIDTHS: Record<string, string> = {
 
 export default function RentalsPendingPage() {
   const { state } = useSidebar();
-  const [data, setData] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [pagination, setPagination] = React.useState({
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize: 20,
   });
-  const [selectedRows, setSelectedRows] = React.useState<Set<number>>(
-    new Set()
-  );
-  const [isConfirming, setIsConfirming] = React.useState(false);
-  const [confirmedReservationIds, setConfirmedReservationIds] = React.useState<
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmedReservationIds, setConfirmedReservationIds] = useState<
     Set<string>
   >(new Set());
-  const [showConfirmDialog, setShowConfirmDialog] = React.useState(false);
-  const [isCanceling, setIsCanceling] = React.useState(false);
-  const [showCancelDialog, setShowCancelDialog] = React.useState(false);
-  const [canceledReservationIds, setCanceledReservationIds] = React.useState<
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isCanceling, setIsCanceling] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [canceledReservationIds, setCanceledReservationIds] = useState<
     Set<string>
   >(new Set());
-  const [showEditDialog, setShowEditDialog] = React.useState(false);
-  const [selectedReservation, setSelectedReservation] =
-    React.useState<any>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<any>(null);
 
-  // 검색 및 필터 상태
-  const [searchTerm, setSearchTerm] = React.useState("");
-  const [dateRange, setDateRange] = React.useState<DateRange | undefined>();
-  const [selectedSite, setSelectedSite] = React.useState("all");
-  const [selectedCategory, setSelectedCategory] = React.useState("all");
+  // 검색 및 필터 상태 - 한글 입력 처리
+  const searchInput = useKoreanInput({
+    delay: 200,
+    enableChoseongSearch: false, // 초성 검색 비활성화
+  });
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [selectedSite, setSelectedSite] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
 
   // 카테고리 매핑 함수 - Google Sheets 데이터를 표준 카테고리로 변환
-  const mapCategoryToStandard = React.useCallback(
-    (rawCategory: string): string => {
-      if (!rawCategory) return rawCategory;
+  const mapCategoryToStandard = useCallback((rawCategory: string): string => {
+    if (!rawCategory) return rawCategory;
 
-      const categoryUpper = rawCategory.toUpperCase().trim();
+    const categoryUpper = rawCategory.toUpperCase().trim();
 
-      // 직접 매칭
-      if (categoryUpper in DEVICE_CATEGORY_LABELS) {
-        return DEVICE_CATEGORY_LABELS[categoryUpper as DeviceCategory];
-      }
+    // 직접 매칭
+    if (categoryUpper in DEVICE_CATEGORY_LABELS) {
+      return DEVICE_CATEGORY_LABELS[categoryUpper as DeviceCategory];
+    }
 
-      // 패턴 매칭
-      if (categoryUpper.includes("GP13")) return DEVICE_CATEGORY_LABELS.GP13;
-      if (categoryUpper.includes("GP12")) return DEVICE_CATEGORY_LABELS.GP12;
-      if (categoryUpper.includes("GP11")) return DEVICE_CATEGORY_LABELS.GP11;
-      if (categoryUpper.includes("GP10")) return DEVICE_CATEGORY_LABELS.GP10;
-      if (categoryUpper.includes("POCKET") || categoryUpper.includes("포켓"))
-        return DEVICE_CATEGORY_LABELS.POCKET3;
-      if (categoryUpper.includes("ACTION") || categoryUpper.includes("액션"))
-        return DEVICE_CATEGORY_LABELS.ACTION5;
-      if (categoryUpper.includes("S23")) return DEVICE_CATEGORY_LABELS.S23;
-      if (categoryUpper.includes("S24")) return DEVICE_CATEGORY_LABELS.S24;
-      if (categoryUpper.includes("S25")) return DEVICE_CATEGORY_LABELS.S25;
-      if (categoryUpper.includes("PS5")) return DEVICE_CATEGORY_LABELS.PS5;
-      if (categoryUpper.includes("GLAMPAM") || categoryUpper.includes("글램팜"))
-        return DEVICE_CATEGORY_LABELS.GLAMPAM;
-      if (categoryUpper.includes("AIRWRAP") || categoryUpper.includes("에어랩"))
-        return DEVICE_CATEGORY_LABELS.AIRWRAP;
-      if (
-        categoryUpper.includes("INSTA360") ||
-        categoryUpper.includes("인스타")
-      )
-        return DEVICE_CATEGORY_LABELS.INSTA360;
-      if (
-        categoryUpper.includes("STROLLER") ||
-        categoryUpper.includes("유모차")
-      )
-        return DEVICE_CATEGORY_LABELS.STROLLER;
-      if (
-        categoryUpper.includes("MINIEVO") ||
-        categoryUpper.includes("미니에보")
-      )
-        return DEVICE_CATEGORY_LABELS.MINIEVO;
-      if (
-        categoryUpper.includes("OJM360") ||
-        categoryUpper.includes("오즈모360")
-      )
-        return DEVICE_CATEGORY_LABELS.OJM360;
-      // 매칭되지 않으면 기타로 분류
-      return DEVICE_CATEGORY_LABELS.ETC;
-    },
-    []
-  );
+    // 패턴 매칭
+    if (categoryUpper.includes("GP13")) return DEVICE_CATEGORY_LABELS.GP13;
+    if (categoryUpper.includes("GP12")) return DEVICE_CATEGORY_LABELS.GP12;
+    if (categoryUpper.includes("GP11")) return DEVICE_CATEGORY_LABELS.GP11;
+    if (categoryUpper.includes("GP10")) return DEVICE_CATEGORY_LABELS.GP10;
+    if (categoryUpper.includes("POCKET") || categoryUpper.includes("포켓"))
+      return DEVICE_CATEGORY_LABELS.POCKET3;
+    if (categoryUpper.includes("ACTION") || categoryUpper.includes("액션"))
+      return DEVICE_CATEGORY_LABELS.ACTION5;
+    if (categoryUpper.includes("S23")) return DEVICE_CATEGORY_LABELS.S23;
+    if (categoryUpper.includes("S24")) return DEVICE_CATEGORY_LABELS.S24;
+    if (categoryUpper.includes("S25")) return DEVICE_CATEGORY_LABELS.S25;
+    if (categoryUpper.includes("PS5")) return DEVICE_CATEGORY_LABELS.PS5;
+    if (categoryUpper.includes("GLAMPAM") || categoryUpper.includes("글램팜"))
+      return DEVICE_CATEGORY_LABELS.GLAMPAM;
+    if (categoryUpper.includes("AIRWRAP") || categoryUpper.includes("에어랩"))
+      return DEVICE_CATEGORY_LABELS.AIRWRAP;
+    if (categoryUpper.includes("INSTA360") || categoryUpper.includes("인스타"))
+      return DEVICE_CATEGORY_LABELS.INSTA360;
+    if (categoryUpper.includes("STROLLER") || categoryUpper.includes("유모차"))
+      return DEVICE_CATEGORY_LABELS.STROLLER;
+    if (categoryUpper.includes("MINIEVO") || categoryUpper.includes("미니에보"))
+      return DEVICE_CATEGORY_LABELS.MINIEVO;
+    if (categoryUpper.includes("OJM360") || categoryUpper.includes("오즈모360"))
+      return DEVICE_CATEGORY_LABELS.OJM360;
+    // 매칭되지 않으면 기타로 분류
+    return DEVICE_CATEGORY_LABELS.ETC;
+  }, []);
 
-  // 검색어 하이라이트 함수
-  const highlightText = React.useCallback(
-    (text: string, searchTerm: string): React.ReactNode => {
+  // 검색어 하이라이트 함수 - 디바운스된 값 사용
+  const highlightText = useCallback(
+    (text: string, searchTerm: string): ReactNode => {
       if (!searchTerm.trim()) return text;
 
       const regex = new RegExp(
@@ -199,13 +191,13 @@ export default function RentalsPendingPage() {
   );
 
   // 고유 식별자 생성 함수
-  const generateReservationId = React.useCallback((reservation: any) => {
+  const generateReservationId = useCallback((reservation: any) => {
     const timestamp = reservation["타임스탬프"];
     const bookingNumber = String(reservation["예약번호"]);
     return `${timestamp}|${bookingNumber}`;
   }, []);
 
-  const handleSelectAll = React.useCallback(
+  const handleSelectAll = useCallback(
     (checked: boolean, currentData: any[]) => {
       if (checked) {
         setSelectedRows(new Set(currentData.map((_, index) => index)));
@@ -216,35 +208,32 @@ export default function RentalsPendingPage() {
     []
   );
 
-  const handleRowSelect = React.useCallback(
-    (index: number, checked: boolean) => {
-      setSelectedRows((prev) => {
-        const newSet = new Set(prev);
-        if (checked) {
-          newSet.add(index);
-        } else {
-          newSet.delete(index);
-        }
-        return newSet;
-      });
-    },
-    []
-  );
+  const handleRowSelect = useCallback((index: number, checked: boolean) => {
+    setSelectedRows((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(index);
+      } else {
+        newSet.delete(index);
+      }
+      return newSet;
+    });
+  }, []);
 
-  const handleConfirmClick = React.useCallback(() => {
+  const handleConfirmClick = useCallback(() => {
     if (selectedRows.size === 0) return;
     setShowConfirmDialog(true);
   }, [selectedRows.size]);
 
-  const handleCancelClick = React.useCallback(() => {
+  const handleCancelClick = useCallback(() => {
     if (selectedRows.size === 0) return;
     setShowCancelDialog(true);
   }, [selectedRows.size]);
 
-  const handleDetailClick = React.useCallback(async (reservation: any) => {
+  const handleDetailClick = useCallback(async (reservation: any) => {
     try {
       const supabase = createClient();
-      
+
       // 실제 데이터베이스에서 최신 예약 정보 가져오기
       const { data, error } = await supabase
         .from("rental_reservations")
@@ -266,24 +255,18 @@ export default function RentalsPendingPage() {
   }, []);
 
   // 필터링된 데이터
-  const filteredData = React.useMemo(() => {
-    return data.filter((item) => {
-      // 검색어 필터 (이름, 예약번호, 이메일)
-      const matchesSearch =
-        !searchTerm ||
-        item["이름"]
-          ?.toString()
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        item["예약번호"]
-          ?.toString()
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        item["이메일"]
-          ?.toString()
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase());
+  const filteredData = useMemo(() => {
+    // 먼저 검색어로 필터링 (es-hangul 기반)
+    let searchFiltered = data;
+    if (searchInput.debouncedValue.trim()) {
+      searchFiltered = searchInput.search(
+        data,
+        (item) =>
+          `${item["이름"] || ""} ${item["예약번호"] || ""} ${item["이메일"] || ""}`
+      );
+    }
 
+    return searchFiltered.filter((item) => {
       // 예약 사이트 필터
       const matchesSite =
         selectedSite === "all" || item["예약사이트"] === selectedSite;
@@ -330,20 +313,18 @@ export default function RentalsPendingPage() {
           }
         })();
 
-      return (
-        matchesSearch && matchesSite && matchesCategory && matchesDateRange
-      );
+      return matchesSite && matchesCategory && matchesDateRange;
     });
   }, [
     data,
-    searchTerm,
+    searchInput,
     selectedSite,
     selectedCategory,
     dateRange,
     mapCategoryToStandard,
   ]);
 
-  const getSelectedConfirmedCount = React.useCallback(() => {
+  const getSelectedConfirmedCount = useCallback(() => {
     return Array.from(selectedRows).filter((index) =>
       confirmedReservationIds.has(generateReservationId(filteredData[index]))
     ).length;
@@ -355,14 +336,14 @@ export default function RentalsPendingPage() {
   ]);
 
   // 고유 값들 추출 (필터 옵션용)
-  const uniqueSites = React.useMemo(() => {
+  const uniqueSites = useMemo(() => {
     const sites = Array.from(
       new Set(data.map((item) => item["예약사이트"]))
     ).filter(Boolean);
     return sites.sort();
   }, [data]);
 
-  const uniqueCategories = React.useMemo(() => {
+  const uniqueCategories = useMemo(() => {
     const categories = Array.from(
       new Set(data.map((item) => mapCategoryToStandard(item["대여품목"])))
     ).filter(Boolean);
@@ -370,8 +351,8 @@ export default function RentalsPendingPage() {
   }, [data, mapCategoryToStandard]);
 
   // 필터 초기화
-  const handleResetFilters = React.useCallback(() => {
-    setSearchTerm("");
+  const handleResetFilters = useCallback(() => {
+    searchInput.clear();
     setDateRange(undefined);
     setSelectedSite("all");
     setSelectedCategory("all");
@@ -379,11 +360,11 @@ export default function RentalsPendingPage() {
   }, []);
 
   // 필터 변경 시 선택 초기화
-  React.useEffect(() => {
+  useEffect(() => {
     setSelectedRows(new Set());
-  }, [searchTerm, dateRange, selectedSite, selectedCategory]);
+  }, [searchInput.debouncedValue, dateRange, selectedSite, selectedCategory]);
 
-  const handleConfirmReservations = React.useCallback(async () => {
+  const handleConfirmReservations = useCallback(async () => {
     if (selectedRows.size === 0) return;
 
     setIsConfirming(true);
@@ -450,7 +431,7 @@ export default function RentalsPendingPage() {
     }
   }, [selectedRows, filteredData, generateReservationId]);
 
-  const handleCancelReservations = React.useCallback(async () => {
+  const handleCancelReservations = useCallback(async () => {
     if (selectedRows.size === 0) return;
 
     setIsCanceling(true);
@@ -522,7 +503,7 @@ export default function RentalsPendingPage() {
     }
   }, [selectedRows, filteredData, generateReservationId]);
 
-  const columns = React.useMemo(() => {
+  const columns = useMemo(() => {
     return [
       {
         id: "select",
@@ -564,7 +545,7 @@ export default function RentalsPendingPage() {
           // 검색 가능한 필드들에 하이라이트 적용
           const searchableFields = ["이름", "예약번호", "이메일"];
           const shouldHighlight =
-            searchableFields.includes(header) && searchTerm;
+            searchableFields.includes(header) && searchInput.debouncedValue;
 
           // 타임스탬프 두 줄 표시
           if (header === "타임스탬프") {
@@ -647,22 +628,27 @@ export default function RentalsPendingPage() {
                   isCanceled ? { textDecoration: "line-through" } : undefined
                 }
               >
-                {shouldHighlight ? highlightText(value, searchTerm) : value}
+                {shouldHighlight
+                  ? highlightText(value, searchInput.debouncedValue)
+                  : value}
               </a>
             );
           }
 
           // 대여품목 필드인 경우 표준화된 카테고리로 표시
-          let displayValue: React.ReactNode = value;
+          let displayValue: ReactNode = value;
           if (header === "대여품목" && value) {
             const standardizedCategory = mapCategoryToStandard(
               value.toString()
             );
             displayValue = shouldHighlight
-              ? highlightText(standardizedCategory, searchTerm)
+              ? highlightText(standardizedCategory, searchInput.debouncedValue)
               : standardizedCategory;
           } else if (shouldHighlight && value) {
-            displayValue = highlightText(value.toString(), searchTerm);
+            displayValue = highlightText(
+              value.toString(),
+              searchInput.debouncedValue
+            );
           }
 
           // 예약번호 필드인 경우 두 줄로 표시 (번호 + 뱃지)
@@ -717,12 +703,12 @@ export default function RentalsPendingPage() {
     confirmedReservationIds,
     canceledReservationIds,
     generateReservationId,
-    searchTerm,
+    searchInput.debouncedValue,
     highlightText,
     mapCategoryToStandard,
   ]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setLoading(true);
     // 전체 데이터 로드
     fetch(`/api/rentals/pending?all=true`)
@@ -975,9 +961,8 @@ export default function RentalsPendingPage() {
           <div className="relative sm:col-span-2 lg:col-span-1">
             <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
             <Input
-              placeholder="이름, 예약번호, 이메일..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="이름, 예약번호, 이메일 검색"
+              {...searchInput.inputProps}
               className="pl-10 h-9 text-sm"
             />
           </div>
@@ -1074,15 +1059,15 @@ export default function RentalsPendingPage() {
           </div>
 
           {/* 적용된 필터 표시 */}
-          {(searchTerm ||
+          {(searchInput.debouncedValue ||
             dateRange?.from ||
             selectedSite !== "all" ||
             selectedCategory !== "all") && (
             <div className="flex flex-wrap items-center gap-1">
               <span className="text-blue-600 text-xs">필터:</span>
-              {searchTerm && (
+              {searchInput.debouncedValue && (
                 <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                  검색: {searchTerm}
+                  검색: {searchInput.debouncedValue}
                 </Badge>
               )}
               {selectedSite !== "all" && (
@@ -1283,7 +1268,7 @@ export default function RentalsPendingPage() {
         onSave={async (rental) => {
           try {
             const supabase = createClient();
-            
+
             // 예약번호로 실제 데이터베이스 예약을 찾아서 수정
             const { error } = await supabase
               .from("rental_reservations")
@@ -1308,13 +1293,12 @@ export default function RentalsPendingPage() {
 
             toast.success("예약 정보가 수정되었습니다.");
             setShowEditDialog(false);
-            
+
             // 데이터 새로고침 - 다른 페이지에도 영향을 줄 수 있으므로 이벤트 발생
-            window.dispatchEvent(new CustomEvent('reservationUpdated'));
-            
+            window.dispatchEvent(new CustomEvent("reservationUpdated"));
           } catch (error) {
-            console.error('예약 수정 오류:', error);
-            toast.error('예약 수정에 실패했습니다.');
+            console.error("예약 수정 오류:", error);
+            toast.error("예약 수정에 실패했습니다.");
           }
         }}
       />

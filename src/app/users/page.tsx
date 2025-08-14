@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useKoreanInput } from "@/hooks/useKoreanInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,6 @@ import {
 import { Label } from "@/components/ui/label";
 import {
   UserIcon,
-  SearchIcon,
   RefreshCwIcon,
   EditIcon,
   UserPlusIcon,
@@ -48,13 +48,15 @@ interface ProfileWithAuth extends Profile {
 
 export default function UsersPage() {
   const [profiles, setProfiles] = useState<ProfileWithAuth[]>([]);
-  const [filteredProfiles, setFilteredProfiles] = useState<ProfileWithAuth[]>(
-    []
-  );
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState<string>("all");
   const [error, setError] = useState<string | null>(null);
+  
+  // 한글 검색 - 직접 구현
+  const searchInput = useKoreanInput({
+    delay: 200,
+    enableChoseongSearch: false,
+  });
 
   // 수정 모달 상태
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
@@ -101,7 +103,6 @@ export default function UsersPage() {
 
       if (result.success && result.data) {
         setProfiles(result.data);
-        setFilteredProfiles(result.data);
       } else {
         throw new Error("잘못된 응답 형식");
       }
@@ -117,18 +118,14 @@ export default function UsersPage() {
     }
   };
 
-  // 검색 및 필터링
-  useEffect(() => {
+  // 검색 및 필터링 로직
+  const filteredProfiles = useMemo(() => {
     let filtered = [...profiles];
 
-    // 텍스트 검색
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter(
-        (profile) =>
-          profile.username.toLowerCase().includes(term) ||
-          profile.full_name.toLowerCase().includes(term) ||
-          (profile.email && profile.email.toLowerCase().includes(term))
+    // 검색 필터링
+    if (searchInput.debouncedValue.trim()) {
+      filtered = searchInput.search(filtered, (profile) => 
+        `${profile.username} ${profile.full_name} ${profile.email || ''}`
       );
     }
 
@@ -137,15 +134,15 @@ export default function UsersPage() {
       filtered = filtered.filter((profile) => profile.role === selectedRole);
     }
 
-    setFilteredProfiles(filtered);
-  }, [searchTerm, selectedRole, profiles]);
+    return filtered;
+  }, [profiles, searchInput.debouncedValue, selectedRole, searchInput]);
 
   useEffect(() => {
     fetchProfiles();
   }, []);
 
   const handleReset = () => {
-    setSearchTerm("");
+    searchInput.clear();
     setSelectedRole("all");
   };
 
@@ -360,12 +357,10 @@ export default function UsersPage() {
         <CardContent className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="md:col-span-2 relative">
-              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
               <Input
-                placeholder="사용자명, 이름, 이메일로 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
+                placeholder="사용자명, 이름, 이메일 검색"
+                {...searchInput.inputProps}
+                className="pl-3"
               />
             </div>
 

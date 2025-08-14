@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { useKoreanInput } from "@/hooks/useKoreanInput";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
@@ -14,8 +15,8 @@ import {
 import StorageList from "@/components/storage/StorageList";
 import { StorageStatistics } from "@/components/storage/StorageStatistics";
 import { createClient } from "@/lib/supabase/client";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -31,7 +32,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  SearchIcon,
   RefreshCwIcon,
   Package,
   BarChart3,
@@ -47,15 +47,18 @@ import { toast } from "sonner";
 
 export default function StoragePage() {
   const [storages, setStorages] = useState<StorageReservation[]>([]);
-  const [filteredStorages, setFilteredStorages] = useState<
-    StorageReservation[]
-  >([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedReservationSite, setSelectedReservationSite] =
     useState<string>("all");
   const [exporting, setExporting] = useState(false);
+  
+  // 한글 검색 - 직접 구현
+  const searchInput = useKoreanInput({
+    delay: 200,
+    enableChoseongSearch: false,
+    onValueChange: () => setDateRange(undefined)
+  });
 
   // 날짜 범위 필터 - 기본값 없음
   const today = new Date();
@@ -71,7 +74,6 @@ export default function StoragePage() {
         .select("*")
         .order("created_at", { ascending: false });
       setStorages(data || []);
-      setFilteredStorages(data || []);
     } catch (error) {
       console.error("데이터 로딩 실패:", error);
     } finally {
@@ -80,27 +82,21 @@ export default function StoragePage() {
   };
 
   // 검색 및 필터링 로직
-  useEffect(() => {
+  const filteredStorages = useMemo(() => {
     let filtered = [...storages];
 
     // 검색 필터링
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter((storage) => {
-        return (
-          storage.customer_name?.toLowerCase().includes(searchLower) ||
-          storage.phone_number?.toLowerCase().includes(searchLower) ||
-          storage.reservation_id?.toLowerCase().includes(searchLower) ||
-          storage.items_description?.toLowerCase().includes(searchLower)
-        );
-      });
+    if (searchInput.debouncedValue.trim()) {
+      filtered = searchInput.search(filtered, (storage: StorageReservation) => 
+        `${storage.customer_name || ''} ${storage.phone_number || ''} ${storage.reservation_id || ''} ${storage.items_description || ''}`
+      );
     }
 
     // 날짜 범위 필터링 (맡기는 날짜 기준)
     if (dateRange?.from && dateRange?.to) {
       const fromStr = format(dateRange.from, "yyyy-MM-dd");
       const toStr = format(dateRange.to, "yyyy-MM-dd");
-      filtered = filtered.filter((storage) => {
+      filtered = filtered.filter((storage: StorageReservation) => {
         return (
           storage.drop_off_date >= fromStr && storage.drop_off_date <= toStr
         );
@@ -109,26 +105,20 @@ export default function StoragePage() {
 
     // 상태 필터링
     if (selectedStatus !== "all") {
-      filtered = filtered.filter((storage) => {
+      filtered = filtered.filter((storage: StorageReservation) => {
         return storage.status === selectedStatus;
       });
     }
 
     // 예약 사이트 필터링
     if (selectedReservationSite !== "all") {
-      filtered = filtered.filter((storage) => {
+      filtered = filtered.filter((storage: StorageReservation) => {
         return storage.reservation_site === selectedReservationSite;
       });
     }
 
-    setFilteredStorages(filtered);
-  }, [
-    storages,
-    searchTerm,
-    dateRange,
-    selectedStatus,
-    selectedReservationSite,
-  ]);
+    return filtered;
+  }, [storages, searchInput.debouncedValue, dateRange, selectedStatus, selectedReservationSite, searchInput]);
 
   // 필터링된 결과의 총 개수 계산
   const totalQuantity = filteredStorages.reduce(
@@ -137,7 +127,7 @@ export default function StoragePage() {
   );
 
   const handleReset = () => {
-    setSearchTerm("");
+    searchInput.clear();
     setDateRange(undefined);
     setSelectedStatus("all");
     setSelectedReservationSite("all");
@@ -153,8 +143,8 @@ export default function StoragePage() {
 
       // 검색 조건 생성
       const searchConditions = [];
-      if (searchTerm.trim()) {
-        searchConditions.push(`검색어: ${searchTerm}`);
+      if (searchInput.debouncedValue.trim()) {
+        searchConditions.push(`검색어: ${searchInput.debouncedValue}`);
       }
       if (dateRange?.from && dateRange?.to) {
         searchConditions.push(
@@ -208,18 +198,7 @@ export default function StoragePage() {
     // 상태 필터를 제외한 다른 필터들만 적용된 결과
     let filtered = [...storages];
 
-    // 텍스트 검색 필터링
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter((storage) => {
-        return (
-          storage.customer_name?.toLowerCase().includes(searchLower) ||
-          storage.phone_number?.toLowerCase().includes(searchLower) ||
-          storage.reservation_id?.toLowerCase().includes(searchLower) ||
-          storage.items_description?.toLowerCase().includes(searchLower)
-        );
-      });
-    }
+    // 텍스트 검색은 이미 koreanSearch에서 처리됨
 
     // 날짜 범위 필터링
     if (dateRange?.from && dateRange?.to) {
@@ -300,17 +279,12 @@ export default function StoragePage() {
             {/* 검색 및 필터 */}
             <div className="mb-6 bg-white p-2 sm:p-4 rounded-lg border border-gray-200 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                {/* 이름/물품명 검색 */}
+                {/* 한글 검색 입력 */}
                 <div className="relative">
-                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
                   <Input
-                    placeholder="고객명, 전화번호, 예약번호, 물품명으로 검색..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setDateRange(undefined);
-                    }}
-                    className="text-sm pl-9"
+                    placeholder="고객명, 전화번호, 예약번호, 물품명 검색"
+                    {...searchInput.inputProps}
+                    className="pl-3"
                   />
                 </div>
 
@@ -442,7 +416,7 @@ export default function StoragePage() {
             <StorageList
               storages={filteredStorages}
               onStorageUpdated={fetchStorages}
-              searchTerm={searchTerm}
+              searchTerm={searchInput.debouncedValue}
             />
           </div>
         </TabsContent>
