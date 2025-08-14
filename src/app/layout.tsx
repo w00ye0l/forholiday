@@ -24,6 +24,9 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "FORHOLIDAY",
   description: "FORHOLIDAY는 휴가를 위한 장비 대여 플랫폼입니다.",
+  icons: {
+    icon: "/icons/favicon.ico",
+  },
 };
 
 export default async function RootLayout({
