@@ -101,7 +101,7 @@ const formSchema = z.object({
   data_transmission: z.enum(["필요없음", "필요"] as const).default("필요없음"),
   sd_option: z.enum(["대여", "구매", "구매+대여"] as const).optional(),
   reservation_site: z.enum(reservationSites),
-  order_number: z.string().min(1, "주문번호는 필수입니다"),
+  order_number: z.string().optional(),
   description: z.string().optional(),
 });
 
@@ -113,18 +113,23 @@ interface RentalFormProps {
   isSubmitting?: boolean;
   showSubmitButton?: boolean;
   formId?: string;
-  onFormReady?: (formId: string, triggerValidation: () => Promise<boolean>, getFormData: () => any, getContactImage: () => File | null) => void;
+  onFormReady?: (
+    formId: string,
+    triggerValidation: () => Promise<boolean>,
+    getFormData: () => any,
+    getContactImage: () => File | null
+  ) => void;
 }
 
 // 모든 라벨 매핑은 이제 @/types/rental에서 import됨
 
-export function RentalForm({ 
-  onSubmit, 
-  onDataChange, 
-  isSubmitting, 
-  showSubmitButton = true, 
+export function RentalForm({
+  onSubmit,
+  onDataChange,
+  isSubmitting,
+  showSubmitButton = true,
   formId,
-  onFormReady 
+  onFormReady,
 }: RentalFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -196,7 +201,7 @@ export function RentalForm({
     if (onDataChange) {
       onDataChange({
         ...data,
-        contactImage: contactImage
+        contactImage: contactImage,
       });
       return;
     }
