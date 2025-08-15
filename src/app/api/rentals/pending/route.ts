@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     
     if (userError || !user) {
       return NextResponse.json(
-        { error: "인증이 필요합니다." },
+        { success: false, error: "인증이 필요합니다." },
         { status: 401 }
       );
     }
@@ -47,13 +47,13 @@ export async function GET(req: Request) {
 
     if (!keyJson) {
       return NextResponse.json(
-        { error: "서비스 계정 키 환경변수가 없습니다." },
+        { success: false, error: "서비스 계정 키 환경변수가 없습니다." },
         { status: 500 }
       );
     }
     if (!spreadsheetId || !sheetName) {
       return NextResponse.json(
-        { error: "시트 ID 또는 시트 이름 환경변수가 없습니다." },
+        { success: false, error: "시트 ID 또는 시트 이름 환경변수가 없습니다." },
         { status: 500 }
       );
     }
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
       }
     } catch (parseErr) {
       return NextResponse.json(
-        { error: "서비스 계정 JSON 파싱 실패", detail: String(parseErr) },
+        { success: false, error: "서비스 계정 JSON 파싱 실패", detail: String(parseErr) },
         { status: 500 }
       );
     }
@@ -91,7 +91,7 @@ export async function GET(req: Request) {
       total = totalRows - 1; // 헤더 제외
     } catch (countErr) {
       return NextResponse.json(
-        { error: "시트 row 카운트 실패", detail: String(countErr) },
+        { success: false, error: "시트 row 카운트 실패", detail: String(countErr) },
         { status: 500 }
       );
     }
@@ -147,7 +147,7 @@ export async function GET(req: Request) {
       gCol = gRes.data.values || [];
     } catch (colErr) {
       return NextResponse.json(
-        { error: "날짜/시간 열 읽기 실패", detail: String(colErr) },
+        { success: false, error: "날짜/시간 열 읽기 실패", detail: String(colErr) },
         { status: 500 }
       );
     }
@@ -189,7 +189,7 @@ export async function GET(req: Request) {
       }
     } catch (rowErr) {
       return NextResponse.json(
-        { error: "데이터 fetch 실패", detail: String(rowErr) },
+        { success: false, error: "데이터 fetch 실패", detail: String(rowErr) },
         { status: 500 }
       );
     }
@@ -216,11 +216,16 @@ export async function GET(req: Request) {
       data.reverse();
     }
 
-    return NextResponse.json({ data, total });
+    return NextResponse.json({ 
+      success: true,
+      data, 
+      total 
+    });
   } catch (e) {
     console.error("Google Sheets API Error:", e);
     return NextResponse.json(
       {
+        success: false,
         error: "구글 시트 데이터 불러오기 실패",
         detail: String(e),
       },
