@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useState, memo } from "react";
+import { useRef, useMemo, useState, memo, useEffect } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { TimeSlot } from "@/lib/inventory-state";
@@ -53,6 +53,7 @@ export const TimelineView = function TimelineView({
   const dateColumnRef = useRef<HTMLDivElement>(null);
   const [loadingPrevious, setLoadingPrevious] = useState(false);
   const [loadingNext, setLoadingNext] = useState(false);
+  const [scrollbarWidth, setScrollbarWidth] = useState(0);
 
   // 예약 상세 모달 상태
   const [selectedReservation, setSelectedReservation] =
@@ -64,6 +65,29 @@ export const TimelineView = function TimelineView({
     setSelectedReservation(reservation);
     setIsDialogOpen(true);
   };
+
+  // 기기 태그를 오름차순으로 정렬
+  const sortedDevices = useMemo(() => {
+    return [...devices].sort((a, b) => a.localeCompare(b));
+  }, [devices]);
+
+  // 스크롤바 너비 계산
+  useEffect(() => {
+    const calculateScrollbarWidth = () => {
+      if (timelineRef.current) {
+        const element = timelineRef.current;
+        const scrollWidth = element.offsetWidth - element.clientWidth;
+        setScrollbarWidth(scrollWidth);
+      }
+    };
+
+    calculateScrollbarWidth();
+    window.addEventListener('resize', calculateScrollbarWidth);
+    
+    return () => {
+      window.removeEventListener('resize', calculateScrollbarWidth);
+    };
+  }, [timeSlots, devices]);
 
   // 성능 최적화: 예약 블록 계산 (메모이제이션)
   const reservationBlocks = useMemo(() => {
@@ -77,7 +101,7 @@ export const TimelineView = function TimelineView({
     });
 
     // 성능 최적화: for 루프 사용
-    for (const deviceTag of devices) {
+    for (const deviceTag of sortedDevices) {
       const deviceBlocks: ReservationBlock[] = [];
       const deviceReservations: RentalReservation[] = [];
       
@@ -115,7 +139,7 @@ export const TimelineView = function TimelineView({
     }
 
     return blocks;
-  }, [devices, timeSlots]);
+  }, [sortedDevices, timeSlots]);
 
   // 예약 데이터 통계
   const totalReservations = timeSlots.reduce(
@@ -148,22 +172,6 @@ export const TimelineView = function TimelineView({
     }
   };
 
-  // 특정 슬롯 인덱스에서 시작하는 예약 블록 찾기
-  const findReservationBlock = (
-    deviceTag: string,
-    slotIndex: number
-  ): ReservationBlock | null => {
-    const deviceBlocks = reservationBlocks.get(deviceTag) || [];
-    return deviceBlocks.find((block) => block.startIndex === slotIndex) || null;
-  };
-
-  // 특정 슬롯이 예약 블록의 중간 부분인지 확인
-  const isBlockMiddle = (deviceTag: string, slotIndex: number): boolean => {
-    const deviceBlocks = reservationBlocks.get(deviceTag) || [];
-    return deviceBlocks.some(
-      (block) => slotIndex > block.startIndex && slotIndex <= block.endIndex
-    );
-  };
 
   if (loading) {
     return (
@@ -184,7 +192,7 @@ export const TimelineView = function TimelineView({
     );
   }
 
-  if (devices.length === 0) {
+  if (sortedDevices.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center text-gray-600">
@@ -204,7 +212,7 @@ export const TimelineView = function TimelineView({
               선택한 기간에 예약이 없습니다
             </div>
             <div className="text-sm mt-2">
-              기기 {devices.length}개가 모두 사용 가능한 상태입니다
+              기기 {sortedDevices.length}개가 모두 사용 가능한 상태입니다
             </div>
             <div className="text-xs text-gray-500 mt-1">
               날짜 범위: {format(startDate, "yyyy-MM-dd", { locale: ko })} ~{" "}
@@ -234,206 +242,196 @@ export const TimelineView = function TimelineView({
 
   return (
     <>
-      <div className="bg-white rounded-lg border border-gray-200 w-full h-full overflow-hidden">
-        {/* 고정된 헤더 행 */}
-        <div className="flex bg-gray-50 border-b border-gray-200">
-          {/* 날짜 헤더 - 완전 고정 */}
-          <div className="w-20 h-6 flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center font-medium text-xs">
-            날짜
-          </div>
-          {/* 기기 헤더 - 완전 고정 */}
-          <div className="flex-1 h-6 bg-gray-50 overflow-hidden relative">
-            <div
-              ref={headerRowRef}
-              className="flex h-6 overflow-x-scroll scrollbar-hidden"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-            >
-              {devices.map((deviceTag) => (
-                <div
-                  key={deviceTag}
-                  className="w-16 sm:w-20 border-r border-gray-200 px-1 py-0.5 bg-gray-50 flex-shrink-0"
-                >
-                  <div className="text-xs font-medium truncate">
-                    {deviceTag}
-                  </div>
+      <div className="bg-white rounded-lg border border-gray-200 w-full h-full relative flex flex-col">
+        {/* 상단 좌측 코너 고정 셀 */}
+        <div className="absolute top-0 left-0 w-20 h-8 bg-gray-100 border-r border-b border-gray-300 flex items-center justify-center font-medium text-xs z-30">
+          날짜
+        </div>
+
+        {/* 상단 헤더 행 - 가로 스크롤 가능, 세로 고정 */}
+        <div 
+          className="absolute top-0 left-20 h-8 bg-gray-50 border-b border-gray-300 overflow-hidden z-20"
+          style={{ 
+            right: `${scrollbarWidth}px` 
+          }}
+        >
+          <div
+            ref={headerRowRef}
+            className="flex h-full overflow-x-auto overflow-y-hidden scrollbar-hidden border-r border-gray-200"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {sortedDevices.map((deviceTag, index) => (
+              <div
+                key={deviceTag}
+                className={`w-16 sm:w-20 px-1 py-1 bg-gray-50 flex-shrink-0 flex items-center justify-center ${
+                  index < sortedDevices.length - 1 ? 'border-r border-gray-200' : ''
+                }`}
+              >
+                <div className="text-xs font-medium truncate">
+                  {deviceTag}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* 스크롤 가능한 컨텐츠 영역 */}
-        <div className="flex flex-1 min-h-0">
-          {/* 날짜 컬럼 - 완전 고정 */}
-          <div className="w-20 flex-shrink-0 border-r border-gray-200 bg-white overflow-hidden">
-            <div
-              ref={dateColumnRef}
-              className="h-full overflow-y-scroll scrollbar-hidden"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        {/* 좌측 날짜 컬럼 - 세로 스크롤 가능, 가로 고정 */}
+        <div 
+          className="absolute top-8 left-0 w-20 bg-white border-r border-gray-300 overflow-hidden z-20"
+          style={{ 
+            bottom: `${scrollbarWidth}px` 
+          }}
+        >
+          <div
+            ref={dateColumnRef}
+            className="h-full overflow-y-auto overflow-x-hidden scrollbar-hidden"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {/* 이전 데이터 로드 버튼 */}
+            <Button
+              variant="ghost"
+              className="w-full h-6 bg-green-200 border-b border-gray-200 flex items-center justify-center gap-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-green-300"
+              onClick={handleLoadPrevious}
+              disabled={loadingPrevious || loading}
             >
-              {/* 이전 데이터 로드 버튼 */}
-              <Button
-                variant="ghost"
-                className="w-full h-6 bg-green-200 border-b border-gray-200 flex items-center justify-center gap-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-green-300"
-                onClick={handleLoadPrevious}
-                disabled={loadingPrevious || loading}
-              >
-                {loadingPrevious ? (
-                  <div className="animate-spin rounded-full h-2 w-2 border-b border-gray-600"></div>
-                ) : (
-                  <>
-                    <ChevronUp className="w-3 h-3" />
-                    <span className="hidden sm:inline text-xs">이전</span>
-                  </>
-                )}
-              </Button>
+              {loadingPrevious ? (
+                <div className="animate-spin rounded-full h-2 w-2 border-b border-gray-600"></div>
+              ) : (
+                <>
+                  <ChevronUp className="w-3 h-3" />
+                  <span className="hidden sm:inline text-xs">이전</span>
+                </>
+              )}
+            </Button>
 
-              {/* 날짜 목록 */}
-              {timeSlots.map((slot) => {
-                const date = new Date(slot.date);
-                const dayOfWeek = date.getDay();
-                const isSaturday = dayOfWeek === 6;
-                const isSunday = dayOfWeek === 0;
+            {/* 날짜 목록 */}
+            {timeSlots.map((slot) => {
+              const date = new Date(slot.date);
+              const dayOfWeek = date.getDay();
+              const isSaturday = dayOfWeek === 6;
+              const isSunday = dayOfWeek === 0;
 
-                return (
-                  <div
-                    key={slot.date}
-                    className="h-6 border-b border-gray-200 flex items-center justify-center text-xs font-medium bg-gray-50"
+              return (
+                <div
+                  key={slot.date}
+                  className="h-6 border-b border-gray-200 flex items-center justify-center text-xs font-medium bg-gray-50"
+                >
+                  <span
+                    className={
+                      isSaturday
+                        ? "text-blue-600"
+                        : isSunday
+                        ? "text-red-600"
+                        : "text-gray-900"
+                    }
                   >
-                    <span
-                      className={
-                        isSaturday
-                          ? "text-blue-600"
-                          : isSunday
-                          ? "text-red-600"
-                          : "text-gray-900"
-                      }
-                    >
-                      {format(date, "MM/dd", { locale: ko })}
-                    </span>
-                    <span
-                      className={`ml-1 ${
-                        isSaturday
-                          ? "text-blue-600"
-                          : isSunday
-                          ? "text-red-600"
-                          : "text-gray-600"
-                      }`}
-                    >
-                      ({format(date, "E", { locale: ko })})
-                    </span>
-                  </div>
-                );
-              })}
+                    {format(date, "MM/dd", { locale: ko })}
+                  </span>
+                  <span
+                    className={`ml-1 ${
+                      isSaturday
+                        ? "text-blue-600"
+                        : isSunday
+                        ? "text-red-600"
+                        : "text-gray-600"
+                    }`}
+                  >
+                    ({format(date, "E", { locale: ko })})
+                  </span>
+                </div>
+              );
+            })}
 
-              {/* 다음 데이터 로드 버튼 */}
-              <Button
-                variant="ghost"
-                className="w-full h-6 bg-green-200 border-b border-gray-200 flex items-center justify-center gap-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-green-300"
-                onClick={handleLoadNext}
-                disabled={loadingNext || loading}
-              >
-                {loadingNext ? (
-                  <div className="animate-spin rounded-full h-2 w-2 border-b border-gray-600"></div>
-                ) : (
-                  <>
-                    <span className="hidden sm:inline text-xs">다음</span>
-                    <ChevronDown className="w-3 h-3" />
-                  </>
-                )}
-              </Button>
-            </div>
+            {/* 다음 데이터 로드 버튼 */}
+            <Button
+              variant="ghost"
+              className="w-full h-6 bg-green-200 border-b border-gray-200 flex items-center justify-center gap-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-green-300"
+              onClick={handleLoadNext}
+              disabled={loadingNext || loading}
+            >
+              {loadingNext ? (
+                <div className="animate-spin rounded-full h-2 w-2 border-b border-gray-600"></div>
+              ) : (
+                <>
+                  <span className="hidden sm:inline text-xs">다음</span>
+                  <ChevronDown className="w-3 h-3" />
+                </>
+              )}
+            </Button>
           </div>
+        </div>
 
-          {/* 타임라인 컨텐츠 영역 - 스크롤 가능 */}
-          <div className="flex-1 overflow-hidden">
-            <div
-              ref={timelineRef}
-              className="w-full h-full overflow-auto"
-              onScroll={(e) => {
-                const target = e.currentTarget;
+        {/* 메인 타임라인 컨텐츠 영역 - 스크롤 가능 */}
+        <div className="absolute top-8 left-20 right-0 bottom-0 overflow-hidden">
+          <div
+            ref={timelineRef}
+            className="w-full h-full overflow-auto"
+            onScroll={(e) => {
+              const target = e.currentTarget;
 
-                // 가로 스크롤은 헤더와 동기화
-                if (headerRowRef.current) {
-                  headerRowRef.current.scrollLeft = target.scrollLeft;
-                }
+              // 가로 스크롤은 헤더와 동기화
+              if (headerRowRef.current) {
+                headerRowRef.current.scrollLeft = target.scrollLeft;
+              }
 
-                // 세로 스크롤은 날짜 컬럼과 동기화
-                if (dateColumnRef.current) {
-                  dateColumnRef.current.scrollTop = target.scrollTop;
-                }
-              }}
-            >
-              <div className="flex min-w-fit">
-                {/* 기기별 열 */}
-                {devices.map((deviceTag) => (
-                  <div
-                    key={deviceTag}
-                    className="w-16 sm:w-20 border-r border-gray-200 relative flex-shrink-0"
-                  >
-                    {/* 이전 데이터 로드 버튼 공간 */}
-                    <div className="h-6 border-b border-gray-200" />
+              // 세로 스크롤은 날짜 컬럼과 동기화
+              if (dateColumnRef.current) {
+                dateColumnRef.current.scrollTop = target.scrollTop;
+              }
+            }}
+          >
+            <div className="flex min-w-fit border-r border-gray-200">
+              {/* 기기별 열 */}
+              {sortedDevices.map((deviceTag, index) => (
+                <div
+                  key={deviceTag}
+                  className={`w-16 sm:w-20 relative flex-shrink-0 ${
+                    index < sortedDevices.length - 1 ? 'border-r border-gray-200' : ''
+                  }`}
+                >
+                  {/* 이전 데이터 로드 버튼 공간 */}
+                  <div className="h-6 border-b border-gray-200" />
 
-                    {/* 날짜별 예약 상태 */}
-                    {timeSlots.map((slot, slotIndex) => {
-                      const reservationBlock = findReservationBlock(
-                        deviceTag,
-                        slotIndex
-                      );
-                      const isMiddle = isBlockMiddle(deviceTag, slotIndex);
+                  {/* 날짜별 예약 상태 */}
+                  {timeSlots.map((slot) => (
+                    <div
+                      key={`${slot.date}-${deviceTag}`}
+                      className="h-6 border-b border-gray-200 bg-white"
+                    />
+                  ))}
 
-                      // 중간 부분이면 빈 공간으로 렌더링 (블록이 차지함)
-                      if (isMiddle) {
-                        return (
-                          <div
-                            key={`${slot.date}-${deviceTag}`}
-                            className="h-6 border-b border-gray-200"
-                          />
-                        );
-                      }
+                  {/* 예약 블록들을 absolute로 오버레이 */}
+                  {(reservationBlocks.get(deviceTag) || []).map((block) => {
+                    const { reservation, duration, startIndex } = block;
+                    const blockHeight = duration * 24; // 24px per slot
 
-                      // 블록의 시작 부분
-                      if (reservationBlock) {
-                        const { reservation, duration } = reservationBlock;
-                        const blockHeight = duration * 24; // 24px per slot
-
-                        return (
-                          <div
-                            key={`${slot.date}-${deviceTag}-block`}
-                            className={`absolute w-full px-0.5 py-0.5 z-10 border-2 border-gray-400 rounded-sm shadow-sm cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 ${
-                              STATUS_MAP[reservation.status]?.color ||
-                              "bg-blue-50"
-                            }`}
-                            style={{
-                              height: `${blockHeight}px`,
-                              top: `${24 + slotIndex * 24}px`, // 로드 버튼 높이(24px) + 슬롯 위치
-                            }}
-                            onClick={() => handleReservationClick(reservation)}
-                            title={`${reservation.renter_name} - 클릭하여 상세정보 보기`}
-                          >
-                            <div className="flex items-center justify-center h-full text-center">
-                              <div className="text-xs font-medium truncate">
-                                {reservation.renter_name}
-                              </div>
-                            </div>
+                    return (
+                      <div
+                        key={`${reservation.reservation_id}-${deviceTag}-block`}
+                        className={`absolute w-full px-0.5 py-0.5 z-10 border-2 border-gray-400 rounded-sm shadow-sm cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 ${
+                          STATUS_MAP[reservation.status]?.color ||
+                          "bg-blue-50"
+                        }`}
+                        style={{
+                          height: `${blockHeight}px`,
+                          top: `${24 + startIndex * 24}px`, // 로드 버튼 높이(24px) + 슬롯 위치
+                        }}
+                        onClick={() => handleReservationClick(reservation)}
+                        title={`${reservation.renter_name} - 클릭하여 상세정보 보기`}
+                      >
+                        <div className="flex items-center justify-center h-full text-center">
+                          <div className="text-xs font-medium truncate">
+                            {reservation.renter_name}
                           </div>
-                        );
-                      }
+                        </div>
+                      </div>
+                    );
+                  })}
 
-                      // 예약이 없는 빈 슬롯
-                      return (
-                        <div
-                          key={`${slot.date}-${deviceTag}`}
-                          className="h-6 border-b border-gray-200 bg-white"
-                        />
-                      );
-                    })}
-
-                    {/* 다음 데이터 로드 버튼 공간 */}
-                    <div className="h-6 border-b border-gray-200" />
-                  </div>
-                ))}
-              </div>
+                  {/* 다음 데이터 로드 버튼 공간 */}
+                  <div className="h-6 border-b border-gray-200" />
+                </div>
+              ))}
             </div>
           </div>
         </div>

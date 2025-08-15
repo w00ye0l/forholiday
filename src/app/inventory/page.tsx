@@ -9,8 +9,6 @@ import { useInventoryStore } from "@/lib/inventory-state";
 // import { shallow } from "zustand/shallow"; // 제거
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, Database, Activity } from "lucide-react";
-import { useSidebar } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
 
 // 컴포넌트 지연 로딩
 const TimelineView = lazy(() =>
@@ -43,19 +41,6 @@ const InventoryDashboard = memo(() => {
 
   const { devices, timeSlots, startDate, endDate } = useInventoryStore();
 
-  const { state } = useSidebar();
-
-  // PC 뷰에서 사이드바 상태에 따른 너비 계산
-  const getContainerWidth = useCallback(() => {
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      return "w-full"; // 모바일에서는 전체 너비
-    }
-    if (state === "expanded") {
-      return "w-[calc(100vw-19rem)]"; // 사이드바가 열려있을 때 (사이드바 16rem + 패딩 2rem + 스크롤바 1rem)
-    } else {
-      return "w-[calc(100vw-9rem)]"; // 사이드바가 닫혀있을 때 (사이드바 5rem + 패딩 2rem + 스크롤바 2rem)
-    }
-  }, [state]);
 
   // 스킵 링크 추가
   useEffect(() => {
@@ -144,22 +129,18 @@ const InventoryDashboard = memo(() => {
       </div>
 
       {/* 타임라인 뷰 */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={cn("overflow-auto", getContainerWidth())}>
-          <div className="min-w-fit md:w-full">
-            <Suspense fallback={<InventoryLoadingSkeleton />}>
-              <TimelineView
-                devices={devices}
-                timeSlots={timeSlots}
-                startDate={startDate}
-                endDate={endDate}
-                loading={loading}
-                onLoadMore={handleLoadMore}
-                daysToShow={DAYS_TO_SHOW}
-              />
-            </Suspense>
-          </div>
-        </div>
+      <div className="flex-1 min-h-0">
+        <Suspense fallback={<InventoryLoadingSkeleton />}>
+          <TimelineView
+            devices={devices}
+            timeSlots={timeSlots}
+            startDate={startDate}
+            endDate={endDate}
+            loading={loading}
+            onLoadMore={handleLoadMore}
+            daysToShow={DAYS_TO_SHOW}
+          />
+        </Suspense>
       </div>
     </main>
   );
